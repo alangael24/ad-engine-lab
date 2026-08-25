@@ -9,7 +9,7 @@
       .replaceAll("AvatarHype", "Ad Engine Lab");
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
-  const brandLogo = "assets/ad-engine-logo.png";
+  const brandLogo = "assets/creative-rush-logo.svg";
   const brandTheme = "assets/brand-theme.css";
 
   function setText(element, value) {
@@ -873,7 +873,7 @@
       const logo = element.querySelector("img.ae-logo");
       if (!logo || logo.getAttribute("src") !== brandLogo) {
         element.innerHTML =
-          `<img class="ae-logo" src="${brandLogo}" alt="Ad Engine Lab">`;
+          `<img class="ae-logo" src="${brandLogo}" alt="CreativeRush AI">`;
       }
     }
 

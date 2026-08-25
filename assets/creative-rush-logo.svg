@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">CreativeRush AI</title>
+  <desc id="desc">Monograma CR en degradado morado y rosa con una flecha ascendente y un destello.</desc>
+  <defs>
+    <linearGradient id="brand" x1="140" y1="820" x2="890" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b46ff"/>
+      <stop offset="0.52" stop-color="#cf2bd2"/>
+      <stop offset="1" stop-color="#ff1493"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="18" flood-color="#000" flood-opacity=".52"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="180" fill="#050507"/>
+  <path d="M177 554c0-205 140-350 337-350 108 0 205 39 274 111l-121 116c-41-42-91-64-149-64-96 0-168 77-168 187 0 111 72 188 168 188 59 0 110-22 151-66l122 114c-69 74-168 115-279 115-196 0-335-145-335-351Z" fill="url(#brand)" filter="url(#shadow)"/>
+  <path d="M505 274h214c128 0 215 69 215 183 0 80-43 140-112 168l145 241H774L654 653v213H505V274Zm149 127v137h58c48 0 75-24 75-69 0-44-27-68-75-68h-58Z" fill="url(#brand)" filter="url(#shadow)"/>
+  <path d="M201 754c239-19 444-113 602-274l-71-40 168-48-3 175-57-62c-168 193-387 310-639 333V754Z" fill="#050507"/>
+  <path d="M205 786c236-19 451-113 621-282" fill="none" stroke="url(#brand)" stroke-width="24" stroke-linecap="round"/>
+  <path d="m853 468 83-12-45 71Z" fill="#ff1493"/>
+  <path d="M850 126c13 67 31 85 98 98-67 13-85 31-98 98-13-67-31-85-98-98 67-13 85-31 98-98Z" fill="#fff"/>
+</svg>
