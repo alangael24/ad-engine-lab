@@ -48,7 +48,7 @@ async function openCampus(nextSession) {
     if (balanceResult.error) throw balanceResult.error;
 
     $("#student-email").textContent = session.user.email || "";
-    $("#plan-name").textContent = planNames[access.plan] || "Ad Engine Lab";
+    $("#plan-name").textContent = planNames[access.plan] || "CreativeRush AI";
     $("#video-credits").textContent = balanceResult.data.video_credits;
     $("#image-credits").textContent = balanceResult.data.image_credits;
     gate.hidden = true;

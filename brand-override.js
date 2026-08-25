@@ -3,10 +3,15 @@
 
   const replaceBrand = (value) =>
     value
-      .replaceAll("AvatarHype Lab", "Ad Engine Lab")
-      .replaceAll("AvatarHype Ecom", "Ad Engine Lab")
-      .replaceAll("Avatar Hype Academy", "Ad Engine Lab Academy")
-      .replaceAll("AvatarHype", "Ad Engine Lab");
+      .replaceAll("AvatarHype Lab", "CreativeRush AI")
+      .replaceAll("AvatarHype Ecom", "CreativeRush AI")
+      .replaceAll("Avatar Hype Academy", "CreativeRush AI Academy")
+      .replaceAll("AvatarHype", "CreativeRush AI")
+      .replaceAll("Avatar Hype", "CreativeRush AI")
+      .replaceAll("Ad Engine Lab", "CreativeRush AI");
+
+  const hasLegacyBrand = (value) =>
+    /AvatarHype|Avatar Hype|Ad Engine Lab/i.test(value || "");
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
   const brandLogo = "assets/creative-rush-logo.svg";
@@ -519,7 +524,7 @@
     );
     setHtml(
       section.querySelector(".r4-precheckout"),
-      'Al pulsar vas al checkout seguro de Ad Engine Lab en Stripe. Después del pago regresarás a esta web y recibirás el enlace de acceso en el correo que utilizaste. Si ya compraste, puedes entrar desde <a href="/campus/">Mi campus</a>.',
+      'Al pulsar vas al checkout seguro de CreativeRush AI en Stripe. Después del pago regresarás a esta web y recibirás el enlace de acceso en el correo que utilizaste. Si ya compraste, puedes entrar desde <a href="/campus/">Mi campus</a>.',
     );
     setText(
       section.querySelector(".r4-clon-bump"),
@@ -822,7 +827,7 @@
       const subtitle = footer.querySelector(".brand .sub");
       const meta = footer.querySelector(".footer-meta");
       const metaHtml =
-        '© 2026 Ad Engine Lab · Campus + curso + herramienta de anuncios con IA <span aria-hidden="true">·</span> <a href="/campus/">Mi campus</a>';
+        '© 2026 CreativeRush AI · Campus + curso + herramienta de anuncios con IA <span aria-hidden="true">·</span> <a href="/campus/">Mi campus</a>';
 
       if (subtitle && subtitle.textContent !== "campus + curso + herramienta") {
         subtitle.textContent = "campus + curso + herramienta";
@@ -861,7 +866,7 @@
   }
 
   function updateTextNode(node) {
-    if (!node.nodeValue || !node.nodeValue.includes("AvatarHype")) return;
+    if (!hasLegacyBrand(node.nodeValue)) return;
     if (node.parentElement && skippedTags.has(node.parentElement.tagName)) return;
     node.nodeValue = replaceBrand(node.nodeValue);
   }
@@ -879,7 +884,7 @@
 
     for (const attribute of ["alt", "aria-label", "title"]) {
       const value = element.getAttribute(attribute);
-      if (value && value.includes("AvatarHype")) {
+      if (hasLegacyBrand(value)) {
         element.setAttribute(attribute, replaceBrand(value));
       }
     }
@@ -933,16 +938,16 @@
   }
 
   function updateMetadata() {
-    document.title = "Ad Engine Lab — Curso + herramienta para crear anuncios con IA";
+    document.title = "CreativeRush AI — Curso + herramienta para crear anuncios con IA";
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) themeColor.setAttribute("content", "#070709");
     const metadata = {
       'meta[name="description"]': "Aprende a crear tu primer anuncio con IA dentro de un campus privado. Curso de 6 módulos, herramienta y saldo inicial desde 25 clips y 50 imágenes.",
       'meta[property="og:title"]': "Vende más. Gasta menos. Crea anuncios con IA.",
       'meta[property="og:description"]': "Una cuenta para aprender el método, producir las escenas y terminar tu primer anuncio listo para probar.",
-      'meta[property="og:url"]': "https://ad-engine-lab.pages.dev/",
-      'meta[property="og:site_name"]': "Ad Engine Lab",
-      'meta[name="twitter:title"]': "Ad Engine Lab — Curso + herramienta de anuncios con IA",
+      'meta[property="og:url"]': "https://creativerushai.com/",
+      'meta[property="og:site_name"]': "CreativeRush AI",
+      'meta[name="twitter:title"]': "CreativeRush AI — Curso + herramienta de anuncios con IA",
       'meta[name="twitter:description"]': "Campus privado, curso práctico, herramienta y saldo inicial de generación.",
     };
     for (const [selector, content] of Object.entries(metadata)) {
@@ -950,7 +955,7 @@
       if (meta) meta.setAttribute("content", content);
     }
     document.querySelectorAll('link[rel="canonical"], link[rel="alternate"]').forEach((link) => {
-      if (link.rel === "canonical") link.setAttribute("href", "https://ad-engine-lab.pages.dev/");
+      if (link.rel === "canonical") link.setAttribute("href", "https://creativerushai.com/");
       else link.remove();
     });
     document.querySelectorAll('script[type="application/ld+json"], script[data-legacy-schema="true"]').forEach((script) => script.remove());
@@ -961,9 +966,9 @@
       schema.textContent = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Product",
-        name: "Ad Engine Lab",
+        name: "CreativeRush AI",
         description: "Campus, curso práctico y herramienta para crear anuncios con IA.",
-        brand: { "@type": "Brand", name: "Ad Engine Lab" },
+        brand: { "@type": "Brand", name: "CreativeRush AI" },
         offers: {
           "@type": "AggregateOffer",
           lowPrice: "1499",

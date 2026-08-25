@@ -42,7 +42,7 @@ async function grantPurchase(supabase, event, session, plan, paymentLinkId, env)
   if (!email) throw new Error("La sesión pagada no contiene un correo de cliente.");
 
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || null;
-  const appUrl = String(env.APP_URL || "https://ad-engine-lab.pages.dev").replace(/\/$/, "");
+  const appUrl = String(env.APP_URL || "https://creativerushai.com").replace(/\/$/, "");
   await ensureAccount(supabase, email, `${appUrl}/campus/`);
 
   const { data, error } = await supabase.rpc("apply_stripe_purchase", {

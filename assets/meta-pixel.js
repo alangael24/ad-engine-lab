@@ -25,7 +25,7 @@ document.addEventListener("click", (event) => {
 
   const isEssential = checkout.href.includes("8x2fZh5B591h4y4eFObwk01");
   window.fbq("track", "InitiateCheckout", {
-    content_name: isEssential ? "Ad Engine Lab — Esencial" : "Ad Engine Lab — Pro",
+    content_name: isEssential ? "CreativeRush AI — Esencial" : "CreativeRush AI — Pro",
     currency: "MXN",
     value: isEssential ? 1499 : 1999,
   });

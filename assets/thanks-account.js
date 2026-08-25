@@ -7,7 +7,7 @@ const courseButton = document.querySelector("#open-course");
 const planName = document.querySelector("#plan-name");
 const planIncludes = document.querySelector("#plan-includes");
 
-const planNames = { esencial: "Ad Engine Lab — Esencial", pro: "Ad Engine Lab — Pro" };
+const planNames = { esencial: "CreativeRush AI — Esencial", pro: "CreativeRush AI — Pro" };
 const planValues = { esencial: 1499, pro: 1999 };
 
 function trackPurchase(plan) {
