@@ -1,0 +1,2 @@
+file '/Users/alan/avatarhype-local/videos/edit/hook_ad_segments/01_hook.mp4'
+file '/Users/alan/avatarhype-local/videos/edit/hook_ad_segments/02_ad_remainder.mp4'

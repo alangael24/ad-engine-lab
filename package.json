@@ -1,0 +1,20 @@
+{
+  "name": "ad-engine-lab-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-static.mjs",
+    "predev": "npm run build",
+    "dev": "wrangler pages dev dist",
+    "check:functions": "wrangler pages functions build --outdir .wrangler/functions-build",
+    "predeploy": "npm run build",
+    "deploy": "wrangler pages deploy dist --project-name ad-engine-lab"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.4",
+    "stripe": "22.5.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#070709" />
+    <title>Pago completado — Ad Engine Lab</title>
+    <meta
+      name="description"
+      content="Tu pago de Ad Engine Lab fue completado en Stripe. Continúa con los pasos de acceso."
+    />
+    <link rel="icon" href="../assets/favicon.ico" sizes="any" />
+    <style>
+      :root {
+        --ink: #140d19;
+        --muted: #6f6577;
+        --paper: #f8f4fa;
+        --card: #fffaff;
+        --purple: #983bff;
+        --pink: #ff1794;
+        --line: rgba(20, 13, 25, 0.15);
+        --gradient: linear-gradient(120deg, #983bff 0%, #d222db 48%, #ff1794 100%);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 14% 0%, rgba(152, 59, 255, 0.17), transparent 34%),
+          radial-gradient(circle at 90% 90%, rgba(255, 23, 148, 0.13), transparent 36%),
+          var(--paper);
+      }
+
+      .topbar {
+        min-height: 78px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px clamp(20px, 5vw, 72px);
+        border-bottom: 1px solid var(--line);
+        background: rgba(248, 244, 250, 0.88);
+        backdrop-filter: blur(18px);
+      }
+
+      .logo {
+        width: 174px;
+        height: 58px;
+        display: block;
+        object-fit: cover;
+        border: 1.5px solid #070709;
+        border-radius: 10px;
+        background: #000;
+        box-shadow: 3px 3px 0 rgba(152, 59, 255, 0.48);
+      }
+
+      .secure {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: clamp(48px, 9vw, 96px) 0 70px;
+      }
+
+      .success {
+        width: 62px;
+        height: 62px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 24px;
+        color: #fff;
+        border: 2px solid #070709;
+        border-radius: 50%;
+        background: var(--gradient);
+        box-shadow: 4px 5px 0 #070709;
+        font-size: 30px;
+        font-weight: 900;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(46px, 8vw, 78px);
+        line-height: 0.96;
+        letter-spacing: -0.065em;
+      }
+
+      .lead {
+        max-width: 650px;
+        margin: 22px 0 34px;
+        color: var(--muted);
+        font-size: clamp(17px, 2.4vw, 21px);
+        line-height: 1.55;
+      }
+
+      .order,
+      .steps {
+        padding: clamp(22px, 4vw, 34px);
+        border: 1.5px solid var(--ink);
+        border-radius: 20px;
+        background: var(--card);
+        box-shadow: 4px 5px 0 rgba(20, 13, 25, 0.92);
+      }
+
+      .order {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--purple);
+        font: 850 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .plan-name { margin: 0; font-size: 25px; }
+      .plan-includes { margin: 7px 0 0; color: var(--muted); line-height: 1.45; }
+
+      .price {
+        flex: 0 0 auto;
+        font-size: 22px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .steps h2 { margin: 0 0 8px; font-size: 22px; }
+      .access-detail { margin: 0 0 18px; color: var(--muted); line-height: 1.5; }
+      .steps ol { margin: 0; padding-left: 22px; }
+      .steps li { padding: 7px 0 7px 7px; line-height: 1.5; }
+      .steps li::marker { color: var(--pink); font-weight: 900; }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        min-height: 52px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 20px;
+        color: #fff;
+        border: 2px solid #070709;
+        border-radius: 11px;
+        background: var(--gradient);
+        box-shadow: 3px 3px 0 #070709;
+        font-weight: 900;
+        text-decoration: none;
+      }
+
+      .button.secondary { color: var(--ink); background: #fff; }
+
+      .note {
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      @media (max-width: 580px) {
+        .logo { width: 125px; height: 46px; }
+        .secure { font-size: 11px; }
+        .order { align-items: flex-start; flex-direction: column; }
+        .button { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a href="../" aria-label="Volver a Ad Engine Lab">
+        <img class="logo" src="../assets/ad-engine-logo.png" alt="Ad Engine Lab" />
+      </a>
+      <span class="secure">Pago procesado con Stripe</span>
+    </header>
+
+    <main>
+      <div class="success" aria-hidden="true">✓</div>
+      <h1>Pago completado.</h1>
+      <p class="lead">
+        Stripe terminó el cobro. Ahora estamos creando una sola cuenta para tu curso, tu herramienta y el saldo incluido en tu plan.
+      </p>
+
+      <section class="order" aria-label="Resumen de la compra">
+        <div>
+          <span class="eyebrow">Tu plan</span>
+          <h2 class="plan-name" id="plan-name">Ad Engine Lab</h2>
+          <p class="plan-includes" id="plan-includes">Curso, herramienta y saldo inicial de generación.</p>
+        </div>
+        <strong class="price" id="plan-price">Pago único</strong>
+      </section>
+
+      <section class="steps">
+        <h2 id="access-status">Estamos creando tu cuenta…</h2>
+        <p class="access-detail" id="access-detail" aria-live="polite">Normalmente tarda solo unos segundos. No cierres esta página.</p>
+        <ol>
+          <li>Revisa el correo que utilizaste en Stripe.</li>
+          <li>Abre el enlace seguro de Ad Engine Lab; no necesitas crear una contraseña.</li>
+          <li>Al entrar verás el curso, la herramienta y el saldo de generación que incluye tu plan.</li>
+        </ol>
+        <div class="actions">
+          <a class="button" id="open-campus" href="../campus/" aria-disabled="true">Abrir mi campus →</a>
+          <a class="button secondary" id="open-course" href="../curso/" aria-disabled="true">Ir directamente al curso</a>
+        </div>
+      </section>
+
+      <p class="note">
+        No vuelvas a pagar si el acceso tarda. Stripe puede repetir eventos y el sistema está preparado para asignar el saldo una sola vez.
+      </p>
+    </main>
+
+    <script>
+      const plans = {
+        esencial: {
+          name: "Ad Engine Lab — Esencial",
+          includes: "25 clips de hasta 5 segundos + 50 generaciones de imágenes.",
+          price: "$1,499 MXN",
+        },
+        pro: {
+          name: "Ad Engine Lab — Pro",
+          includes: "60 clips de hasta 5 segundos + 100 generaciones de imágenes.",
+          price: "$1,999 MXN",
+        },
+      };
+
+      const selected = plans[new URLSearchParams(window.location.search).get("plan")];
+      if (selected) {
+        document.querySelector("#plan-name").textContent = selected.name;
+        document.querySelector("#plan-includes").textContent = selected.includes;
+        document.querySelector("#plan-price").textContent = selected.price;
+      }
+    </script>
+    <script type="module" src="../assets/thanks-account.js"></script>
+  </body>
+</html>
