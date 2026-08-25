@@ -8,6 +8,21 @@ const planName = document.querySelector("#plan-name");
 const planIncludes = document.querySelector("#plan-includes");
 
 const planNames = { esencial: "Ad Engine Lab — Esencial", pro: "Ad Engine Lab — Pro" };
+const planValues = { esencial: 1499, pro: 1999 };
+
+function trackPurchase(plan) {
+  if (typeof window.fbq !== "function" || !planValues[plan] || !sessionId) return;
+
+  const storageKey = `meta_purchase_${sessionId}`;
+  if (window.localStorage.getItem(storageKey)) return;
+
+  window.fbq("track", "Purchase", {
+    content_name: planNames[plan],
+    currency: "MXN",
+    value: planValues[plan],
+  });
+  window.localStorage.setItem(storageKey, "1");
+}
 
 function setStatus(title, detail, ready = false) {
   if (status) status.textContent = title;
@@ -35,6 +50,7 @@ async function checkPurchase(attempt = 0) {
     if (response.ok && data.ready) {
       if (planNames[data.plan]) planName.textContent = planNames[data.plan];
       planIncludes.textContent = `${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
+      if (data.paymentStatus === "paid") trackPurchase(data.plan);
       setStatus(
         "Tu cuenta y tu saldo están listos",
         "Te enviamos un enlace seguro al correo usado en Stripe. Ábrelo para entrar al curso y a la herramienta.",

@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 export function sanitizeStaticHtml(source) {
   return source
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (script) =>
-      script.includes("brand-override.js") ? script : "",
+      script.includes("brand-override.js") || script.includes("meta-pixel.js") ? script : "",
     )
     .replace(/<link\b(?=[^>]*\brel=["']preload["'])(?=[^>]*\bas=["']script["'])[^>]*>/gi, "")
     .replace(/\n{3,}/g, "\n\n");
