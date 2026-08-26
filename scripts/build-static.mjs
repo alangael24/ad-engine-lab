@@ -30,6 +30,8 @@ for (const entry of staticEntries) {
   }
   await cp(resolve(root, entry), resolve(output, entry), {
     recursive: true,
-    filter: (source) => !source.endsWith(".DS_Store"),
+    filter: (source) =>
+      !source.endsWith(".DS_Store") &&
+      !source.startsWith(resolve(root, "videos", "edit")),
   });
 }
