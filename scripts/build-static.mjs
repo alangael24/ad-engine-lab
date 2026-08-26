@@ -10,6 +10,7 @@ const staticEntries = [
   "brand-override.js",
   "videos.html",
   "_routes.json",
+  "_next",
   "assets",
   "videos",
   "herramienta",

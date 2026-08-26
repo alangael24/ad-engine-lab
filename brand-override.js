@@ -15,7 +15,7 @@
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
   const brandLogo = "assets/creative-rush-logo.svg";
-  const brandTheme = "assets/brand-theme.css?v=20260825-4";
+  const brandTheme = "assets/brand-theme.css?v=20260825-5";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
@@ -195,8 +195,8 @@
       description.innerHTML = descriptionReplacement;
     }
 
-    if (chip && chip.textContent !== "curso + herramienta + producción incluida") {
-      chip.textContent = "curso + herramienta + producción incluida";
+    if (chip && chip.textContent !== "pago único por el curso · recarga solo lo que uses") {
+      chip.textContent = "pago único por el curso · recarga solo lo que uses";
     }
 
     setText(
@@ -220,8 +220,8 @@
       const anchor = bar.querySelector(".lb-in");
       const offer =
         '<span class="lb-dot" aria-hidden="true"></span>' +
-        '<span class="lb-offer lb-offer-full">ENTRA AL CURSO · PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span>' +
-        '<span class="lb-offer lb-offer-m">TU PRIMER ANUNCIO · PRODUCCIÓN INCLUIDA</span> ' +
+        '<span class="lb-offer lb-offer-full">ENTRA AL CURSO. PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span>' +
+        '<span class="lb-offer lb-offer-m">ENTRA AL CURSO. PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span> ' +
         '<span aria-hidden="true">→</span>';
 
       if (bar.getAttribute("aria-label") !== "Produce tu primer anuncio con el curso y la herramienta") {
@@ -229,6 +229,10 @@
       }
       if (anchor && anchor.innerHTML !== offer) anchor.innerHTML = offer;
     });
+
+    document
+      .querySelectorAll(".hero-proof .hp-upd")
+      .forEach((updatedLabel) => updatedLabel.remove());
   }
 
   function updateHowSection() {
@@ -474,7 +478,7 @@
     const section = document.querySelector('[data-section="pricing"]');
     if (!section) return;
 
-    setText(section.querySelector(".pd1-line"), "CURSO + HERRAMIENTA + PRODUCCIÓN INCLUIDA");
+    setText(section.querySelector(".pd1-line"), "APRENDE + CREA + PRUEBA DESDE EL DÍA 1");
     setText(section.querySelector(".pd1-src"), "DESDE $1,499 MXN");
     setText(section.querySelector(".lo-tag"), "LOS DOS PLANES INCLUYEN EL SISTEMA COMPLETO");
     setText(
@@ -866,21 +870,27 @@
       const summaryText = summary
         ? [...summary.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)
         : null;
-      if (summaryText && summaryText.nodeValue !== "Plan Pro · $1,999 MXN") {
-        summaryText.nodeValue = "Plan Pro · $1,999 MXN";
+      if (
+        summaryText &&
+        summaryText.nodeValue !== "PRO · CREA Y PRUEBA MÁS"
+      ) {
+        summaryText.nodeValue = "PRO · CREA Y PRUEBA MÁS";
       }
 
-      if (full && full.textContent !== "60 clips · 100 imágenes · pago único") {
-        full.textContent = "60 clips · 100 imágenes · pago único";
+      if (
+        full &&
+        full.textContent !== "$1,999 · 60 escenas + 100 imágenes · solo $500 más"
+      ) {
+        full.textContent = "$1,999 · 60 escenas + 100 imágenes · solo $500 más";
       }
-      if (mobile && mobile.textContent !== "60 clips + 100 imágenes") {
-        mobile.textContent = "60 clips + 100 imágenes";
+      if (mobile && mobile.textContent !== "2,4× más video · solo $500 más") {
+        mobile.textContent = "2,4× más video · solo $500 más";
       }
-      if (buttonFull && buttonFull.textContent !== "Ver planes") {
-        buttonFull.textContent = "Ver planes";
+      if (buttonFull && buttonFull.textContent !== "Ver la oferta") {
+        buttonFull.textContent = "Ver la oferta";
       }
-      if (buttonMobile && buttonMobile.textContent !== "Ver planes") {
-        buttonMobile.textContent = "Ver planes";
+      if (buttonMobile && buttonMobile.textContent !== "Ver oferta") {
+        buttonMobile.textContent = "Ver oferta";
       }
     }
   }
