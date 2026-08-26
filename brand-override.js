@@ -14,8 +14,7 @@
     /AvatarHype|Avatar Hype|Ad Engine Lab/i.test(value || "");
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
-  const brandLogo = "assets/creative-rush-logo.svg";
-  const brandTheme = "assets/brand-theme.css?v=20260825-9";
+  const brandTheme = "assets/brand-theme.css?v=20260825-10";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
@@ -902,11 +901,12 @@
     if (!(element instanceof Element)) return;
 
     if (element.matches(".brand .b")) {
-      const logo = element.querySelector("img.ae-logo");
-      if (!logo || logo.getAttribute("src") !== brandLogo) {
-        element.innerHTML =
-          `<img class="ae-logo" src="${brandLogo}" alt="CreativeRush AI">`;
+      const wordmark =
+        '<span class="ae-wordmark"><span class="ae-wordmark-creative">Creative</span><span class="ae-wordmark-rush">Rush</span></span>';
+      if (element.innerHTML !== wordmark) {
+        element.innerHTML = wordmark;
       }
+      element.setAttribute("aria-label", "CreativeRush");
     }
 
     for (const attribute of ["alt", "aria-label", "title"]) {

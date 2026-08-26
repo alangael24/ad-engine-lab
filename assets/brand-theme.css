@@ -47,32 +47,43 @@
 
 .ahc .brand .b {
   display: inline-flex;
-  width: 174px;
-  height: 68px;
+  width: auto;
+  height: auto;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 0;
-  line-height: 0;
-  border: 1.5px solid var(--ae-black);
-  border-radius: 10px;
-  background: #000;
-  box-shadow: 3px 3px 0 rgba(152, 59, 255, 0.55);
+  justify-content: flex-start;
+  overflow: visible;
+  padding: 3px 0;
+  font-family: var(--font-bricolage), sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.065em;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.ahc .brand .b img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 50%;
+.ahc .ae-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.ahc .brand .b .ae-wordmark-creative {
+  color: var(--ae-purple);
+}
+
+.ahc .brand .b .ae-wordmark-rush {
+  color: var(--ae-pink);
 }
 
 .ahc .footer .brand .b {
-  width: 132px;
-  height: 58px;
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 3px 3px 0 rgba(240, 24, 166, 0.58);
+  width: auto;
+  height: auto;
+  font-size: 25px;
+  border: 0;
+  box-shadow: none;
 }
 
 .ahc .launch-bar,
@@ -87,11 +98,11 @@
 .ahc.ahcr4 .bug-fixbar .lb-in {
   color: #fff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
-  min-height: 18px;
-  padding: 1px 7px;
-  gap: 4px;
-  font-size: 7.5px;
-  line-height: 1;
+  min-height: 30px;
+  padding: 5px 12px;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.1;
 }
 
 .ahc .launch-bar .lb-dot,
@@ -101,9 +112,8 @@
 }
 
 .ahc .launch-bar .lb-dot {
-  width: 4px;
-  height: 4px;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14), 0 0 8px rgba(255, 23, 148, 0.66);
+  width: 7px;
+  height: 7px;
 }
 
 .ahc .stamp,
@@ -431,14 +441,15 @@
   }
 
   .ahc .brand .b {
-    width: 116px;
-    height: 50px;
-    border-radius: 8px;
+    width: auto;
+    height: auto;
+    font-size: 23px;
   }
 
   .ahc .footer .brand .b {
-    width: 104px;
-    height: 46px;
+    width: auto;
+    height: auto;
+    font-size: 22px;
   }
 
   .ahc .plat-grid.ae-delivery-grid {
@@ -450,14 +461,24 @@
   }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 680px) {
   .ahc.ahcr4 .launch-bar .lb-in,
   .ahc.ahcr4 .bug-fixbar .lb-in {
     min-height: 16px;
     padding: 1px 5px;
+    gap: 3px;
     font-size: 7px;
   }
 
+  .ahc .launch-bar .lb-dot {
+    width: 4px;
+    height: 4px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14), 0 0 8px rgba(255, 23, 148, 0.66);
+  }
+
+}
+
+@media (max-width: 430px) {
   .ahc .tier .ae-value-row {
     grid-template-columns: 20px minmax(0, 1fr);
   }
