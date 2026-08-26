@@ -15,7 +15,7 @@
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
   const brandLogo = "assets/creative-rush-logo.svg";
-  const brandTheme = "assets/brand-theme.css?v=20260825-3";
+  const brandTheme = "assets/brand-theme.css?v=20260825-4";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
@@ -29,37 +29,37 @@
     real: {
       href: "https://buy.stripe.com/8x2fZh5B591h4y4eFObwk01",
       price: "$1,499 MXN",
-      button: "Elegir Esencial — $1,499 MXN",
+      button: "Empezar y crear mi anuncio — $1,499 MXN",
       name: "Esencial",
-      label: "Para comenzar",
-      subline: "pago único · 25 clips · 50 imágenes",
+      label: "Empieza hoy",
+      subline: "todo incluido · pago único",
       description:
-        "Para aprender el método y producir tu primer bloque de creativos con saldo incluido.",
+        "Todo lo necesario para aprender el sistema y producir tu primer anuncio sin comprar generaciones por separado.",
       features: [
-        "Campus privado y curso práctico de 6 módulos",
-        "La misma cuenta abre el curso y la herramienta",
-        "25 generaciones de video de hasta 5 segundos",
-        "50 generaciones de imágenes",
-        "Guion, dirección de escenas, montaje y pruebas",
-        "Pago único; sin mensualidad del curso",
+        ["Curso práctico completo de 6 módulos", "INCLUIDO"],
+        ["Acceso a nuestra herramienta de IA", "INCLUIDO"],
+        ["Escenas de video para tu primer anuncio", "25"],
+        ["Imágenes para producto, personajes y anuncios", "50"],
+        ["Método para personajes consistentes", "INCLUIDO"],
+        ["Campus privado y progreso guardado", "DE POR VIDA"],
       ],
     },
     complete: {
       href: "https://buy.stripe.com/14AbJ1aVp6T9c0wfJSbwk00",
       price: "$1,999 MXN",
-      button: 'Elegir Pro — $1,999 MXN <span class="arr">→</span>',
+      button: 'Quiero más producción — $1,999 MXN <span class="arr">→</span>',
       name: "Pro",
-      label: "Más producción",
-      subline: "pago único · 60 clips · 100 imágenes",
+      label: "Más vendido",
+      subline: "2,4× más video · pago único",
       description:
-        "Para salir con más variaciones, probar más ángulos y producir creativos durante más tiempo.",
+        "Más producción significa más ganchos, ángulos y versiones para encontrar qué vende antes de recargar.",
       features: [
-        "Campus privado y el mismo curso de 6 módulos",
-        "La misma cuenta abre el curso y la herramienta",
-        "60 generaciones de video de hasta 5 segundos",
-        "100 generaciones de imágenes",
-        "Más saldo para hooks, escenas y variaciones",
-        "Pago único; sin mensualidad del curso",
+        ["Curso práctico completo de 6 módulos", "INCLUIDO"],
+        ["Acceso a nuestra herramienta de IA", "INCLUIDO"],
+        ["Escenas de video para anuncios y variaciones", "<s>25</s> 60"],
+        ["Imágenes para producto, personajes y anuncios", "<s>50</s> 100"],
+        ["35 escenas extra para probar más ganchos", "+140%"],
+        ["50 imágenes extra para ampliar creativos", "+100%"],
       ],
     },
     animated: {
@@ -93,9 +93,16 @@
       setHtml(tier.querySelector("h3"), `Plan<br>${offer.name}`);
       setText(tier.querySelector(".psub"), offer.subline);
       setText(tier.querySelector(".tdesc"), offer.description);
+      const valueStack = tier.querySelector("ul");
+      if (valueStack) valueStack.classList.add("ae-value-stack");
       setHtml(
-        tier.querySelector("ul"),
-        offer.features.map((feature) => `<li>${feature}</li>`).join(""),
+        valueStack,
+        offer.features
+          .map(
+            ([feature, value]) =>
+              `<li class="ae-value-row"><span class="ae-value-check" aria-hidden="true">✓</span><span class="ae-value-copy">${feature}</span><span class="ae-value-tag">${value}</span></li>`,
+          )
+          .join(""),
       );
 
       const price = tier.querySelector(".price .now");
@@ -108,7 +115,7 @@
         button.setAttribute("target", "_self");
         button.setAttribute("rel", "noopener");
         const expectedText =
-          key === "complete" ? "Elegir Pro — $1,999 MXN →" : offer.button;
+          key === "complete" ? "Quiero más producción — $1,999 MXN →" : offer.button;
         const currentText = button.textContent.replace(/\s+/g, " ").trim();
         if (currentText !== expectedText) {
           if (key === "complete") button.innerHTML = offer.button;
@@ -117,7 +124,7 @@
       }
 
       if (key === "complete") {
-        setText(tier.querySelector(".ribbon"), "★ Más saldo por cada peso");
+        setText(tier.querySelector(".ribbon"), "★ 2,4× MÁS VIDEO POR SOLO $500 MÁS");
         const savings = tier.querySelector(".psub");
         setText(savings, offer.subline);
         const oldPrice = tier.querySelector(".price .was");
@@ -132,7 +139,7 @@
     );
     setHtml(
       comparisons[1],
-      "<strong>Pro:</strong> por $500 MXN adicionales obtienes 35 clips y 50 imágenes extra.",
+      "<strong>Pro:</strong> por solo $500 MXN más obtienes 140% más video y 100% más imágenes.",
     );
     setHtml(
       comparisons[2],
@@ -454,16 +461,16 @@
     const section = document.querySelector('[data-section="pricing"]');
     if (!section) return;
 
-    setText(section.querySelector(".pd1-line"), "DOS PLANES. UN SOLO PAGO.");
+    setText(section.querySelector(".pd1-line"), "CURSO + HERRAMIENTA + PRODUCCIÓN INCLUIDA");
     setText(section.querySelector(".pd1-src"), "DESDE $1,499 MXN");
-    setText(section.querySelector(".lo-tag"), "ELIGE EL SALDO QUE NECESITAS PARA EMPEZAR");
+    setText(section.querySelector(".lo-tag"), "LOS DOS PLANES INCLUYEN EL SISTEMA COMPLETO");
     setText(
       section.querySelector(".lo-count"),
-      "Esencial: 25 clips + 50 imágenes · Pro: 60 clips + 100 imágenes",
+      "Tú solo eliges cuánto quieres producir: 25 o 60 escenas de video + 50 o 100 imágenes",
     );
     setText(
       section.querySelector(".lo-why"),
-      "Los dos planes crean la misma cuenta y desbloquean el mismo campus, curso y herramienta. Solo cambia el saldo inicial de producción.",
+      "No tienes que elegir entre aprender o producir. Ambos planes incluyen el curso, el campus y nuestra herramienta; solo cambia la cantidad de creativos que puedes generar.",
     );
 
     const paymentCopy = section.querySelector(".price-head > p:last-of-type");
@@ -472,24 +479,24 @@
       "<strong>Pago único.</strong> Stripe confirma el cobro, crea tu cuenta y te envía un enlace seguro por email. No necesitas contraseña y tu tarjeta no queda suscrita al curso.",
     );
 
-    setText(section.querySelector(".bs-tag"), "ESENCIAL O PRO · TÚ ELIGES CUÁNTO PRODUCIR");
-    setText(section.querySelector(".bs-clock"), "sin mensualidad del curso");
+    setText(section.querySelector(".bs-tag"), "PRO = 2,4× MÁS VIDEO");
+    setText(section.querySelector(".bs-clock"), "solo $500 MXN más");
     setText(
       section.querySelector(".bs-why"),
-      "Esencial incluye 25 clips de hasta 5 segundos y 50 imágenes por $1,499 MXN.",
+      "60 escenas en lugar de 25: 35 oportunidades extra para probar ganchos, ángulos y versiones.",
     );
     setText(
       section.querySelector(".bs-redeem"),
-      "Pro incluye 60 clips de hasta 5 segundos y 100 imágenes por $1,999 MXN.",
+      "100 imágenes en lugar de 50: el doble de conceptos, referencias y anuncios estáticos.",
     );
     setText(
       section.querySelector(".bs-bridge"),
-      "En ambos casos el curso sigue siendo tuyo. Al terminar el saldo no existe ningún cargo automático.",
+      "Mismo curso. Misma herramienta. Mucha más producción antes de necesitar una recarga.",
     );
 
     setText(
       section.querySelector(".tbtn-kicker"),
-      "El curso es permanente. El saldo de generación es inicial y no se renueva automáticamente.",
+      "Por solo $500 MXN más obtienes 35 escenas y 50 imágenes adicionales para encontrar qué vende.",
     );
 
     const quickQuestions = section.querySelectorAll(".eco-q");
@@ -538,7 +545,7 @@
     );
     setHtml(
       priceMath[1],
-      "<strong>Pro:</strong> por $500 MXN adicionales obtienes 35 clips y 50 imágenes extra.",
+      "<strong>Pro:</strong> por solo $500 MXN más obtienes 140% más video y 100% más imágenes.",
     );
     setText(
       priceMath[2],

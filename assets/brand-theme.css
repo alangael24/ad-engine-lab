@@ -242,6 +242,82 @@
   background: var(--ae-gradient);
 }
 
+.ahc .tier .ae-value-stack {
+  list-style: none;
+  margin: 22px 0 26px;
+  padding: 0;
+  border-top: 1.5px solid rgba(240, 24, 166, 0.62);
+}
+
+.ahc .tier .ae-value-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(240, 24, 166, 0.42);
+  color: var(--ink);
+  line-height: 1.32;
+}
+
+.ahc .tier .ae-value-row::before {
+  content: none;
+}
+
+.ahc .ae-value-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  color: #fff;
+  background: var(--ae-gradient);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ahc .ae-value-copy {
+  min-width: 0;
+  font-weight: 720;
+}
+
+.ahc .ae-value-tag {
+  justify-self: end;
+  padding: 4px 8px;
+  color: #b30e78;
+  background: rgba(240, 24, 166, 0.11);
+  border-radius: 5px;
+  font-family: var(--font-spline-mono), monospace;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.ahc .ae-value-tag s {
+  margin-right: 3px;
+  color: rgba(22, 21, 15, 0.42);
+  text-decoration-color: #f018a6;
+  text-decoration-thickness: 2px;
+}
+
+.ahc .tier.best .ae-value-row {
+  color: rgba(255, 255, 255, 0.94);
+  border-bottom-color: rgba(255, 42, 176, 0.38);
+}
+
+.ahc .tier.best .ae-value-tag {
+  color: #fff;
+  background: linear-gradient(110deg, rgba(152, 59, 255, 0.82), rgba(255, 23, 148, 0.82));
+}
+
+.ahc .tier.best .ae-value-tag s {
+  color: rgba(255, 255, 255, 0.52);
+  text-decoration-color: #ff72c7;
+}
+
 .ahc .plat-bullets li::marker,
 .ahc .tier li::marker {
   color: var(--ae-pink);
@@ -335,6 +411,13 @@
     grid-template-columns: 1fr;
   }
 
+  .ahc .tier.best .ribbon {
+    width: calc(100% - 28px);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
   .ahc .brand .b {
     width: 116px;
     height: 50px;
@@ -352,6 +435,17 @@
 
   .ahc .ae-delivery-card {
     min-height: 220px;
+  }
+}
+
+@media (max-width: 430px) {
+  .ahc .tier .ae-value-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .ahc .ae-value-tag {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 
