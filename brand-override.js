@@ -159,12 +159,12 @@
       "Vende más. Gasta menos.<br>Aprende a crear anuncios con IA que generan ventas.";
     const description = document.querySelector(".r4-what");
     const descriptionReplacement =
-      "<strong>Paga una vez y entra con una sola cuenta.</strong> Aprende a construir el anuncio dentro del curso y usa nuestra herramienta con saldo incluido para producir sus escenas — sin cámaras, actores ni agencias.";
+      "<strong>Deja de pagar cientos por producir un solo anuncio.</strong> Aprende el método dentro del curso y utiliza nuestra herramienta para crear anuncios con IA diseñados para vender — sin cámaras, actores ni agencias.";
     const chip = document.querySelector(".r4-chip");
     const lede = document.querySelector(".hero-lede");
 
-    if (stamp && stamp.textContent !== "campus propio + curso + herramienta") {
-      stamp.textContent = "campus propio + curso + herramienta";
+    if (stamp && stamp.textContent !== "curso práctico + herramienta propia") {
+      stamp.textContent = "curso práctico + herramienta propia";
     }
 
     if (headline && headline.innerHTML !== replacement) {
@@ -175,13 +175,13 @@
       description.innerHTML = descriptionReplacement;
     }
 
-    if (chip && chip.textContent !== "una cuenta · curso + herramienta + saldo incluido") {
-      chip.textContent = "una cuenta · curso + herramienta + saldo incluido";
+    if (chip && chip.textContent !== "curso + herramienta + producción incluida") {
+      chip.textContent = "curso + herramienta + producción incluida";
     }
 
     setText(
       lede,
-      "Después del pago creamos tu cuenta automáticamente. Entras a tu campus, sigues una ruta de 6 módulos y utilizas el saldo del plan para producir tu primer anuncio listo para probar.",
+      "Entra al curso, aprende el sistema y utiliza la producción incluida para crear tu primer anuncio y sus variaciones. Tu objetivo no es coleccionar lecciones: es salir con anuncios listos para probar y encontrar el que vende.",
     );
 
     const crossedOutLabels = [
@@ -200,12 +200,12 @@
       const anchor = bar.querySelector(".lb-in");
       const offer =
         '<span class="lb-dot" aria-hidden="true"></span>' +
-        '<span class="lb-offer lb-offer-full">PAGA UNA VEZ · RECIBE CURSO + HERRAMIENTA + SALDO PARA EMPEZAR</span>' +
-        '<span class="lb-offer lb-offer-m">CURSO + HERRAMIENTA + SALDO INCLUIDO</span> ' +
+        '<span class="lb-offer lb-offer-full">ENTRA AL CURSO · PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span>' +
+        '<span class="lb-offer lb-offer-m">TU PRIMER ANUNCIO · PRODUCCIÓN INCLUIDA</span> ' +
         '<span aria-hidden="true">→</span>';
 
-      if (bar.getAttribute("aria-label") !== "Curso, herramienta y saldo inicial en una sola cuenta") {
-        bar.setAttribute("aria-label", "Curso, herramienta y saldo inicial en una sola cuenta");
+      if (bar.getAttribute("aria-label") !== "Produce tu primer anuncio con el curso y la herramienta") {
+        bar.setAttribute("aria-label", "Produce tu primer anuncio con el curso y la herramienta");
       }
       if (anchor && anchor.innerHTML !== offer) anchor.innerHTML = offer;
     });
@@ -218,7 +218,7 @@
       ".how-steps > li:nth-of-type(3) > .how-t",
     );
     const replacement =
-      "<b>LO PRODUCES</b> — abres la herramienta con la misma cuenta del curso, conviertes el guion en clips de hasta 5 segundos y los montas hasta dejar tu primer anuncio listo para probar. El saldo inicial ya viene cargado según tu plan.";
+      "<b>LO PRODUCES</b> — utilizas nuestra herramienta para crear cada escena con personajes consistentes, darle vida a tu oferta y terminar con un anuncio listo para probar. La producción para empezar ya viene incluida en tu plan.";
 
     if (thirdStep && thirdStep.innerHTML !== replacement) {
       thirdStep.innerHTML = replacement;
@@ -229,14 +229,14 @@
     const section = document.querySelector('[data-section="quien_sale"]');
     if (!section) return;
 
-    setText(section.querySelector("h3"), "¿Qué puedes mostrar sin grabarte?");
+    setText(section.querySelector("h3"), "¿Quién sale en tus anuncios?");
     const paragraphs = section.querySelectorAll(".r4-quien-p");
     const content = [
-      "Presentadores, productos, manos, escenarios y recursos visuales creados con IA para contar la idea de tu anuncio.",
-      "Cada generación produce una escena corta. Tú eliges cuáles conservar y cómo unirlas en el montaje.",
-      "Puedes usar una imagen de referencia para mantener el producto, el personaje o el estilo entre escenas.",
-      "Describes la acción, el encuadre y el movimiento con lenguaje normal; no necesitas saber código.",
-      "El curso te enseña qué debe comunicar cada plano para que el resultado no sea solo bonito, sino útil para vender.",
+      "Presentadores y avatares creados con IA, consistentes de una escena a otra: tu marca hablando, demostrando y vendiendo sin que tengas que salir tú.",
+      "Mantén el mismo personaje, la misma apariencia y el mismo estilo visual de principio a fin.",
+      "Elige quién aparece, qué hace, dónde está y cómo interactúa con tu producto.",
+      "Describe la acción, el encuadre y el movimiento con lenguaje normal; no necesitas saber código.",
+      "El curso te enseña qué debe comunicar cada escena para detener el scroll y mover al cliente hacia la compra.",
     ];
     paragraphs.forEach((paragraph, index) => setText(paragraph, content[index]));
     setText(
@@ -318,27 +318,27 @@
     const section = document.querySelector('[data-section="nums"]');
     if (!section) return;
 
-    setText(section.querySelector(".nums-head h2"), "Las cifras que sí importan.");
+    setText(section.querySelector(".nums-head h2"), "Tu primera campaña ya viene incluida.");
 
     const cards = section.querySelectorAll(".nums-grid .num");
     const cardContent = [
       {
         big: "25–60",
         label:
-          "clips de video de hasta 5 segundos incluidos, según el plan que elijas.",
-        calc: "saldo real de generación ✓",
+          "escenas de video para construir, variar y probar anuncios sin pagar generaciones extra para empezar.",
+        calc: "producción de video incluida ✓",
       },
       {
         big: "50–100",
         label:
-          "generaciones de imágenes incluidas para conceptos, referencias y anuncios estáticos.",
-        calc: "imágenes incluidas",
+          "imágenes para productos, personajes, conceptos, anuncios estáticos y referencias consistentes.",
+        calc: "más creativos para probar",
       },
       {
         big: "1.º",
         label:
-          "tu primer anuncio listo para montar y probar sin comprar generaciones adicionales para empezar.",
-        calc: "aprendes + produces",
+          "tu primer anuncio listo para lanzar, con recursos para probar nuevos ganchos y versiones según tu plan.",
+        calc: "sales creando, no estudiando",
       },
     ];
 
@@ -352,26 +352,26 @@
 
     setText(
       section.querySelector(".r2-cost-table h3"),
-      "La cuenta que importa.",
+      "No compras solo un curso. Sales con algo que puedes probar.",
     );
     setText(
       section.querySelector(".r4-bug-hero"),
-      "Los dos planes incluyen el curso y acceso a la herramienta. Esencial trae 25 clips y 50 imágenes; Pro trae 60 clips y 100 imágenes.",
+      "Elige cuánta producción quieres llevarte: Esencial para crear tu primer anuncio; Pro para salir con más escenas, ganchos y variaciones listas para probar.",
     );
 
     const rows = section.querySelectorAll(".ct-row");
     const rowContent = [
       [
-        "HOY, un solo pago",
-        "el curso, la academia, la herramienta y el saldo del plan que elijas",
+        "PLAN ESENCIAL",
+        "25 escenas de video + 50 imágenes para aprender el sistema y producir tu primer anuncio",
       ],
       [
-        "TU PRIMER ANUNCIO",
-        "25 o 60 clips de hasta 5 segundos, más 50 o 100 imágenes",
+        "PLAN PRO",
+        "60 escenas de video + 100 imágenes para probar más ganchos, ángulos y versiones",
       ],
       [
-        "DESPUÉS",
-        "el curso sigue siendo tuyo; recargas la herramienta solo si decides crear más",
+        "EL RESULTADO",
+        "anuncios reales listos para lanzar, medir y mejorar — no otra carpeta llena de teoría",
       ],
     ];
     rows.forEach((row, index) => {
@@ -384,8 +384,8 @@
     const notes = section.querySelectorAll(".ct-note");
     const noteContent = [
       "El saldo de tu plan se añade una sola vez con la compra. No es una suscripción y no se renueva automáticamente.",
-      "Cada generación de video produce un clip de hasta 5 segundos. Las generaciones no son ilimitadas.",
-      "No recibes anuncios prefabricados: generas las escenas, aprendes a dirigirlas y las conviertes en un anuncio con intención de venta.",
+      "Cada generación de video crea una escena de hasta 5 segundos. Las generaciones no son ilimitadas.",
+      "No recibes anuncios genéricos: aprendes a dirigir cada escena para construir creativos con intención de venta.",
       "Cuando termines el saldo incluido, la generación se detiene sin cargos automáticos. El curso y tu progreso permanecen activos.",
     ];
     notes.forEach((note, index) => setText(note, noteContent[index]));
@@ -552,16 +552,16 @@
 
     setHtml(
       section.querySelector("h2"),
-      'Aprende el método. <span class="serif">Produce tu primer anuncio.</span>',
+      'Crea anuncios con IA diseñados para vender. <span class="serif">Empieza hoy.</span>',
     );
     const paragraphs = section.querySelectorAll("p");
     setText(
       paragraphs[0],
-      "El curso se paga una vez y queda dentro de tu campus. Esencial carga 25 clips y 50 imágenes; Pro carga 60 clips y 100 imágenes en la misma cuenta que abre la herramienta.",
+      "Entra con todo lo que necesitas para pasar de una idea a anuncios reales: el método, nuestra herramienta y producción incluida para crear sin cámaras, actores ni agencias.",
     );
     setText(
       section.querySelector(".final-live"),
-      "Paga, abre el enlace de tu correo y entra directamente al sistema: primero aprendes el proceso y después utilizas el saldo de tu plan para producir.",
+      "Tu meta no es terminar otro curso. Es lanzar tu primer anuncio, probar versiones y descubrir qué hace que tu cliente se detenga, haga clic y compre.",
     );
     setText(
       section.querySelector(".final-lock"),
@@ -569,7 +569,7 @@
     );
 
     const chips = section.querySelectorAll(".chip");
-    ["pago único", "curso de acceso permanente", "saldo incluido"].forEach(
+    ["primer anuncio", "producción incluida", "listo para probar"].forEach(
       (label, index) => setText(chips[index], label),
     );
   }
