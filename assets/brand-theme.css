@@ -203,11 +203,27 @@
   border-color: rgba(20, 13, 25, 0.88);
 }
 
-.ahc .ficha.feat,
-.ahc .tier.best {
+.ahc .ficha.feat {
   background: linear-gradient(180deg, rgba(152, 59, 255, 0.13), rgba(255, 23, 148, 0.055) 38%, var(--card) 72%);
   border-color: var(--ae-purple);
   box-shadow: 5px 6px 0 rgba(152, 59, 255, 0.26);
+}
+
+.ahc .tier.best {
+  color: #fff;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(152, 59, 255, 0.48), transparent 38%),
+    radial-gradient(circle at 100% 34%, rgba(255, 23, 148, 0.26), transparent 42%),
+    linear-gradient(180deg, #17101d, #09070c 74%);
+  border-color: var(--ae-purple);
+  box-shadow: 7px 8px 0 rgba(152, 59, 255, 0.3);
+}
+
+.ahc.js-anim [data-section="pricing"] .tiers .tier.reveal {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition: none;
 }
 
 .ahc .tiers {
