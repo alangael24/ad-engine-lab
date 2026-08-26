@@ -438,12 +438,6 @@
   }
 }
 
-@media (max-width: 680px) {
-  .ahc .launch-bar .lb-in {
-    font-size: 9.5px;
-  }
-}
-
 @media (max-width: 430px) {
   .ahc .tier .ae-value-row {
     grid-template-columns: 20px minmax(0, 1fr);

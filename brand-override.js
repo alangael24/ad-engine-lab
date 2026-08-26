@@ -15,7 +15,7 @@
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
   const brandLogo = "assets/creative-rush-logo.svg";
-  const brandTheme = "assets/brand-theme.css?v=20260825-5";
+  const brandTheme = "assets/brand-theme.css?v=20260825-6";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
