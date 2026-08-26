@@ -83,13 +83,15 @@
   box-shadow: 0 3px 18px rgba(152, 59, 255, 0.28);
 }
 
-.ahc .launch-bar .lb-in {
+.ahc.ahcr4 .launch-bar .lb-in,
+.ahc.ahcr4 .bug-fixbar .lb-in {
   color: #fff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
-  min-height: 24px;
-  padding: 3px 9px;
-  font-size: 9.5px;
-  line-height: 1.1;
+  min-height: 18px;
+  padding: 1px 7px;
+  gap: 4px;
+  font-size: 7.5px;
+  line-height: 1;
 }
 
 .ahc .launch-bar .lb-dot,
@@ -99,8 +101,9 @@
 }
 
 .ahc .launch-bar .lb-dot {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14), 0 0 8px rgba(255, 23, 148, 0.66);
 }
 
 .ahc .stamp,
@@ -448,10 +451,11 @@
 }
 
 @media (max-width: 430px) {
-  .ahc .launch-bar .lb-in {
-    min-height: 22px;
-    padding: 3px 6px;
-    font-size: 8.5px;
+  .ahc.ahcr4 .launch-bar .lb-in,
+  .ahc.ahcr4 .bug-fixbar .lb-in {
+    min-height: 16px;
+    padding: 1px 5px;
+    font-size: 7px;
   }
 
   .ahc .tier .ae-value-row {
