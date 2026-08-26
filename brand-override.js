@@ -148,15 +148,28 @@
   }
 
   function updateCheckoutLinks() {
-    const defaultCheckout = stripeOffers.complete.href;
-
-    document
-      .querySelectorAll('a[href="#pedido"], a[data-checkout="complete"], a[data-checkout="pro"]')
-      .forEach((anchor) => {
-        anchor.setAttribute("href", defaultCheckout);
-        anchor.setAttribute("data-checkout", "pro");
+    document.querySelectorAll("a").forEach((anchor) => {
+      const tier = anchor.closest('[data-section="pricing"] .tier');
+      if (tier && anchor.matches(".tbtn")) {
+        const key = getOfferKey(tier);
+        const offer = key ? stripeOffers[key] : null;
+        if (offer?.href) anchor.setAttribute("href", offer.href);
         anchor.setAttribute("target", "_self");
-      });
+        return;
+      }
+
+      const href = anchor.getAttribute("href") || "";
+      const isGenericPurchaseCta =
+        href === "#pedido" ||
+        href.includes("buy.stripe.com") ||
+        anchor.hasAttribute("data-checkout");
+
+      if (isGenericPurchaseCta) {
+        anchor.setAttribute("href", "#precios");
+        anchor.removeAttribute("data-checkout");
+        anchor.setAttribute("target", "_self");
+      }
+    });
   }
 
   function updateHeroSection() {
@@ -297,7 +310,7 @@
 
     setText(section.querySelector(".swipe-hint"), "desliza para explorar las posibilidades →");
     const cta = section.querySelector("a.stamp");
-    if (cta) setHtml(cta, 'Quiero el curso + la herramienta <span class="arr">→</span>');
+    if (cta) setHtml(cta, 'Ver los planes <span class="arr">→</span>');
     setText(
       section.querySelector(".plat-bridge"),
       "Ahora, por qué juntamos el aprendizaje y la producción en una sola oferta ↓",
@@ -310,7 +323,7 @@
       ["Cómo funciona", "#proceso"],
       ["Mi campus", "campus/"],
       ["Temario", "#temario"],
-      ["Elegir Pro", stripeOffers.complete.href],
+      ["Ver precios", "#precios"],
     ];
     navLinks.forEach((link, index) => {
       if (!links[index]) return;
@@ -642,7 +655,7 @@
       element.hidden = true;
     });
     setText(section.querySelector(".plat-head .tab .ref"), "/ así se entrega");
-    setText(section.querySelector(".plat-cta .stamp"), "Elegir el plan Pro →");
+    setText(section.querySelector(".plat-cta .stamp"), "Comparar los planes →");
     setText(
       section.querySelector(".plat-bridge"),
       "¿Qué tipo de anuncios puedes construir con el sistema? ↓",
@@ -863,11 +876,11 @@
       if (mobile && mobile.textContent !== "60 clips + 100 imágenes") {
         mobile.textContent = "60 clips + 100 imágenes";
       }
-      if (buttonFull && buttonFull.textContent !== "Elegir Pro") {
-        buttonFull.textContent = "Elegir Pro";
+      if (buttonFull && buttonFull.textContent !== "Ver planes") {
+        buttonFull.textContent = "Ver planes";
       }
-      if (buttonMobile && buttonMobile.textContent !== "Elegir Pro") {
-        buttonMobile.textContent = "Elegir Pro";
+      if (buttonMobile && buttonMobile.textContent !== "Ver planes") {
+        buttonMobile.textContent = "Ver planes";
       }
     }
   }
