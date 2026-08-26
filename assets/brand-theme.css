@@ -71,11 +71,11 @@
 }
 
 .ahc .brand .b .ae-wordmark-creative {
-  color: var(--ae-purple);
+  color: var(--ae-purple) !important;
 }
 
 .ahc .brand .b .ae-wordmark-rush {
-  color: var(--ae-pink);
+  color: var(--ae-pink) !important;
 }
 
 .ahc .footer .brand .b {
