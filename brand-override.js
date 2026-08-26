@@ -220,12 +220,12 @@
       const anchor = bar.querySelector(".lb-in");
       const offer =
         '<span class="lb-dot" aria-hidden="true"></span>' +
-        '<span class="lb-offer lb-offer-full">APRENDE EL MÉTODO. CREA TU PRIMER ANUNCIO.</span>' +
-        '<span class="lb-offer lb-offer-m">APRENDE EL MÉTODO. CREA TU PRIMER ANUNCIO.</span> ' +
+        '<span class="lb-offer lb-offer-full">VENDE MÁS. GASTA MENOS. CREA ANUNCIOS CON IA.</span>' +
+        '<span class="lb-offer lb-offer-m">VENDE MÁS. GASTA MENOS. CREA ANUNCIOS CON IA.</span> ' +
         '<span aria-hidden="true">→</span>';
 
-      if (bar.getAttribute("aria-label") !== "Aprende el método y crea tu primer anuncio") {
-        bar.setAttribute("aria-label", "Aprende el método y crea tu primer anuncio");
+      if (bar.getAttribute("aria-label") !== "Vende más y gasta menos creando anuncios con IA") {
+        bar.setAttribute("aria-label", "Vende más y gasta menos creando anuncios con IA");
       }
       if (anchor && anchor.innerHTML !== offer) anchor.innerHTML = offer;
     });
