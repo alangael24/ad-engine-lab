@@ -462,12 +462,24 @@
 }
 
 @media (max-width: 680px) {
-  .ahc.ahcr4 .launch-bar .lb-in,
-  .ahc.ahcr4 .bug-fixbar .lb-in {
+  .ahc.ahcr2.ahcr4 .offer-bar .lb-in,
+  .ahc.ahcr2.ahcr4 .bug-fixbar .lb-in {
     min-height: 16px;
     padding: 1px 5px;
     gap: 3px;
     font-size: 7px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .ahc.ahcr2.ahcr4 .offer-bar .lb-offer,
+  .ahc.ahcr2.ahcr4 .offer-bar .lb-offer-m {
+    font-family: var(--font-spline-mono), monospace !important;
+    font-size: 7px !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap !important;
   }
 
   .ahc .launch-bar .lb-dot {

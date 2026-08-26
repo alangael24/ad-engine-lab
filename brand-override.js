@@ -14,7 +14,7 @@
     /AvatarHype|Avatar Hype|Ad Engine Lab/i.test(value || "");
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
-  const brandTheme = "assets/brand-theme.css?v=20260825-11";
+  const brandTheme = "assets/brand-theme.css?v=20260825-12";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
