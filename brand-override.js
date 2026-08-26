@@ -872,25 +872,22 @@
         : null;
       if (
         summaryText &&
-        summaryText.nodeValue !== "PRO · CREA Y PRUEBA MÁS"
+        summaryText.nodeValue !== "Pack Completo · $1,999 MXN"
       ) {
-        summaryText.nodeValue = "PRO · CREA Y PRUEBA MÁS";
+        summaryText.nodeValue = "Pack Completo · $1,999 MXN";
       }
 
-      if (
-        full &&
-        full.textContent !== "$1,999 · 60 escenas + 100 imágenes · solo $500 más"
-      ) {
-        full.textContent = "$1,999 · 60 escenas + 100 imágenes · solo $500 más";
+      if (full && full.textContent !== "aprende el método y produce tu primer anuncio") {
+        full.textContent = "aprende el método y produce tu primer anuncio";
       }
-      if (mobile && mobile.textContent !== "2,4× más video · solo $500 más") {
-        mobile.textContent = "2,4× más video · solo $500 más";
+      if (mobile && mobile.textContent !== "aprende y produce tu primer anuncio") {
+        mobile.textContent = "aprende y produce tu primer anuncio";
       }
-      if (buttonFull && buttonFull.textContent !== "Ver la oferta") {
-        buttonFull.textContent = "Ver la oferta";
+      if (buttonFull && buttonFull.textContent !== "Entro hoy") {
+        buttonFull.textContent = "Entro hoy";
       }
-      if (buttonMobile && buttonMobile.textContent !== "Ver oferta") {
-        buttonMobile.textContent = "Ver oferta";
+      if (buttonMobile && buttonMobile.textContent !== "Entro hoy") {
+        buttonMobile.textContent = "Entro hoy";
       }
     }
   }
