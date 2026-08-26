@@ -86,17 +86,21 @@
 .ahc .launch-bar .lb-in {
   color: #fff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
-  min-height: 30px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  font-size: 11px;
-  line-height: 1.15;
+  min-height: 24px;
+  padding: 3px 9px;
+  font-size: 9.5px;
+  line-height: 1.1;
 }
 
 .ahc .launch-bar .lb-dot,
 .ahc .np-dot {
   background: #fff;
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16), 0 0 18px rgba(255, 23, 148, 0.78);
+}
+
+.ahc .launch-bar .lb-dot {
+  width: 6px;
+  height: 6px;
 }
 
 .ahc .stamp,
@@ -445,9 +449,9 @@
 
 @media (max-width: 430px) {
   .ahc .launch-bar .lb-in {
-    min-height: 26px;
-    padding: 4px 7px;
-    font-size: 9.5px;
+    min-height: 22px;
+    padding: 3px 6px;
+    font-size: 8.5px;
   }
 
   .ahc .tier .ae-value-row {
