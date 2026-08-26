@@ -220,12 +220,12 @@
       const anchor = bar.querySelector(".lb-in");
       const offer =
         '<span class="lb-dot" aria-hidden="true"></span>' +
-        '<span class="lb-offer lb-offer-full">VENDE MÁS. GASTA MENOS. CREA ANUNCIOS CON IA.</span>' +
-        '<span class="lb-offer lb-offer-m">VENDE MÁS. GASTA MENOS. CREA ANUNCIOS CON IA.</span> ' +
+        '<span class="lb-offer lb-offer-full">MÁS ANUNCIOS. MENOS COSTO. SIN CÁMARAS NI AGENCIAS.</span>' +
+        '<span class="lb-offer lb-offer-m">MÁS ANUNCIOS. MENOS COSTO. SIN CÁMARAS NI AGENCIAS.</span> ' +
         '<span aria-hidden="true">→</span>';
 
-      if (bar.getAttribute("aria-label") !== "Vende más y gasta menos creando anuncios con IA") {
-        bar.setAttribute("aria-label", "Vende más y gasta menos creando anuncios con IA");
+      if (bar.getAttribute("aria-label") !== "Crea más anuncios con menos costo y sin cámaras ni agencias") {
+        bar.setAttribute("aria-label", "Crea más anuncios con menos costo y sin cámaras ni agencias");
       }
       if (anchor && anchor.innerHTML !== offer) anchor.innerHTML = offer;
     });
