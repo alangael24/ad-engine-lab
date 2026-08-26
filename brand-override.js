@@ -15,7 +15,7 @@
 
   const skippedTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
   const brandLogo = "assets/creative-rush-logo.svg";
-  const brandTheme = "assets/brand-theme.css?v=20260825-6";
+  const brandTheme = "assets/brand-theme.css?v=20260825-7";
 
   function setText(element, value) {
     if (element && element.textContent !== value) element.textContent = value;
@@ -220,12 +220,12 @@
       const anchor = bar.querySelector(".lb-in");
       const offer =
         '<span class="lb-dot" aria-hidden="true"></span>' +
-        '<span class="lb-offer lb-offer-full">ENTRA AL CURSO. PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span>' +
-        '<span class="lb-offer lb-offer-m">ENTRA AL CURSO. PRODUCE TU PRIMER ANUNCIO SIN PAGAR GENERACIONES EXTRA</span> ' +
+        '<span class="lb-offer lb-offer-full">APRENDE EL MÉTODO. CREA TU PRIMER ANUNCIO.</span>' +
+        '<span class="lb-offer lb-offer-m">APRENDE EL MÉTODO. CREA TU PRIMER ANUNCIO.</span> ' +
         '<span aria-hidden="true">→</span>';
 
-      if (bar.getAttribute("aria-label") !== "Produce tu primer anuncio con el curso y la herramienta") {
-        bar.setAttribute("aria-label", "Produce tu primer anuncio con el curso y la herramienta");
+      if (bar.getAttribute("aria-label") !== "Aprende el método y crea tu primer anuncio") {
+        bar.setAttribute("aria-label", "Aprende el método y crea tu primer anuncio");
       }
       if (anchor && anchor.innerHTML !== offer) anchor.innerHTML = offer;
     });
