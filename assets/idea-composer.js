@@ -1,6 +1,6 @@
 import {FORMATS,LOOKS,creativeLabel,creativeGuide} from './creative-formats.js';
 const $=s=>document.querySelector(s),el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n;};
-export function ideaComposer({task,tell,brands,create,openBrand,home,getProject,startChat}){
+export function ideaComposer({task,tell,brands,create,openBrand,home,getProject,startChat,attachReference}){
  let fingerprint=null,brandId=null,creative={format:'auto',look:'auto'},file=null,requestId=null,currentProject=null,resumeAfterChoice=false;
  function closeDialogs(){document.querySelectorAll('.creative-dialog[open]').forEach(d=>d.close());}
  function productLabel(){const b=brands().find(b=>b.id===brandId);$('#idea-product').textContent=b?'＠ '+b.data.name:'＠ Producto';}
@@ -24,7 +24,7 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,getProject,
   // Preserve the same request identity after an ambiguous create response.
   const nextFingerprint=JSON.stringify({idea,creative,brandId});if(nextFingerprint!==fingerprint){requestId=crypto.randomUUID();fingerprint=nextFingerprint;}requestId??=crypto.randomUUID();
   try{const p=await create(requestId,{title:idea.slice(0,100),idea,creative,brandId,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[],narrationAssetId:null,timingConfirmed:false});requestId=null;
-   if(file){const transfer=new DataTransfer();transfer.items.add(file);$('#reference-file').files=transfer.files;$('#reference-file').dispatchEvent(new Event('change'));file=null;$('#idea-file').value='';attachment();$('#reference-dialog').showModal();tell('Idea guardada. La referencia está lista para analizar.');}else{await startChat(idea.slice(0,2000));}
+   if(file){const selected=file;file=null;$('#idea-file').value='';attachment();await attachReference(selected);}else{await startChat(idea.slice(0,2000));}
    $('#idea-input').value='';
   }finally{button.disabled=false;}
  });};

@@ -14,7 +14,7 @@ export async function prepareReference(file,{silent=false,progress=()=>{}}={}){
     if(!silent){
       progress('Preparando el audio de la referencia…');
       const Audio=window.AudioContext||window.webkitAudioContext;const context=new Audio();let decoded;
-      try{decoded=await context.decodeAudioData(original);}catch{error('No pudimos extraer el audio. Prueba otro MP4. Si no tiene voz, marca «Referencia sin narración».');}finally{await context.close();}
+      try{decoded=await context.decodeAudioData(original);}catch{throw Object.assign(new Error('No pudimos extraer el audio.'),{code:'REFERENCE_AUDIO_UNREADABLE'});}finally{await context.close();}
       if(Math.abs(decoded.duration-duration)>1)error('La duración del audio no coincide con el video. Exporta ambos en un solo MP4.');
       const offline=new OfflineAudioContext(1,Math.ceil(duration*16000),16000),src=offline.createBufferSource();src.buffer=decoded;src.connect(offline.destination);src.start();
       const mono=await offline.startRendering();audio=bytesBase64(monoWav(mono.getChannelData(0)));
