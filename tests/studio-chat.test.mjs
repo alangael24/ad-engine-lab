@@ -33,3 +33,13 @@ test('chat records and privileged writes inaccessible to browser roles',async()=
 test('moving preserves source ranges and each clip while retiming captions',()=>{const before=structuredClone(p.data),last=before.scenes.at(-1);const d=applyEdit(p,validateEdit({operation:'move_scene',sceneId:last.id,position:1,message:'Mover'}));assert.equal(d.scenes[0].id,last.id);assert.equal(d.scenes[0].start,0);assert.equal(d.scenes[0].narrationStart,last.narrationStart??last.start);assert.equal(d.scenes[0].selectedVersionId,last.selectedVersionId);assert.equal(d.scenes.at(-1).end,before.scenes.at(-1).end);});
 test('expired requests cannot commit even before another instruction starts',async()=>{const b=request('X');await call(db,'studio_chat_write',[u.id,'reserve',b.requestId,p.id,JSON.stringify({expected:b.expected,message:b.message,enabled:true})]);await db.query("update studio_chat_edits set created_at=now()-interval '4 minutes' where id=$1",[b.requestId]);const r=await call(db,'studio_chat_write',[u.id,'complete',b.requestId,p.id,JSON.stringify({edit:{operation:'set_hook',message:'X'},nextData:p.data})]);assert.equal(r.status,'uncertain');assert.equal((await reload()).revision,b.expected);});
 test('quota prevents unbounded paid inference',async()=>{await db.query("insert into studio_chat_edits(id,user_id,project_id,request_payload,before_data,status) select gen_random_uuid(),$1,$2,'{}','{}','failed' from generate_series(1,30)",[u.id,p.id]);const count=calls;assert.equal((await postStudioChat(ctx(request('Otro')))).status,429);assert.equal(calls,count);});
+
+test('script tool requires a complete value while non-writing responses may use null',()=>{
+ const request=chatRequest(p,[],[],'Escribe el guion');
+ const schema=request.tools[0].function.parameters;
+ assert.ok(schema.required.includes('value'));
+ assert.throws(()=>validateEdit({operation:'draft_script',message:'Aquí tienes el guion.'}),/CHAT_INVALID/);
+ assert.equal(validateEdit({operation:'clarify',message:'¿Qué producto prefieres?',value:null}).operation,'clarify');
+ const draft=validateEdit({operation:'draft_script',message:'Aquí tienes el guion.',value:'Conoce nuestro producto.'});
+ assert.equal(applyEdit({...p,data:{...p.data,scenes:[]}},draft).scriptDraft,'Conoce nuestro producto.');
+});

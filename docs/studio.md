@@ -107,3 +107,12 @@ Validated with `node --test tests/*.test.mjs` (86 passing) and a real Flash dire
 ## Conversation interface (2026-09-05)
 
 The project opens on a single conversation with the current script, production progress, playable render and download action. Reference upload opens from the chat toolbar. Scene, timing and manual assembly controls are available only through the collapsed “Detalles del anuncio” section. This interface change does not enable new-media providers. Locally verified opening/closing optional details, reference dialog and playback of the saved Nebula result without provider calls.
+
+
+## Conversation responsiveness (2026-09-05)
+
+Submitting an idea now starts the first script directly when a saved product is selected and no reference file needs review. A sole saved brand is preselected visibly. After reference adoption, an empty script can start from the saved idea.
+
+Messages appear immediately with a processing indicator. A lost response triggers bounded read-only reconciliation against the existing request ID; an explicit retry reuses that same ID. Typed follow-ups persist in session storage and project URLs retain the open conversation after reload. Same-project refreshes preserve reading position; the latest output follows the conversation when the user is at the bottom. The current script appears alongside the relevant reply, with a compact composer and no repeated idea heading.
+
+The director tool now requires value (nullable for operations without a value); a draft must contain spoken narration, with a separate concise assistant response. Local verification used delayed and dropped HTTP responses, one initial submit/one created project, and no duplicate POST after recovery. Real Flash trials confirmed the final schema can return narration and a shorter follow-up, but these are limited examples, not an ad-quality benchmark. Two earlier tone trials omitted the value, and one returned a storyboard before the contract was clarified.
