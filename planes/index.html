@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,follow" /><meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Elige tu plan | CreativeRush</title>
+  <link rel="icon" href="/assets/favicon.png" /><link rel="stylesheet" href="/assets/onboarding.css?v=20260830-1" />
+  <script defer src="/assets/meta-pixel.js?v=20260830-1"></script>
+</head>
+<body data-onboarding="plans">
+  <header class="on-nav"><a class="on-logo" href="/" aria-label="CreativeRush">Creative<span>Rush</span></a><button class="text-button" id="signout" type="button" hidden>Cambiar de cuenta</button></header>
+  <main class="on-main plans-main">
+    <ol class="on-steps" aria-label="Pasos para empezar"><li class="done"><span>✓</span> Tu cuenta</li><li aria-current="step"><span>2</span> Tu plan</li><li><span>3</span> Tu estudio</li></ol>
+    <div class="on-heading"><h1>Elige cómo empezar.</h1><p>Tu cuenta, lista. Ahora dale producción a tus ideas.</p><p id="account-email" class="account-email">Comprobando tu cuenta…</p></div>
+    <div class="billing-pill">Pago único <span>Sin suscripción</span></div>
+    <section class="plan-card" aria-labelledby="plan-title">
+      <div class="plan-topline"><span class="plan-label">PACK DE LANZAMIENTO</span><span class="plan-tag">Para tu marca</span></div>
+      <h2 id="plan-title">CreativeRush Launch</h2>
+      <p class="muted">De una foto de producto a nuevas escenas para tus ads.</p>
+      <div class="plan-price">$999 <span>MXN</span></div><p class="price-detail">Un solo pago. Sin cargos mensuales.</p>
+      <aside class="availability-note"><strong>Antes de elegir tu pack</strong><p>La generación de video está pausada y la de imágenes aún no está activada. El saldo no se podrá utilizar hasta habilitar estos servicios.</p></aside>
+      <button type="button" class="on-button" id="choose-plan" disabled>Comprobando cuenta…</button>
+      <p class="checkout-caption">Pago seguro con Stripe · se usará el correo de tu cuenta</p>
+      <hr />
+      <ul class="plan-features">
+        <li><span>✓</span><div><strong>12 escenas de video</strong><small>De hasta 5 segundos, en calidad de hasta 720p.</small></div></li>
+        <li><span>✓</span><div><strong>20 generaciones de imagen</strong><small>Para referencias y creativos de producto.</small></div></li>
+        <li><span>✓</span><div><strong>Tu estudio de video ads</strong><small>Describe tu idea y añade una foto si la necesitas.</small></div></li>
+        <li><span>✓</span><div><strong>Tus resultados en un solo lugar</strong><small>Historial y descargas privadas desde tu cuenta.</small></div></li>
+      </ul>
+    </section>
+    <p id="on-message" class="on-message" role="status" aria-live="polite"></p>
+    <a class="studio-link" id="open-studio" href="/herramienta/" hidden>Ya tienes un pack. Ir a mi estudio →</a>
+    <p class="on-bottom">No se realiza ningún cobro hasta que lo confirmes en Stripe.</p>
+    <noscript><p>Activa JavaScript para verificar tu cuenta y continuar al pago.</p></noscript>
+  <p style="text-align:center;padding:16px"><a href="/estudio/">Preparar mi marca y mi anuncio antes de producir →</a></p></main>
+  <script type="module" src="/assets/onboarding.js?v=20260830-1"></script>
+</body>
+</html>

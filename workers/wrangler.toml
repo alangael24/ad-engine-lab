@@ -1,0 +1,6 @@
+name = "creativerush-generation-sweeper"
+main = "sweeper.js"
+compatibility_date = "2026-08-24"
+[triggers]
+crons = ["* * * * *"]
+# Set CREATIVE_RUSH_URL and GENERATION_WORKER_TOKEN through your secret store.

@@ -1,0 +1,22 @@
+const stages={queued:'Tu anuncio está en cola.',planning:'Preparando las escenas de tu guion…',narration:'Preparando la narración…',timing:'Sincronizando las escenas con la voz…',images:'Preparando las imágenes…',clips:'Preparando las tomas…',assembly:'Montando tu video y sus subtítulos…',completed:'Tu video está listo.'};
+export function productionPanel({api,task,getProject,isDirty,tell,refresh}){
+ const root=document.createElement('section');root.className='production-panel';root.setAttribute('aria-label','Producción del anuncio');
+ const status=document.createElement('p');status.setAttribute('role','status');
+ const button=document.createElement('button');button.type='button';button.className='primary';button.textContent='Aprobar guion y crear video';
+ const video=document.createElement('video');video.controls=true;video.playsInline=true;video.hidden=true;video.preload='metadata';
+ root.append(status,button,video);document.querySelector('.chat-editor').after(root);
+ let timer,currentId,lastRender,lastCompletedJob,polling=false;
+ async function open(p){
+  clearTimeout(timer);currentId=p.id;
+  const r=await api('/api/studio-production?project='+p.id);if(getProject()?.id!==p.id)return;
+  const j=r.productions[0],active=j&&['queued','running'].includes(j.status);
+  button.hidden=Boolean(active);button.disabled=!r.enabled||!p.data.scriptDraft?.trim();button.textContent=j?.status==='succeeded'?'Crear otra versión':'Aprobar guion y crear video';
+  status.textContent=j?(j.error||stages[j.stage]||'Preparando tu anuncio…'):(r.enabled?'Revisa el guion. Al aprobarlo, nos encargamos de producir el video.':'La producción automática está sin conexión. Puedes preparar y guardar tu guion.');
+  if(j?.status==='succeeded'&&j.renderId){if(lastRender!==j.renderId){const media=await api('/api/studio?render='+j.renderId);if(getProject()?.id!==p.id)return;video.src=media.url;lastRender=j.renderId;}video.hidden=false;if(lastCompletedJob!==j.id){lastCompletedJob=j.id;await refresh(p.id);return;}}else{video.hidden=true;video.removeAttribute('src');lastRender=null;}
+  if(active)timer=setTimeout(async()=>{if(polling||getProject()?.id!==p.id)return;polling=true;try{await open(getProject());}catch{status.textContent='Reconectando con tu producción…';timer=setTimeout(()=>open(getProject()).catch(()=>{}),5000);}finally{polling=false;}},4000);
+ }
+ button.onclick=()=>task(async()=>{if(isDirty()){tell('Guarda el guion antes de aprobarlo.',true);return;}const p=getProject(),key='studio-production:'+p.id;let request;try{request=JSON.parse(sessionStorage.getItem(key));}catch{}request??={requestId:crypto.randomUUID(),projectId:p.id,expected:p.revision};sessionStorage.setItem(key,JSON.stringify(request));button.disabled=true;
+  try{await api('/api/studio-production',{method:'POST',body:request});sessionStorage.removeItem(key);await open(p);}catch(e){await open(p);throw e;}
+ });
+ return {open,stop(){clearTimeout(timer);}};
+}

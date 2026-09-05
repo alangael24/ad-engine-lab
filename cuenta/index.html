@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,follow" /><meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Crea tu cuenta | CreativeRush</title>
+  <link rel="icon" href="/assets/favicon.png" /><link rel="stylesheet" href="/assets/onboarding.css?v=20260830-google-1" />
+  <script defer src="/assets/meta-pixel.js?v=20260830-1"></script>
+</head>
+<body data-onboarding="account">
+  <header class="on-nav"><a class="on-logo" href="/" aria-label="CreativeRush">Creative<span>Rush</span></a><a href="/">Volver al inicio ↗</a></header>
+  <main class="on-main account-main">
+    <ol class="on-steps" aria-label="Pasos para empezar"><li aria-current="step"><span>1</span> Tu cuenta</li><li><span>2</span> Tu plan</li><li><span>3</span> Tu estudio</li></ol>
+    <div class="on-heading"><span class="on-eyebrow">HECHO PARA TU MARCA</span><h1 id="account-title">Primero, tu cuenta.</h1><p id="account-intro">Tu próximo ad empieza aquí. Crea tu cuenta gratis<br class="desktop-break" /> y después elige tu pack de producción.</p></div>
+    <section class="account-card" aria-labelledby="form-title">
+      <div class="account-icon" aria-hidden="true">✦</div>
+      <h2 id="form-title">Accede a tu cuenta</h2><p class="muted">Con Google o tu correo. Sin tarjeta en este paso.</p>
+      <button type="button" class="google-button" id="google-signin" aria-describedby="google-status" disabled>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.61 4.61 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.31 2.98-7.36Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.61-2.41l-3.24-2.51c-.9.6-2.05.96-3.37.96-2.6 0-4.81-1.76-5.6-4.13H3.05v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.91A6 6 0 0 1 6.09 12c0-.66.11-1.31.31-1.91V7.5H3.05A10 10 0 0 0 2 12c0 1.61.39 3.14 1.05 4.5l3.35-2.59Z"/><path fill="#EA4335" d="M12 5.96c1.47 0 2.79.51 3.83 1.51l2.87-2.87A9.61 9.61 0 0 0 12 2a10 10 0 0 0-8.95 5.5l3.35 2.59c.79-2.37 3-4.13 5.6-4.13Z"/></svg>
+        <span id="google-label">Continuar con Google</span>
+      </button>
+      <p id="google-status" class="google-status" role="status" hidden></p>
+      <div class="auth-divider"><span>o continúa con tu correo</span></div>
+      <form id="signup-form">
+        <label for="signup-email">Tu correo electrónico</label>
+        <input id="signup-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="tu@marca.com" required maxlength="254" />
+        <button class="on-button" id="signup-submit" type="submit" disabled>Conectando…</button>
+      </form>
+      <p id="on-message" class="on-message" role="status" aria-live="polite"></p>
+      <p class="account-switch" id="account-switch">¿Ya tienes cuenta? <a href="/cuenta/?mode=login">Inicia sesión</a></p>
+      <div class="account-footnote">Si eliges correo, te enviaremos un enlace para confirmar que es tuyo. Crear tu cuenta no realiza ningún cobro ni incluye generaciones gratuitas.</div>
+    </section>
+    <p class="on-bottom">Tu producto. Tus ideas. Tu próximo anuncio.</p>
+    <noscript><p>Activa JavaScript para crear tu cuenta e iniciar sesión.</p></noscript>
+  </main>
+  <script type="module" src="/assets/onboarding.js?v=20260830-google-1"></script>
+</body>
+</html>

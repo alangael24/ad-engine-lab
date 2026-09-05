@@ -555,12 +555,13 @@
         *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
       }
     </style>
+    <link rel="stylesheet" href="../assets/tool-jobs.css" />
     <script src="/assets/meta-pixel.js?v=20260825-1"></script>
   </head>
   <body>
     <div class="preview-bar">
       <span class="preview-dot" aria-hidden="true"></span>
-      Vista previa · todavía no descuenta créditos
+      <span id="service-status">Comprobando disponibilidad…</span>
     </div>
 
     <aside class="sidebar" aria-label="Proyectos">
@@ -569,13 +570,14 @@
         <span class="new-icon" aria-hidden="true">+</span>
         Nuevo proyecto
       </button>
+      <a class="course-link" href="/estudio/" style="margin:14px 0">Mis marcas y anuncios completos →</a>
       <h2 class="recent-heading">Recientes</h2>
       <div class="recent-list" id="recent-list">
         <p class="recent-empty">Tus escenas aparecerán aquí para que puedas continuarlas.</p>
       </div>
       <div class="sidebar-bottom">
-        <a class="course-link" href="../curso/">
-          <span>Módulos del curso</span><span aria-hidden="true">→</span>
+        <a class="course-link" href="/planes/">
+          <span>Mi pack de producción</span><span aria-hidden="true">→</span>
         </a>
         <div class="credits"><span class="credit-dot" aria-hidden="true"></span><span id="desktop-credit-copy">Comprobando saldo…</span></div>
       </div>
@@ -584,7 +586,7 @@
     <div class="workspace">
       <header class="mobile-header">
         <a class="brand" href="../" aria-label="Volver a CreativeRush AI"><img src="../assets/creative-rush-logo.svg" alt="CreativeRush AI" /></a>
-        <div class="mobile-actions">
+        <div class="mobile-actions"><a href="/estudio/" style="font-size:11px">Mis anuncios</a>
           <button class="mobile-new" id="mobile-new" type="button">+ Nuevo</button>
           <span class="mobile-credits" id="mobile-credit-copy">Saldo…</span>
         </div>
@@ -600,14 +602,13 @@
 
       <main class="creator">
         <section class="hero" aria-labelledby="page-title">
-          <h1 id="page-title">¿Qué vamos a crear hoy?</h1>
-          <p>Una idea es suficiente. La herramienta decide cómo convertirla en una escena.</p>
+          <h1 id="page-title">Tu producto. Tu próximo ad.</h1>
+          <p>Describe el video que necesitas para tu marca. La foto de tu producto es opcional.</p>
         </section>
 
         <section class="creation-area" aria-label="Crear una escena">
           <div class="prepared-status" id="prepared-status" aria-live="polite">
-            <span class="status-check" aria-hidden="true">✓</span>
-            <span id="status-text">Solicitud preparada.</span>
+            <span id="status-text"></span>
           </div>
 
           <div class="composer" id="composer">
@@ -662,202 +663,33 @@
                 </span>
               </div>
 
-              <button class="generate-button" id="generate-button" type="button" aria-label="Generar escena" disabled>↑</button>
+              <span class="generation-cost" id="generation-cost">Usa 1 clip de tu saldo</span>
+              <button class="generate-button" id="generate-button" type="button" aria-label="Generar video" disabled>↑</button>
             </div>
           </div>
 
-          <p class="helper">La referencia es opcional · escribe tu idea con lenguaje normal · antes de generar siempre verás cuántos créditos cuesta</p>
+          <p class="helper">5 s = 1 clip de saldo · si falla, se devuelve automáticamente · tus videos son privados</p>
+          <p class="helper">La generación de imágenes todavía no está conectada. Tu saldo de imágenes se conserva.</p>
+        </section>
+        <section class="jobs-section" aria-labelledby="jobs-title">
+          <h2 id="jobs-title">Tus videos</h2>
+          <p class="jobs-note">Últimos 50 trabajos. Puedes cerrar la pestaña y regresar después.</p>
+          <div id="generation-results" class="generation-results"><p>Todavía no has generado videos.</p></div>
         </section>
       </main>
     </div>
 
     <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title" hidden>
       <div class="auth-card">
-        <p class="auth-kicker">Acceso de alumnos</p>
-        <h2 id="auth-title">Entra con el correo de tu compra.</h2>
-        <p class="auth-copy">No necesitas contraseña. Te enviaremos un enlace seguro y cargaremos automáticamente los créditos incluidos en tu plan.</p>
-        <form class="auth-form" id="auth-form">
-          <label for="auth-email">Correo usado en Stripe</label>
-          <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="tu@email.com" required />
-          <button class="auth-submit" id="auth-submit" type="submit">Enviarme mi acceso →</button>
-        </form>
+        <p class="auth-kicker">Tu estudio de video ads</p>
+        <h2 id="auth-title">Primero, tu cuenta.</h2>
+        <p class="auth-copy">Crea tu cuenta gratis. Después elige un pack de producción para tu marca.</p>
+        <a class="auth-submit" href="/cuenta/">Crear cuenta o iniciar sesión →</a>
         <p class="auth-message" id="auth-message" aria-live="polite"></p>
-        <p class="auth-note">Si acabas de pagar, espera unos segundos. Tu cuenta se crea desde el pago confirmado, no desde este formulario.</p>
+        <p class="auth-note">Si ya tienes cuenta y saldo, entrarás directamente a tu estudio.</p>
       </div>
     </section>
 
-    <script>
-      (() => {
-        const prompt = document.querySelector("#scene-prompt");
-        const charCount = document.querySelector("#char-count");
-        const composer = document.querySelector("#composer");
-        const generateButton = document.querySelector("#generate-button");
-        const durationSelect = document.querySelector("#duration-select");
-        const resolutionSelect = document.querySelector("#resolution-select");
-        const ratioSelect = document.querySelector("#ratio-select");
-        const fileInput = document.querySelector("#reference-file");
-        const preview = document.querySelector("#reference-preview");
-        const previewImage = document.querySelector("#reference-image");
-        const removeReference = document.querySelector("#remove-reference");
-        const assetsButton = document.querySelector("#assets-button");
-        const preparedStatus = document.querySelector("#prepared-status");
-        const statusText = document.querySelector("#status-text");
-        const recentList = document.querySelector("#recent-list");
-        const newProjectButtons = [document.querySelector("#new-project"), document.querySelector("#mobile-new")].filter(Boolean);
-        const storageKey = "creative-rush-ai-recent-scenes-v2";
-
-        let selectedDuration = 5;
-        let selectedResolution = "720p";
-        let selectedRatio = "9:16";
-        let referenceFile = null;
-        let previewUrl = null;
-        let accountReady = false;
-
-        const updatePromptState = () => {
-          charCount.textContent = `${prompt.value.length} / 1600`;
-          generateButton.disabled = prompt.value.trim().length < 8 || !accountReady;
-          preparedStatus.classList.remove("is-visible");
-        };
-
-        const updateSettings = () => {
-          durationSelect.value = String(selectedDuration);
-          resolutionSelect.value = selectedResolution;
-          ratioSelect.value = selectedRatio;
-        };
-
-        const setReference = (file) => {
-          if (!file || !file.type.startsWith("image/")) return;
-          referenceFile = file;
-          if (previewUrl) URL.revokeObjectURL(previewUrl);
-          previewUrl = URL.createObjectURL(file);
-          previewImage.src = previewUrl;
-          preview.classList.add("is-visible");
-        };
-
-        const clearReference = () => {
-          referenceFile = null;
-          fileInput.value = "";
-          preview.classList.remove("is-visible");
-          previewImage.removeAttribute("src");
-          if (previewUrl) URL.revokeObjectURL(previewUrl);
-          previewUrl = null;
-        };
-
-        const readRecent = () => {
-          try { return JSON.parse(window.localStorage.getItem(storageKey) || "[]"); }
-          catch { return []; }
-        };
-        const writeRecent = (items) => {
-          try { window.localStorage.setItem(storageKey, JSON.stringify(items.slice(0, 8))); }
-          catch { /* La creación funciona aunque el navegador bloquee el historial local. */ }
-        };
-        const cleanTitle = (value) => {
-          const cleaned = value.replace(/\s+/g, " ").trim().replace(/[&<>"']/g, "");
-          return cleaned.length > 34 ? `${cleaned.slice(0, 34)}…` : cleaned;
-        };
-
-        const renderRecent = () => {
-          const items = readRecent();
-          if (!items.length) {
-            recentList.innerHTML = '<p class="recent-empty">Tus escenas aparecerán aquí para que puedas continuarlas.</p>';
-            return;
-          }
-          recentList.innerHTML = items.map((item, index) => `
-            <button class="recent-item" type="button" data-recent="${index}">
-              <span class="recent-thumb" aria-hidden="true">${index + 1}</span>
-              <span class="recent-copy">
-                <strong>${item.title}</strong>
-                <small>${item.duration} s · ${item.resolution} · ${item.ratio}</small>
-              </span>
-            </button>`).join("");
-
-          recentList.querySelectorAll("[data-recent]").forEach((button) => {
-            button.addEventListener("click", () => {
-              const item = readRecent()[Number(button.dataset.recent)];
-              if (!item) return;
-              prompt.value = item.prompt;
-              selectedDuration = item.duration || 5;
-              selectedResolution = item.resolution || "720p";
-              selectedRatio = item.ratio || "9:16";
-              updateSettings();
-              updatePromptState();
-              prompt.focus();
-            });
-          });
-        };
-
-        const resetProject = () => {
-          prompt.value = "";
-          selectedDuration = 5;
-          selectedResolution = "720p";
-          selectedRatio = "9:16";
-          clearReference();
-          updateSettings();
-          updatePromptState();
-          prompt.focus();
-        };
-
-        prompt.addEventListener("input", updatePromptState);
-        prompt.addEventListener("keydown", (event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !generateButton.disabled) {
-            event.preventDefault();
-            generateButton.click();
-          }
-        });
-        durationSelect.addEventListener("change", () => { selectedDuration = Number(durationSelect.value); });
-        resolutionSelect.addEventListener("change", () => { selectedResolution = resolutionSelect.value; });
-        ratioSelect.addEventListener("change", () => { selectedRatio = ratioSelect.value; });
-        fileInput.addEventListener("change", () => setReference(fileInput.files?.[0]));
-        assetsButton.addEventListener("click", () => fileInput.click());
-        removeReference.addEventListener("click", clearReference);
-        ["dragenter", "dragover"].forEach((name) => composer.addEventListener(name, (event) => {
-          event.preventDefault();
-          composer.classList.add("is-dragging");
-        }));
-        ["dragleave", "drop"].forEach((name) => composer.addEventListener(name, (event) => {
-          event.preventDefault();
-          composer.classList.remove("is-dragging");
-        }));
-        composer.addEventListener("drop", (event) => setReference(event.dataTransfer?.files?.[0]));
-        newProjectButtons.forEach((button) => button.addEventListener("click", resetProject));
-        window.addEventListener("ad-engine:auth-state", (event) => {
-          accountReady = event.detail?.authenticated === true;
-          updatePromptState();
-        });
-
-        generateButton.addEventListener("click", () => {
-          if (generateButton.disabled) return;
-          const payload = {
-            prompt: prompt.value.trim(),
-            mode: "auto",
-            durationSeconds: selectedDuration,
-            resolution: selectedResolution,
-            aspectRatio: selectedRatio,
-            referenceImage: referenceFile,
-          };
-          window.lastAdEngineRequest = payload;
-          window.dispatchEvent(new CustomEvent("ad-engine:generate", { detail: payload }));
-
-          const recent = readRecent();
-          recent.unshift({
-            title: cleanTitle(payload.prompt),
-            prompt: payload.prompt,
-            duration: selectedDuration,
-            resolution: selectedResolution,
-            ratio: selectedRatio,
-            createdAt: new Date().toISOString(),
-          });
-          writeRecent(recent);
-          renderRecent();
-          statusText.textContent = `${selectedDuration} s · ${selectedResolution} · ${selectedRatio} · ${referenceFile ? "con referencia" : "sin referencia"}`;
-          preparedStatus.classList.add("is-visible");
-        });
-
-        updateSettings();
-        updatePromptState();
-        renderRecent();
-      })();
-    </script>
-    <script type="module" src="../assets/tool-account.js"></script>
+    <script type="module" src="../assets/tool-app.js"></script>
   </body>
 </html>

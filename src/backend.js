@@ -1,15 +1,23 @@
 import { createClient } from "@supabase/supabase-js";
 
 export const PLAN_BY_PAYMENT_LINK = Object.freeze({
+  plink_1U8z8uEudyi7fxH7OsFRKvC9: Object.freeze({
+    code: "esencial",
+    videoCredits: 12,
+    imageCredits: 20,
+    courseAccess: false,
+  }),
   plink_1U8OYPEudyi7fxH7JgMyocZY: Object.freeze({
     code: "esencial",
     videoCredits: 25,
     imageCredits: 50,
+    courseAccess: true,
   }),
   plink_1U8OYOEudyi7fxH7YMCWb1rc: Object.freeze({
     code: "pro",
     videoCredits: 60,
     imageCredits: 100,
+    courseAccess: true,
   }),
 });
 

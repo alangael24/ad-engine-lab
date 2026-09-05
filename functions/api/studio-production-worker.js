@@ -1,0 +1,44 @@
+import {getSupabaseAdmin,json} from '../../src/backend.js';
+import {readJson,rpc,UUID,ApiError} from '../../src/generations.js';
+import {verifyWorker} from './worker.js';
+import {signed,own} from '../../src/studio.js';
+import {productionError} from '../../src/studio-production.js';
+import {projectData,scenePrompt} from '../../assets/studio-model.js';
+export async function onRequestPost(context){try{
+ await verifyWorker(context.request,context.env.PRODUCTION_WORKER_TOKEN);
+ const db=getSupabaseAdmin(context.env),b=await readJson(context.request,150000);
+ if(!/^[\w-]{1,80}$/.test(b.workerId||''))throw new ApiError('UNAUTHORIZED');
+ const args={p_worker:b.workerId,p_action:b.action,p_id:b.jobId||null,p_lease:b.leaseToken||null,p_data:b.data||{}};
+ if(b.action==='claim'){
+  if(context.env.PRODUCTION_ENABLED!=='true')return json({job:null});
+  return json({job:await rpc(db,'studio_production_work',args)});
+ }
+ if(!UUID.test(b.jobId||'')||!UUID.test(b.leaseToken||''))throw new ApiError('LEASE_LOST');
+ if(['heartbeat','inspect','begin_step','finish_step','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
+ const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
+ if(b.action==='asset'){
+  const a=await own(db,'studio_assets',j.user_id,b.data?.assetId);return json({asset:a,url:await signed(db,a.bucket,a.storage_path)});
+ }
+ if(b.action==='upload'||b.action==='register'){
+  const d=b.data;if(!UUID.test(d?.assetId||'')||!['image','narration'].includes(d.kind))throw Error('PRODUCTION_INVALID');
+  const bucket=d.kind==='image'?'generation-references':'studio-media';
+  const ext=d.kind==='image'?'png':'mp3',mime=d.kind==='image'?'image/png':'audio/mpeg',path=`${j.user_id}/production/${j.id}/${d.assetId}.${ext}`;
+  if(b.action==='upload'){const u=await db.storage.from(bucket).createSignedUploadUrl(path);if(u.error)throw u.error;return json({uploadUrl:u.data.signedUrl});}
+  const info=await db.storage.from(bucket).info(path),size=info.data?.size??info.data?.metadata?.size,type=info.data?.contentType??info.data?.metadata?.mimetype;
+  if(info.error||!size||size>(d.kind==='image'?6291456:20971520)||type!==mime)throw new ApiError('RESULT_NOT_READY');
+  if(d.kind==='narration'&&(!Number.isFinite(d.duration)||d.duration<=0||d.duration>120))throw Error('PRODUCTION_TIMING');
+  return json({value:await rpc(db,'studio_production_work',{...args,p_action:'write',p_data:{key:`asset-${d.assetId}`,stage:j.stage,action:'register_asset',assetId:d.assetId,data:{kind:d.kind,name:d.kind==='image'?'Imagen del anuncio':'Narración del anuncio',bucket,storage_path:path,mime_type:mime,size_bytes:size,duration_seconds:d.kind==='image'?null:d.duration}}})});
+ }
+ if(b.action==='write'){
+  const d={...b.data};if(!['save_project','version','select_version','render'].includes(d.action))throw Error('PRODUCTION_INVALID');
+  if(d.action==='save_project')d.data=projectData(d.data);
+  if(d.action==='version'){
+   if(!UUID.test(d.data?.requestId||'')||!UUID.test(d.data?.sceneId||''))throw Error('PRODUCTION_INVALID');
+   if(!d.data.assetId&&context.env.GENERATION_ENABLED!=='true')throw new ApiError('WORKER_OFFLINE');
+   const p=await own(db,'studio_projects',j.user_id,j.project_id);
+   d.data={requestId:d.data.requestId,sceneId:d.data.sceneId,assetId:d.data.assetId||null,instruction:'Producción automática',prompt:scenePrompt(p,d.data.sceneId)};
+  }
+  return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});
+ }
+ throw Error('PRODUCTION_INVALID');
+}catch(e){return productionError(e);}}

@@ -43,9 +43,9 @@ async function grantPurchase(supabase, event, session, plan, paymentLinkId, env)
 
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || null;
   const appUrl = String(env.APP_URL || "https://creativerushai.com").replace(/\/$/, "");
-  await ensureAccount(supabase, email, `${appUrl}/campus/`);
+  await ensureAccount(supabase, email, `${appUrl}/herramienta/`);
 
-  const { data, error } = await supabase.rpc("apply_stripe_purchase", {
+  const { data, error } = await supabase.rpc("apply_saas_purchase", {
     p_event_id: event.id,
     p_checkout_session_id: session.id,
     p_payment_link_id: paymentLinkId,
@@ -57,6 +57,7 @@ async function grantPurchase(supabase, event, session, plan, paymentLinkId, env)
     p_payment_status: String(session.payment_status || "paid"),
     p_video_credits: plan.videoCredits,
     p_image_credits: plan.imageCredits,
+    p_course_access: plan.courseAccess === true,
   });
 
   if (error) throw error;

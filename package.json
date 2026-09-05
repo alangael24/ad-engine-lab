@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "worker:h3": "node workers/h3-worker.mjs",
     "build": "node scripts/build-static.mjs",
     "predev": "npm run build",
     "dev": "wrangler pages dev dist",
@@ -15,6 +17,7 @@
     "stripe": "22.5.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "wrangler": "4.125.0"
   }
 }
