@@ -1,12 +1,28 @@
 export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
  const $=s=>document.querySelector(s),log=$('#chat-history'),form=$('#chat-form'),input=$('#chat-input'),scriptCard=$('#chat-script'),scriptText=$('#chat-script-text');
- let projectId=null,available=false,rows=[],poll=null,inFlight=false,view=0,deliveryNote='',polls=0,followLatest=true;
+ let projectId=null,available=false,rows=[],poll=null,inFlight=false,view=0,deliveryNote='',polls=0,followLatest=true,streamNodes=null;
  const drafts=new Map(),key=id=>'studio-chat:'+id;
  const pending=id=>{try{return JSON.parse(sessionStorage.getItem(key(id)));}catch{return null;}};
  const saveDraft=(id,value)=>{drafts.set(id,value);try{sessionStorage.setItem(key(id)+':draft',value);}catch{}};
  const active=()=>getProject()?.id===projectId;
  function line(text,kind){const p=document.createElement('p');p.className='chat-message '+kind;p.textContent=text;log.append(p);return p;}
  function busyLine(text){const p=line(text,'detail chat-working');p.setAttribute('role','status');}
+ function streaming(event,id){
+  if(projectId!==id||!active())return;
+  if(!streamNodes){
+   log.querySelectorAll('.chat-working').forEach(n=>n.remove());
+   const root=document.createElement('article');root.className='chat-streaming';root.setAttribute('aria-label','Respuesta en curso');
+   const message=document.createElement('p');message.className='chat-message assistant';
+   const script=document.createElement('p');script.className='stream-script';script.hidden=true;root.append(message,script);log.append(root);
+   streamNodes={root,message,script,text:{message:'',script:''}};
+  }
+  streamNodes.text[event.field]+=event.text;
+  const text=streamNodes.text[event.field],lastSpace=Math.max(text.lastIndexOf(' '),text.lastIndexOf('\n'));
+  // Reveal complete words as they arrive; no timer or simulated typing.
+  streamNodes[event.field].textContent=lastSpace>=0?text.slice(0,lastSpace+1):'';
+  if(event.field==='script'){streamNodes.script.hidden=false;scriptCard.hidden=true;}
+  if(followLatest)reveal();
+ }
  function controls(){const waiting=pending(projectId)||rows.some(r=>r.status==='running');$('#chat-send').disabled=!available||Boolean(waiting)||inFlight;$('#chat-recover').hidden=!waiting||inFlight;$('#chat-recover').textContent='Comprobar respuesta';$('#chat-status').textContent=!available?'Asistente temporalmente sin conexión.':waiting?'Puedes escribir tu siguiente mensaje mientras termino.':'';}
  function paint(){
   const script=getProject()?.data.scriptDraft?.trim();scriptCard.hidden=!script;scriptText.textContent=script||'';
@@ -49,19 +65,19 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   const existing=pending(id);
   if(existing&&existing.message!==message){await sync(id);return;}
   const request=existing||{projectId:id,expected:p.revision,requestId:crypto.randomUUID(),message};
-  sessionStorage.setItem(key(id),JSON.stringify(request));if(!existing){input.value='';input.style.height='auto';saveDraft(id,'');}polls=0;inFlight=true;deliveryNote='';paint();
+  sessionStorage.setItem(key(id),JSON.stringify(request));if(!existing){input.value='';input.style.height='auto';saveDraft(id,'');}polls=0;inFlight=true;streamNodes=null;deliveryNote='';paint();
   followLatest=true;reveal();
   try{
-   const r=await api('/api/studio-chat',{method:'POST',body:request});
+   const r=await api('/api/studio-chat',{method:'POST',body:request,onDelta:event=>streaming(event,id)});
    if(r.edit.status!=='running')sessionStorage.removeItem(key(id));
-   if(projectId===id&&active()){rows=rows.filter(x=>x.id!==r.edit.id).concat(r.edit);paint();const follow=followLatest;await refresh(id);if(follow)reveal();}
+   if(projectId===id&&active()){rows=rows.filter(x=>x.id!==r.edit.id).concat(r.edit);const follow=followLatest;await refresh(id);if(follow)reveal();}
   }catch(e){
    // A lost response never creates a second request identity. Read persisted state first.
    if(['CHAT_OFFLINE','CHAT_LIMIT','STUDIO_CONFLICT','CHAT_BUSY','PRODUCTION_BUSY','UNAUTHORIZED','STUDIO_NOT_FOUND'].includes(e.code)){
     sessionStorage.removeItem(key(id));if(projectId===id){deliveryNote=e.message;if(!input.value){input.value=message;saveDraft(id,message);}}
    }else if(projectId===id)deliveryNote='La conexión se interrumpió. Estoy comprobando si tu respuesta quedó guardada.';
    if(projectId===id&&active())try{await sync(id);}catch{}
-  }finally{inFlight=false;if(projectId===id&&active()){paint();schedule(id);input.focus({preventScroll:true});}}
+  }finally{streamNodes=null;inFlight=false;if(projectId===id&&active()){paint();schedule(id);input.focus({preventScroll:true});}}
  }
  form.onsubmit=e=>{e.preventDefault();task(()=>send(input.value));};
  $('#chat-recover').onclick=()=>task(async()=>{

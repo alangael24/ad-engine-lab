@@ -1,3 +1,4 @@
+import {readChatResponse} from './chat-stream.js';
 // Shared browser auth. Account creation never grants production credits.
 let clientPromise, publicConfig, providersPromise;
 export function getAuthClient() {
@@ -76,13 +77,14 @@ export async function requestGoogleAccess() {
   await authorizeGoogle(client, location.origin);
 }
 
-export async function apiRequest(resource, { body, method = 'GET', raw = false } = {}) {
+export async function apiRequest(resource, { body, method = 'GET', raw = false, onDelta } = {}) {
   const client = await getAuthClient();
   const { data, error } = await client.auth.getSession();
   if (error || !data.session) throw Object.assign(new Error('Inicia sesión para continuar.'), { code: 'UNAUTHORIZED' });
-  const headers = { accept: 'application/json', authorization: `Bearer ${data.session.access_token}` };
+  const headers = { accept: onDelta ? 'text/event-stream' : 'application/json', authorization: `Bearer ${data.session.access_token}` };
   if (body != null) headers['content-type'] = raw ? body.type : 'application/json';
   const response = await fetch(resource, { method, headers, ...(body != null ? { body: raw ? body : JSON.stringify(body) } : {}) });
+  if(response.ok&&onDelta&&response.headers.get('content-type')?.includes('text/event-stream'))return readChatResponse(response,onDelta);
   const payload = await response.json();
   if (!response.ok) throw Object.assign(new Error(payload.error || 'No se pudo completar la solicitud.'), { code: payload.code || (response.status === 401 ? 'UNAUTHORIZED' : 'REQUEST_FAILED') });
   return payload;
