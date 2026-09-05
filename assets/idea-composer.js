@@ -12,9 +12,14 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   if(!brands().some(b=>b.id===brandId)){let last;try{last=localStorage.getItem('studio-last-product');}catch{}brandId=brands().some(b=>b.id===last)?last:brands().length===1?brands()[0].id:null;}
   const onboarding=waitingForStore||!brands().length;
   $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':'¿Qué anuncio quieres crear?';
-  input.placeholder=onboarding?'Pega el enlace de tu tienda o producto…':'Describe tu idea o añade una referencia…';
+  input.placeholder=onboarding?'Ej. mitienda.com':'Describe tu idea o añade una referencia…';
+  $('#empty').classList.toggle('needs-product',onboarding);
+  $('#idea-label').className=onboarding?'home-input-label':'sr-only';
+  $('#idea-label').textContent=onboarding?'Pega el enlace de tu tienda o producto':'Tu idea o referencia';
+  $('#idea-submit').textContent=onboarding?'Continuar':'↑';
+  input.setAttribute('inputmode',onboarding?'url':'text');
   $('#idea-attach').hidden=onboarding;$('#idea-options').hidden=onboarding;
-  $('#idea-submit').setAttribute('aria-label',onboarding?'Encontrar mi producto':'Crear anuncio');$('#idea-submit').title=onboarding?'Encontrar mi producto':'Crear anuncio';
+  $('#idea-submit').setAttribute('aria-label',onboarding?'Continuar':'Crear anuncio');$('#idea-submit').title=onboarding?'Continuar':'Crear anuncio';
   const b=brands().find(b=>b.id===brandId);$('#idea-product').hidden=!b;$('#idea-product').textContent=b?b.data.name+' ⌄':'';
   $('#idea-style').textContent=creative.format==='auto'&&creative.look==='auto'?'Estilo automático':creativeLabel(creative);
  }
