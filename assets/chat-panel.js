@@ -1,4 +1,6 @@
+import {createVisualCollector} from './chat-visuals.js';
 export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
+ const collectVisuals=createVisualCollector(api);
  const $=s=>document.querySelector(s),log=$('#chat-history'),form=$('#chat-form'),input=$('#chat-input'),scriptCard=$('#chat-script'),scriptText=$('#chat-script-text');
  let projectId=null,available=false,rows=[],poll=null,inFlight=false,view=0,deliveryNote='',polls=0,followLatest=true,streamNodes=null;
  const drafts=new Map(),key=id=>'studio-chat:'+id;
@@ -33,7 +35,8 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   if(!rows.length&&!request)line('Tengo el contexto de tu producto. Dime qué quieres crear o cambiar.','assistant');
   for(const [index,r] of rows.entries()){line(r.message,'user');if(r.status==='succeeded'){
    line(r.result.message,'assistant');if(index===scriptRow&&script)log.append(scriptCard);
-   if(r.result.operation==='set_look'||r.result.operation==='edit_scene')line('La dirección está actualizada. El video cambiará al producir las nuevas tomas.','detail');
+   if(r.result.productionId)line('Estoy preparando las tomas necesarias y la nueva versión.','detail');
+   if(r.result.productionError)line(({PRODUCTION_LIMIT:'Los cambios están guardados. Alcanzaste el límite de producciones de esta prueba.',PRODUCTION_PRODUCT:'Los cambios están guardados. Falta una imagen del producto para generar las tomas.',PRODUCTION_BUSY:'Los cambios están guardados. Hay otra producción en curso.'}[r.result.productionError]||'Los cambios están guardados. La generación de nuevas tomas no está disponible ahora.'),'detail');
    if(r.result.renderError)line(({STUDIO_WORKER_OFFLINE:'El montaje está temporalmente sin conexión.',STUDIO_RENDER_BUSY:'Tu montaje está esperando a que terminen los anteriores.',STUDIO_NARRATION_REQUIRED:'El cambio está guardado. Falta la narración para montarlo.',STUDIO_AUDIO_TIMING:'El cambio está guardado. El audio necesita sincronizarse antes del montaje.',STUDIO_NOT_READY:'El cambio está guardado. Faltan tomas para montar el video.',STUDIO_CLIP_TOO_SHORT:'El cambio está guardado. Una toma necesita más duración.'}[r.result.renderError]||'El cambio está guardado; todavía no pude montar el video.'),'detail');
   }else if(r.status==='running')busyLine('Estoy trabajando en tu anuncio…');
   else line(r.status==='uncertain'?'No pude confirmar esta respuesta. Tu anuncio conserva la última versión guardada.':r.result?.message||'No pude completar este cambio. Tu anuncio se conservó.','detail');}
@@ -68,7 +71,8 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   sessionStorage.setItem(key(id),JSON.stringify(request));if(!existing){input.value='';input.style.height='auto';saveDraft(id,'');}polls=0;inFlight=true;streamNodes=null;deliveryNote='';paint();
   followLatest=true;reveal();
   try{
-   const r=await api('/api/studio-chat',{method:'POST',body:request,onDelta:event=>streaming(event,id)});
+   const visuals=await collectVisuals(p);
+   const r=await api('/api/studio-chat',{method:'POST',body:{...request,visuals},onDelta:event=>streaming(event,id)});
    if(r.edit.status!=='running')sessionStorage.removeItem(key(id));
    if(projectId===id&&active()){rows=rows.filter(x=>x.id!==r.edit.id).concat(r.edit);const follow=followLatest;await refresh(id);if(follow)reveal();}
   }catch(e){

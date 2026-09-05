@@ -19,14 +19,25 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
  try{
   await invoke('heartbeat');await providers.ready?.();
   const project=job.snapshot;
-  const plan=await once('plan','planning',async()=>validatePlan(await providers.plan(project,invoke),project.data.scriptDraft));
-  const narration=await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
-  const timeline=await once('timing','timing',()=>alignScenes(plan,narration.alignment,narration.duration));
-  const images=[];
-  for(const [i,s] of plan.scenes.entries())images.push(await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:images[0],invoke,jobId:job.id})));
-  const scenes=timeline.map(s=>({...s,visual:`${s.visual}\nMovimiento: ${s.motion}`.slice(0,800),imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId}));
+  const existing=project.data.scenes||[],revision=existing.length>0;
+  const plan=await once('plan','planning',async()=>revision?{
+   continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
+   scenes:existing.map(s=>({...s,motion:'Follow the approved scene direction; preserve continuity.'}))
+  }:validatePlan(await providers.plan(project,invoke),project.data.scriptDraft));
+  const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
+  const narration=reuseNarration?{assetId:project.data.narrationAssetId}:await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
+  const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
+  // Existing stills anchor regenerated scenes even when the first shot changes.
+  const images=[],existingAnchor=existing.find(s=>s.imageAssetId);
+  const reusable=s=>s.selectedVersionId&&(reuseNarration||timeline.filter(t=>t.planSceneId===s.id).every(t=>t.id===s.id&&t.end-t.start<=s.end-s.start));
+  for(const [i,s] of plan.scenes.entries())images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
+  const scenes=timeline.map(s=>{
+   const old=existing.find(p=>p.id===s.id),keep=old?.selectedVersionId&&(reuseNarration||s.end-s.start<=old.end-old.start);
+   return {...s,visual:revision?s.visual:`${s.visual}\nMovimiento: ${s.motion}`.slice(0,800),imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
+  });
   await write('prepare','images','save_project',{...project.data,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
   for(const [i,s] of scenes.entries()){
+   if(s.selectedVersionId)continue;
    const source=await once(`source-${i}`,'clips',()=>providers.clip?.({project,plan,scene:s,index:i,invoke})||{});
    const v=await write(`clip-${i}`,'clips','version',{requestId:await stableId(job.id,`clip-${i}`),sceneId:s.id,assetId:source.assetId||null});
    await wait(c=>{const version=c.versions.find(x=>x.id===v.id);if(version?.status==='failed'||version?.status==='canceled')throw Error('PRODUCTION_CLIP_FAILED');return version?.status==='succeeded';});
