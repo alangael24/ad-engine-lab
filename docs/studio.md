@@ -102,3 +102,8 @@ The chat `produce` operation atomically starts a snapshot production. `workers/p
 Run the worker with CREATIVE_RUSH_URL, PRODUCTION_WORKER_TOKEN, PRODUCTION_WORKER_ID, REFERENCE_FLASH_KEY, OPENAI_API_KEY, ELEVENLABS_API_KEY and PRODUCTION_VOICE_ID. Server-side PRODUCTION_ENABLED and the existing GENERATION_ENABLED flags must be deliberately configured only after provider and billing validation. No such activation was performed in this release. Existing render and H3 queues remain separate workers.
 
 Validated with `node --test tests/*.test.mjs` (86 passing) and a real Flash director plus existing Nebula images/audio/clips in `tests/production-preview.mjs`. The fixture produced an eleven-scene 37.375-second MP4 from one chat approval. It uses cached Scribe timestamps and a described material catalog. New OpenAI image and ElevenLabs speech adapters have not been live-tested. This is not a claim that unrestricted new-media customer production is ready. Deployment: 4429495d.ad-engine-lab.pages.dev.
+
+
+## Conversation interface (2026-09-05)
+
+The project opens on a single conversation with the current script, production progress, playable render and download action. Reference upload opens from the chat toolbar. Scene, timing and manual assembly controls are available only through the collapsed “Detalles del anuncio” section. This interface change does not enable new-media providers. Locally verified opening/closing optional details, reference dialog and playback of the saved Nebula result without provider calls.

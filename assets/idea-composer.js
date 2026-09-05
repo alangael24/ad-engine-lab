@@ -24,7 +24,7 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,getProject}
   // Preserve the same request identity after an ambiguous create response.
   const nextFingerprint=JSON.stringify({idea,creative,brandId});if(nextFingerprint!==fingerprint){requestId=crypto.randomUUID();fingerprint=nextFingerprint;}requestId??=crypto.randomUUID();
   try{const p=await create(requestId,{title:idea.slice(0,100),idea,creative,brandId,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[],narrationAssetId:null,timingConfirmed:false});requestId=null;
-   if(file){const transfer=new DataTransfer();transfer.items.add(file);$('#reference-file').files=transfer.files;$('#reference-file').dispatchEvent(new Event('change'));file=null;$('#idea-file').value='';attachment();step('idea');tell('Idea guardada. La referencia está lista para analizar.');}else{tell('Idea y dirección guardadas. Puedes añadir una referencia o continuar al guion.');}
+   if(file){const transfer=new DataTransfer();transfer.items.add(file);$('#reference-file').files=transfer.files;$('#reference-file').dispatchEvent(new Event('change'));file=null;$('#idea-file').value='';attachment();$('#reference-dialog').showModal();tell('Idea guardada. La referencia está lista para analizar.');}else{tell('Idea y dirección guardadas. Pide tu guion en el chat.');}
    $('#idea-input').value='';
   }finally{button.disabled=false;}
  });};
