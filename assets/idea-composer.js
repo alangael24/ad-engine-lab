@@ -10,14 +10,19 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
  function remember(id){brandId=id;try{localStorage.setItem('studio-last-product',id);}catch{}controls();}
  function controls(){
   if(!brands().some(b=>b.id===brandId)){let last;try{last=localStorage.getItem('studio-last-product');}catch{}brandId=brands().some(b=>b.id===last)?last:brands().length===1?brands()[0].id:null;}
+  const onboarding=waitingForStore||!brands().length;
+  $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':'¿Qué anuncio quieres crear?';
+  input.placeholder=onboarding?'Pega el enlace de tu tienda o producto…':'Describe tu idea o añade una referencia…';
+  $('#idea-attach').hidden=onboarding;$('#idea-options').hidden=onboarding;
+  $('#idea-submit').setAttribute('aria-label',onboarding?'Encontrar mi producto':'Crear anuncio');$('#idea-submit').title=onboarding?'Encontrar mi producto':'Crear anuncio';
   const b=brands().find(b=>b.id===brandId);$('#idea-product').hidden=!b;$('#idea-product').textContent=b?b.data.name+' ⌄':'';
   $('#idea-style').textContent=creative.format==='auto'&&creative.look==='auto'?'Estilo automático':creativeLabel(creative);
  }
- function askStore(){closeChoices();closeDialogs();waitingForStore=true;if(!savedIdea&&input.value.trim()&&ideaIntent(input.value).kind==='idea')savedIdea=input.value.trim();input.value='';resize();input.placeholder='Pega el enlace de tu tienda o producto…';note('¿Qué producto anunciamos? Pega su enlace.');input.focus();}
+ function askStore(){closeChoices();closeDialogs();waitingForStore=true;if(!savedIdea&&input.value.trim()&&ideaIntent(input.value).kind==='idea')savedIdea=input.value.trim();input.value='';resize();controls();note('');input.focus();}
  function choices(title,products,choose){const root=$('#idea-products');root.replaceChildren();$('#product-question').textContent=title;for(const p of products){const b=el('button');b.type='button';b.className='product-choice';if(p.image){const img=el('img');img.src=p.image;img.alt='';img.referrerPolicy='no-referrer';b.append(img);}b.append(el('span',p.name));b.onclick=()=>task(()=>choose(p));root.append(b);}$('#idea-manual').hidden=true;$('#product-picker').hidden=false;}
  function chooseProduct(){
   if(!brands().length){askStore();return;}
-  choices('¿Para qué producto?',brands().map(b=>({id:b.id,name:b.data.name})),async p=>{remember(p.id);closeChoices();if(resumeAfterChoice){resumeAfterChoice=false;waitingForStore=false;input.value=savedIdea||input.value;await submit();}});
+  choices('¿Para qué producto?',brands().map(b=>({id:b.id,name:b.data.name})),async p=>{waitingForStore=false;remember(p.id);closeChoices();if(resumeAfterChoice){resumeAfterChoice=false;waitingForStore=false;input.value=savedIdea||input.value;await submit();}});
  }
  function styles(){for(const [selector,options,key] of [['#format-options',FORMATS,'format'],['#look-options',LOOKS,'look']]){const root=$(selector);root.replaceChildren();for(const [id,option] of Object.entries(options)){const b=el('button');b.type='button';b.className=key==='format'?'format-card format-'+id:'look-chip look-'+id;b.setAttribute('aria-pressed',String(creative[key]===id));b.append(el('strong',option.name));b.onclick=()=>{creative={...creative,[key]:id};styles();controls();};root.append(b);}}}
  function attachment(){const root=$('#idea-attachment');root.replaceChildren();root.hidden=!file;if(file){root.append(el('span',file.name));const remove=el('button','×');remove.type='button';remove.setAttribute('aria-label','Quitar referencia');remove.onclick=()=>{file=null;$('#idea-file').value='';attachment();};root.append(remove);}}
@@ -31,8 +36,9 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   if(imported.photo&&!imported.data.productAssetId){const {asset}=await api('/api/store-import',{method:'POST',body:{action:'image',token:imported.photo}});imported.data.productAssetId=asset.id;}
   const existing=brands().find(b=>b.id===imported.id);
   const brand=existing||await saveBrand(imported.id,imported.data);
-  remember(brand.id);closeChoices();waitingForStore=false;input.placeholder='Escribe una idea o pega un enlace…';
-  const idea=savedIdea||`Crea un anuncio para ${brand.data.name}.`;savedIdea=idea;await launch(idea);
+  waitingForStore=false;remember(brand.id);closeChoices();resumeAfterChoice=false;
+  if(savedIdea||file){await launch(savedIdea||'Crea un anuncio inspirado en este video.');return;}
+  input.value='';resize();note('');input.focus();
  }
  async function inspect(url){
   note('Leyendo tu tienda…');
