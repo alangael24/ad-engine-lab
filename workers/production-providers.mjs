@@ -55,13 +55,13 @@ export function createProductionProviders(env,{fetchImpl=fetch}={}){
   },
   async image({project,plan,index,anchor,previous,invoke}){
    const ids=[project.brand_snapshot.productAssetId,anchor?.assetId,previous?.assetId].filter((id,i,all)=>id&&all.indexOf(id)===i);
-   const form=new FormData();const model=env.PRODUCTION_IMAGE_MODEL||'gpt-image-1.5';form.set('model',model);if(model==='gpt-image-1.5')form.set('input_fidelity','high');form.set('prompt',imageDirection(project,plan,index));form.set('quality','high');form.set('output_format','png');form.set('n','1');
+   const form=new FormData();const model=env.PRODUCTION_IMAGE_MODEL||'gpt-image-1.5';form.set('model',model);if(model==='gpt-image-1.5')form.set('input_fidelity','high');form.set('prompt',imageDirection(project,plan,index));const quality=env.PRODUCTION_IMAGE_QUALITY||'medium';if(!['low','medium','high'].includes(quality))fail('PRODUCTION_INVALID');form.set('quality',quality);form.set('output_format','png');form.set('n','1');
    form.set('size',{'9:16':'1024x1536','16:9':'1536x1024','1:1':'1024x1024'}[project.data.aspectRatio]);
    for(const [i,id] of ids.entries()){const f=await loadImage(id,invoke,fetchImpl);form.append('image[]',new Blob([f.bytes],{type:f.mime}),`reference-${i}.${f.ext}`);}
    const r=await fetchImpl('https://api.openai.com/v1/images/edits',{method:'POST',headers:{authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(300000)});
    if(!r.ok)await providerFailure(r,'openai_image');const d=JSON.parse(new TextDecoder().decode(await readBounded(r,12000000)));if(!d.data?.[0]?.b64_json)fail('PRODUCTION_PROVIDER');
    const bytes=Buffer.from(d.data[0].b64_json,'base64');if(bytes.length>6291456||imageType(bytes)[0]!=='image/png')fail('PRODUCTION_PROVIDER');
-   return {...await saveAsset('image',bytes,invoke,fetchImpl),provider:'openai',model,quality:'high',size:form.get('size'),referenceCount:ids.length,requestId:r.headers.get('x-request-id'),usage:d.usage||null};
+   return {...await saveAsset('image',bytes,invoke,fetchImpl),provider:'openai',model,quality,size:form.get('size'),referenceCount:ids.length,requestId:r.headers.get('x-request-id'),usage:d.usage||null};
   },
   // No direct GPU submission here: the existing version queue owns H3 leases and billing.
   async clip(){return {};},
