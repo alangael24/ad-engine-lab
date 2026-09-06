@@ -13,6 +13,7 @@ async function providerFailure(response,stage){
  let data;try{data=JSON.parse(new TextDecoder().decode(await readBounded(response,16000)));}catch{}
  const safe=value=>typeof value==='string'&&/^[a-zA-Z0-9_.-]{1,100}$/.test(value)?value:undefined;
  console.error(JSON.stringify({event:'production_provider_failed',stage,status:response.status,code:safe(data?.error?.code),type:safe(data?.error?.type),param:safe(data?.error?.param)}));
+ if(stage==='openai_image'&&['credit_balance_exhausted','billing_hard_limit_reached','insufficient_quota'].includes(data?.error?.code))fail('PRODUCTION_IMAGE_QUOTA');
  fail('PRODUCTION_PROVIDER');
 }
 export async function callDirector(project,env,{fetchImpl=fetch,catalog=[]}={}){

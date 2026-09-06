@@ -34,7 +34,25 @@ normal UI. Real OpenAI images and MiniMax speech are used. The first production
 began before image-credit accounting was deployed; its initial five images are
 an internal test expense, not evidence of production image-credit debits.
 
-End-to-end render and chat revision results: pending final verification.
+The first MP4 was assembled on Render but its quality response was invalid.
+After the review/retry fixes, the same five clips and narration were reused
+without another media debit. Production `90da99c1-4635-4f0b-8385-1d9494e5fa9d`
+completed with quality `passed`; render `d7950745-21f2-40cd-9b2d-2db5649996f6`
+was downloaded and its SHA-256 matched the automatic review. Actual output:
+14.75 seconds, 1080x1920 H.264 at 24fps with AAC audio, 12,633,919 bytes.
+H3 sources were 720p; the final render scales to 1080x1920.
+
+A natural-language request to replace only the opening image was applied by
+DeepSeek and automatically started a new production. Voice, timing and all four
+other selected scene versions remained unchanged. Both attempts to generate
+that new image failed with OpenAI HTTP 429, `credit_balance_exhausted` /
+`insufficient_quota`; each reservation was refunded. The original finished
+video remains available. The revised MP4 is **not verified or delivered**.
+
+OpenAI's authenticated dashboard confirmed the active key “para creativerush”
+in Default project. At verification, the API balance was -$0.89 and that key's
+monthly spend was $1.59 (not an isolated cost measurement of this test).
+No credit purchase or auto-reload change was made.
 
 ## Fixes found in the real test
 
@@ -69,7 +87,15 @@ End-to-end render and chat revision results: pending final verification.
   reservations, duplicate failure refunds, image debits/refunds and reuse of
   completed images. These checks rolled back all fixture state and did not call
   a provider.
-- Local suite: 133 passed, 1 optional separate-editor sandbox check skipped.
+- Local suite: 137 passed, 1 optional separate-editor sandbox check skipped;
+  subsequent provider-diagnostic and prior-video-retention checks passed.
+- The real image-provider failures reserved and refunded the image credit once
+  per attempt. Final test balance: 19 video credits, 20 image credits.
+- A malformed review gets one bounded formatting correction and must still pass
+  deterministic validation. No malformed report approves or regenerates media.
+- Browser modules now share a release hash; static entry pages revalidate.
+  Failed productions refresh their saved storyboard before retrying, and the
+  last approved video remains accessible while a revision is pending/failed.
 - Stripe checkout currently sells the existing $999 MXN bundle. This rollout
   does not change pricing. Real payment/webhook verification is pending because
   the Stripe connector requires reauthentication. The deployed endpoint rejects
