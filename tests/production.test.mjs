@@ -144,3 +144,13 @@ test('automatic version writes use H3 image-aware prompts and reuse frozen outpu
   const rows=(await db.query('select prompt from generation_jobs where request_id=$1',[data.data.data.requestId])).rows;assert.equal(rows.length,1);assert.ok(rows[0].prompt.startsWith('For the target video'));assert.match(rows[0].prompt,/overall_soundscape: N\/A/);
  }finally{globalThis.fetch=network;}
 });
+test('temporary test allowance expires and preserves the normal daily attempt limit',async()=>{
+ const f=await fixture();
+ for(let i=0;i<5;i++){const j=await start(f);await db.query("update studio_productions set status='failed' where id=$1",[j.id]);}
+ await assert.rejects(start(f),/PRODUCTION_LIMIT/);
+ await db.query("insert into production_attempt_allowances values($1,7,now()+interval '1 hour')",[f.u.id]);
+ const extra=await start(f);assert.equal(extra.status,'queued');
+ await db.query("update studio_productions set status='failed' where id=$1",[extra.id]);
+ await db.query("update production_attempt_allowances set expires_at=now()-interval '1 minute' where user_id=$1",[f.u.id]);
+ await assert.rejects(start(f),/PRODUCTION_LIMIT/);
+});
