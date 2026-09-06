@@ -1,6 +1,6 @@
 # Production spending controls
 
-Implemented locally on 2026-09-05; **not deployed or enabled**. Render remains suspended and the last RunPod inventory was empty. This change makes no paid calls, creates no GPU, and changes no customer balances.
+Implemented on 2026-09-05 and deployed for the authorized Medium trial on 2026-09-06. The production admission ledger was enabled with a bounded allowance; see [the trial report](medium-e2e-2026-09-06.md) for results and shutdown status. GPU idle shutdown remains optional and was not enabled in that trial.
 
 ## Audit of the last OpenAI test
 
@@ -12,7 +12,7 @@ Pricing source: https://developers.openai.com/api/docs/models/gpt-image-1.5
 
 ## Admission budget
 
-Apply migration `20260906044611_production_spending_limits.sql` before deploying the updated Pages API. The operator-only `production_spend_policy` starts at **zero**, blocking paid production until explicitly funded. Do not enable while the user's services are paused.
+Migration `20260906044611_production_spending_limits.sql` was applied before deploying the updated Pages API. The operator-only `production_spend_policy` starts at **zero**, blocking paid production until explicitly funded. Do not enable while the user's services are paused.
 
 - All values are integer millionths of USD, not customer credits.
 - `project_limit` is cumulative per project across retries, revisions and repairs.
@@ -40,7 +40,7 @@ On Pages, configure `GPU_IDLE_ENABLED=true` and optional `GPU_IDLE_SECONDS` (def
 
 This first version **does not auto-wake**. To resume later: disable the controller, explicitly resume the existing pod, then reset `gpu_idle_control` to `draining=false,idle_since=null` before accepting work and re-enabling monitoring. Do not run manually submitted or other applications' jobs on this managed pod. Storage may still be billed on a stopped pod.
 
-With the CPU host suspended, its controller cannot run. This code is not an active watchdog until deployed and configured; nothing was reactivated to test it. A later independent scheduled controller would avoid depending on the renderer's uptime.
+With the CPU host suspended, its controller cannot run. This code is not an active watchdog until configured and enabled. The Medium trial used manual infrastructure shutdown, so it does not validate this controller against a live pod. A later independent scheduled controller would avoid depending on the renderer's uptime.
 
 ## Validation
 
