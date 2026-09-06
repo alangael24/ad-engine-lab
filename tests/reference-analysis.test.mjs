@@ -4,7 +4,7 @@ import {database,user,call} from './helpers/database.mjs';
 import {mockSupabase} from './helpers/supabase-http.mjs';
 import {sampleFrames,validateAnalysis,parseModelJson,referenceDirection,FLASH_MODEL} from '../assets/reference-model.js';
 import {monoWav} from '../assets/reference-media.js';
-import {getReferenceAnalysis,postReferenceAnalysis,validateInput,modelRequest} from '../src/reference-analysis.js';
+import {getReferenceAnalysis,postReferenceAnalysis,validateInput,modelRequest,transcribeReference,analysisAvailability} from '../src/reference-analysis.js';
 import {postStudio} from '../src/studio.js';
 let db,stub,original,providerCalls,asrCalls,output,finish,model;
 const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-key',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'private-flash',REFERENCE_SCRIBE_KEY:'private-scribe'};
@@ -30,3 +30,12 @@ test('active request and daily quota prevent more provider calls; expired reques
 test('analysis tables have RLS, browser cannot read other data or call privileged RPC, and source claims are never auto-approved',async()=>{const f=await fixture();await postReferenceAnalysis(ctx(body(f.p),f.token));await db.exec('set role authenticated');try{await assert.rejects(db.query('select * from studio_reference_analyses'),/permission denied/);await assert.rejects(call(db,'studio_reference_write',[f.u.id,'reserve',crypto.randomUUID(),f.p.id,'{}']),/permission denied/);}finally{await db.exec('reset role');}const flag=(await db.query("select relrowsecurity from pg_class where relname='studio_reference_analyses'")).rows[0];assert.equal(flag.relrowsecurity,true);const stored=(await db.query('select * from studio_reference_analyses where user_id=$1',[f.u.id])).rows[0];assert.ok(!JSON.stringify(stored).includes('private-flash'));assert.ok(!JSON.stringify(stored).includes('must-not-be-saved'));assert.equal(stored.adopted_at,null);});
 
 test('binary WAV lengths cannot shift magic offsets through UTF-8 decoding',()=>{for(const duration of [36.038188,36.246,48.4,90.969938,120]){const b=body({id:crypto.randomUUID()});b.source.duration=duration;b.frames=sampleFrames(duration);b.audio=Buffer.from(monoWav(new Float32Array(Math.ceil(duration*16000)))).toString('base64');assert.ok(validateInput(b).audio.length>44);}});
+
+// The exact timestamp format used by the hosted OpenAI transcription adapter.
+test('OpenAI word timestamps feed the same bounded reference evidence',async()=>{
+ const env={REFERENCE_OPENAI_KEY:'test-openai',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'test'};
+ assert.equal(analysisAvailability(env),true);
+ let calls=0;const invoke=async(url,options)=>{calls++;assert.equal(url,'https://api.openai.com/v1/audio/transcriptions');assert.equal(options.body.get('response_format'),'verbose_json');assert.equal(options.body.get('timestamp-granularities[]'),null);assert.equal(options.body.get('timestamp_granularities[]'),'word');return Response.json({words:[{word:'Hola',start:0,end:.4},{word:'mundo',start:.5,end:1}]});};
+ const result=await transcribeReference({source:{duration:2},audio:new Uint8Array(44)},env,invoke);assert.equal(result.text,'Hola mundo');assert.equal(result.wordCount,2);assert.equal(calls,1);
+ await assert.rejects(transcribeReference({source:{duration:2},audio:new Uint8Array(44)},env,async()=>Response.json({words:[{word:'bad',start:0,end:12}]})),/REFERENCE_PROVIDER/);
+});

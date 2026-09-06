@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {database,user,call,ready} from './helpers/database.mjs';
 import {validatePlan,alignScenes,alignmentFromWords,imageDirection} from '../assets/production-model.js';
 import {processProduction} from '../workers/production-worker.mjs';
-import {postProduction,getProduction} from '../src/studio-production.js';
+import {postProduction,getProduction,productionEnabled} from '../src/studio-production.js';
 import {mockSupabase} from './helpers/supabase-http.mjs';
 let db;before(async()=>{db=await database();});after(async()=>{await db.close();});
 async function fixture(){const u=await user(db),photo=crypto.randomUUID();const write=(action,id,data,expected=null)=>call(db,'studio_write',[u.id,action,id,JSON.stringify(data),expected]);
@@ -17,6 +17,47 @@ async function fixture(){const u=await user(db),photo=crypto.randomUUID();const 
 }
 const start=(f,id=crypto.randomUUID(),enabled=true)=>call(db,'studio_production_start',[f.u.id,id,f.p.id,f.p.revision,enabled]);
 const work=(j,action,data={})=>call(db,'studio_production_work',['test-producer',action,j.id,j.lease_token,JSON.stringify(data)]);
+test('hosted service role can save a first brand without Auth password access',async()=>{
+ const u=await user(db);
+ await db.exec('set role service_role');
+ try {
+  const b=await call(db,'studio_write',[u.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Imported shop',product:'Shoes'})]);
+  assert.equal(b.user_id,u.id);
+  await assert.rejects(db.query('select * from auth.users'),/permission denied/);
+ } finally {await db.exec('reset role');}
+});
+test('production rollout is limited to permitted users and fails closed without their identity',()=>{
+ const env={PRODUCTION_ENABLED:'true',PRODUCTION_ALLOWED_USERS:'account-a, account-b'};
+ assert.equal(productionEnabled(env,'account-a'),true);
+ assert.equal(productionEnabled(env,'account-b'),true);
+ assert.equal(productionEnabled(env,'another-account'),false);
+ assert.equal(productionEnabled(env),false);
+ assert.equal(productionEnabled({...env,PRODUCTION_ENABLED:'false'},'account-a'),false);
+});
+test('no-credit accounts stop before media calls and insufficient image balance rolls back the step',async()=>{
+ const f=await fixture();await db.query('update credit_balances set image_credits=0 where user_id=$1',[f.u.id]);
+ await assert.rejects(start(f),/INSUFFICIENT_CREDITS/);
+ assert.equal((await db.query('select count(*)::int n from studio_productions where project_id=$1',[f.p.id])).rows[0].n,0);
+ await db.query('update credit_balances set image_credits=1 where user_id=$1',[f.u.id]);
+ const initial=await start(f);let j;do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ await db.query('update credit_balances set image_credits=0 where user_id=$1',[f.u.id]);
+ await assert.rejects(work(j,'begin_step',{key:'image-0',stage:'images'}),/INSUFFICIENT_CREDITS/);
+ assert.equal((await db.query('select steps from studio_productions where id=$1',[j.id])).rows[0].steps['image-0'],undefined);
+ await work(j,'fail',{code:'INSUFFICIENT_CREDITS'});
+});
+test('completed images replay without charging; failed image refunds once and a new attempt reuses completed assets',async()=>{
+ const f=await fixture(),initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const plan={continuity:'Same',scenes:[{id:crypto.randomUUID(),text:'Hola mundo.',visual:'First',motion:'Pan'},{id:crypto.randomUUID(),text:'Conoce el producto.',visual:'Second',motion:'Push'}]};
+ await work(j,'begin_step',{key:'plan',stage:'planning'});await work(j,'finish_step',{key:'plan',result:plan});
+ await work(j,'begin_step',{key:'image-0',stage:'images'});const asset={assetId:crypto.randomUUID()};await work(j,'finish_step',{key:'image-0',result:asset});
+ await work(j,'begin_step',{key:'image-0',stage:'images'});
+ await work(j,'begin_step',{key:'image-1',stage:'images'});await assert.rejects(work(j,'begin_step',{key:'image-1',stage:'images'}),/PRODUCTION_UNCERTAIN/);
+ await work(j,'fail',{code:'PRODUCTION_PROVIDER'});await assert.rejects(work(j,'fail',{code:'PRODUCTION_PROVIDER'}),/LEASE_LOST/);
+ assert.equal((await db.query('select image_credits from credit_balances where user_id=$1',[f.u.id])).rows[0].image_credits,19);
+ const next=await start(f);assert.deepEqual(next.steps['image-0'].result,asset);assert.equal(next.steps['image-1'],undefined);
+ assert.equal((await db.query("select count(*)::int n from credit_ledger where user_id=$1 and reason='image_generation_refunded'",[f.u.id])).rows[0].n,1);
+});
 test('production start is authenticated, owner-scoped, revision-bound and idempotent',async()=>{
  const f=await fixture(),g=await fixture(),id=crypto.randomUUID();await assert.rejects(start(f,id,false),/PRODUCTION_OFFLINE/);
  const j=await start(f,id);assert.equal((await start(f,id,false)).id,j.id);

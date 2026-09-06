@@ -5,7 +5,7 @@ export async function database() {
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
     create schema auth; create schema storage;
-    create table auth.users(id uuid primary key, email text, created_at timestamptz default now());
+    create table auth.users(id uuid primary key, email text, created_at timestamptz default now(), encrypted_password text);
     create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth to authenticated, service_role;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -13,6 +13,8 @@ export async function database() {
   for (const file of ['202608250001_accounts_and_credits.sql','20260830011058_saas_generation_jobs.sql','20260904230633_brand_storyboard_versions.sql','20260905015812_studio_reference_analysis.sql','20260905045330_studio_chat_edits.sql','20260905071152_studio_production_pipeline.sql','20260905095537_chat_revision_followups.sql','20260906002544_production_quality_gate.sql']) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url),'utf8'));
   }
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260906032225_production_service_permissions.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260906033406_production_credit_guards.sql', import.meta.url),'utf8'));
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

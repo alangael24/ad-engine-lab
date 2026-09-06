@@ -42,7 +42,23 @@ export function parseStore(html,url){
  for(let n=0;n<nodes.length&&n<2500;n++){const x=nodes[n];if(!x||typeof x!=='object')continue;if(Array.isArray(x)){nodes.push(...x.slice(0,100));continue;}const types=[x['@type']].flat();if(types.some(t=>['Organization','OnlineStore','WebSite'].includes(t))&&!brand)brand=plain(x.name,80);if(types.includes('Product')){const p=product(x,url,brand);if(p)products.push(p);}for(const v of Object.values(x))if(v&&typeof v==='object')nodes.push(v);}
  if(!products.length&&(meta['og:type']==='product'||/\/(?:products|product|producto)\/[^/]+/.test(new URL(url).pathname))){const p=product({name:meta['og:title']||title,description:meta.description||meta['og:description'],image:meta['og:image']},url,brand);if(p)products.push(p);}
  const links=[];for(const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi)){const a=attrs(m[1]),href=safeUrl(a.href,url);if(href&&new URL(href).origin===new URL(url).origin&&/\/(?:products|product|producto)\/[^/?#]+/.test(new URL(href).pathname)&&!links.some(x=>x.url===href))links.push({name:plain(m[2],120)||decode(new URL(href).pathname.split('/').filter(Boolean).at(-1)).replace(/-/g,' '),url:href,images:[]});if(links.length>=12)break;}
- const unique=[...new Map(products.slice(0,30).map(p=>[p.url+'|'+p.name,p])).values()].slice(0,12);
+ // JSON-LD often repeats one product for every size and places its photo only
+ // on the variants. Merge that page into one usable product, keeping the largest
+ // published version of each photo instead of a 100px thumbnail.
+ const grouped=new Map();
+ for(const p of products.slice(0,30)){
+  const previous=grouped.get(p.url);
+  grouped.set(p.url,previous?{...previous,name:p.name.length<previous.name.length?p.name:previous.name,
+   description:previous.description||p.description,sourceText:previous.sourceText||p.sourceText,
+   images:[...previous.images,...p.images]}:p);
+ }
+ const unique=[...grouped.values()].slice(0,12).map(p=>{
+  const photos=new Map();for(const src of p.images){const u=new URL(src),key=u.origin+u.pathname,old=photos.get(key);
+   if(!old||Number(u.searchParams.get('width')||0)>Number(new URL(old).searchParams.get('width')||0))photos.set(key,src);}
+  const isPage=new URL(p.url).pathname===new URL(url).pathname;
+  const description=p.description||(isPage?plain(meta.description||meta['og:description'],600):'');
+  return {...p,description,sourceText:p.sourceText||description,images:[...photos.values()].slice(0,6)};
+ });
  return {url,brand:brand||new URL(url).hostname.replace(/^www\./,''),products:unique,links,shopify:/cdn\.shopify\.com|Shopify\.shop/.test(html)};
 }
 export async function inspectStore(value,request=fetch){

@@ -5,7 +5,7 @@ import {creativeGuide} from '../assets/creative-formats.js';
 import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
-import {productionError} from './studio-production.js';
+import {productionError,productionEnabled} from './studio-production.js';
 import {CHAT_MODEL,OPS,validateEdit,applyEdit,editFollowup} from '../assets/chat-model.js';
 const errors={CHAT_OFFLINE:[503,'El asistente no está disponible ahora.'],CHAT_BUSY:[409,'Hay una instrucción en curso. Recupera su resultado antes de enviar otra.'],CHAT_LIMIT:[429,'Alcanzaste el límite de instrucciones de esta prueba.'],CHAT_INVALID:[422,'No pudimos interpretar una acción válida. El anuncio se conservó.'],CHAT_PROVIDER:[503,'No se completó la respuesta. Recupera el resultado antes de intentar de nuevo.'],CHAT_NO_UNDO:[409,'No hay un cambio del chat que pueda deshacerse sobre esta edición.'],CHAT_LAST_SCENE:[409,'El anuncio debe conservar al menos una escena.'],CHAT_SCRIPT_EXISTS:[409,'Este anuncio ya tiene escenas. Pide un cambio específico del guion.']};
 const error=e=>{const code=Object.keys(errors).find(k=>k===e.code||k===e.message);return code?json({code,error:errors[code][1]},errors[code][0]):productionError(e);};
@@ -23,7 +23,7 @@ export async function callEditor(project,versions,history,message,env,request=fe
 }
 function publicRow(r){return {id:r.id,status:r.status==='running'&&Date.parse(r.created_at)<Date.now()-180000?'uncertain':r.status,message:r.request_payload.message,result:r.result,revision:r.applied_revision,createdAt:r.created_at};}
 async function rows(db,user,project){const r=await db.from('studio_chat_edits').select('*').eq('user_id',user).eq('project_id',project).order('created_at',{ascending:false}).limit(20);if(r.error)throw r.error;return r.data.reverse();}
-export async function getStudioChat(context){try{const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);return json({enabled:enabled(context.env),productionEnabled:context.env.PRODUCTION_ENABLED==='true',edits:(await rows(db,user.id,id)).map(publicRow)});}catch(e){return error(e);}}
+export async function getStudioChat(context){try{const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);return json({enabled:enabled(context.env),productionEnabled:productionEnabled(context.env,user.id),edits:(await rows(db,user.id,id)).map(publicRow)});}catch(e){return error(e);}}
 export async function postStudioChat(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2400000);
  if(!UUID.test(b.requestId||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1||typeof b.message!=='string'||!b.message.trim()||b.message.length>2000)fail('CHAT_INVALID');
@@ -32,9 +32,9 @@ export async function postStudioChat(context){try{
  const execute=async onDelta=>{try{
   const contextData=await rpc(db,'studio_read',{p_user_id:user.id,p_project_id:b.projectId});
   if(contextData.project.revision!==b.expected)fail('STUDIO_CONFLICT');
-  const output=await callEditor(contextData.project,contextData.versions,await rows(db,user.id,b.projectId),b.message,context.env,fetch,onDelta,b.visuals||[]);
+  const output=await callEditor(contextData.project,contextData.versions,await rows(db,user.id,b.projectId),b.message,{...context.env,PRODUCTION_ENABLED:productionEnabled(context.env,user.id)?'true':'false'},fetch,onDelta,b.visuals||[]);
   const nextData=applyEdit(contextData.project,output.edit,contextData.versions);
-  const done=await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'complete',p_id:b.requestId,p_project:b.projectId,p_data:{...output,nextData,followup:editFollowup(contextData.project,output.edit,nextData),productionEnabled:context.env.PRODUCTION_ENABLED==='true'}});
+  const done=await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'complete',p_id:b.requestId,p_project:b.projectId,p_data:{...output,nextData,followup:editFollowup(contextData.project,output.edit,nextData),productionEnabled:productionEnabled(context.env,user.id)}});
   return {edit:publicRow(done)};
  }catch(e){await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'fail',p_id:b.requestId,p_project:b.projectId,p_data:{message:errors[Object.keys(errors).find(k=>k===e.code||k===e.message)]?.[1]||'No se aplicó el cambio. Recupera el proyecto antes de continuar.',code:e.code||'CHAT_PROVIDER'}}).catch(()=>{});throw e.code?e:Object.assign(Error('CHAT_PROVIDER'),{code:'CHAT_PROVIDER'});}};
  if(!context.request.headers.get('accept')?.includes('text/event-stream'))return json(await execute());
