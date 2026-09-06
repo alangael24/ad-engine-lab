@@ -1,6 +1,8 @@
+import {onRequestPost as productionWorkerRoute} from '../functions/api/studio-production-worker.js';
+import {CHAT_MODEL} from '../assets/chat-model.js';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
-import {database,user,call} from './helpers/database.mjs';
+import {database,user,call,ready} from './helpers/database.mjs';
 import {validatePlan,alignScenes,alignmentFromWords,imageDirection} from '../assets/production-model.js';
 import {processProduction} from '../workers/production-worker.mjs';
 import {postProduction,getProduction} from '../src/studio-production.js';
@@ -79,4 +81,25 @@ test('chat approval creates one production atomically and duplicate completion r
  const g=await fixture(),gid=crypto.randomUUID();await call(db,'studio_chat_write',[g.u.id,'reserve',gid,g.p.id,JSON.stringify({...payload,expected:g.p.revision})]);
  await assert.rejects(call(db,'studio_chat_write',[g.u.id,'complete',gid,g.p.id,JSON.stringify({...done,productionEnabled:false})]),/PRODUCTION_OFFLINE/);
  assert.equal((await db.query('select status from studio_chat_edits where id=$1',[gid])).rows[0].status,'running');
+});
+
+test('automatic version writes use H3 image-aware prompts and reuse frozen output on retry',async()=>{
+ const f=await fixture();await ready(db);const initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const scene={id:crypto.randomUUID(),text:'Hola mundo.',visual:'Show the complete filter.',motion:'Continuous flowing water.',start:0,end:5,imageAssetId:f.p.brand_snapshot.productAssetId};
+ await work(j,'write',{key:'prepare-test',stage:'images',action:'save_project',data:{...f.p.data,scenes:[scene]}});
+ const stub=mockSupabase(db),network=globalThis.fetch;let llm=0;
+ globalThis.fetch=async(input,opts)=>{
+  if(String(input).startsWith('https://opencode.ai/')){
+   llm++;const req=JSON.parse(opts.body);assert.equal(req.messages[1].content[1].type,'image_url');
+   return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+  }return stub.fetch(input,opts);
+ };
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',REFERENCE_FLASH_KEY:'test-only'};
+ const data={workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'write',data:{key:'clip-test',stage:'clips',action:'version',data:{requestId:crypto.randomUUID(),sceneId:scene.id}}};
+ const invoke=()=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify(data)})});
+ try{
+  const first=await invoke();assert.equal(first.status,200,await first.clone().text());const second=await invoke();assert.equal(second.status,200,await second.clone().text());assert.equal(llm,1);
+  const rows=(await db.query('select prompt from generation_jobs where request_id=$1',[data.data.data.requestId])).rows;assert.equal(rows.length,1);assert.ok(rows[0].prompt.startsWith('For the target video'));assert.match(rows[0].prompt,/overall_soundscape: N\/A/);
+ }finally{globalThis.fetch=network;}
 });

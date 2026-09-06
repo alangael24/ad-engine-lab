@@ -3,7 +3,8 @@ const $ = selector => document.querySelector(selector);
 const isPlans = document.body.dataset.onboarding === 'plans';
 const params = new URLSearchParams(location.search);
 const login = params.get('mode') === 'login';
-const next = params.get('next') === 'planes' ? 'planes' : 'tool';
+const next = params.get('next') === 'editor' ? 'editor' : params.get('next') === 'planes' ? 'planes' : 'tool';
+if(next==='editor')sessionStorage.setItem('creative-rush-return','editor');
 let client, ready = false, routing = false, waiting = false, googleEnabled = false, googlePending = false;
 function message(text, tone = 'neutral') { $('#on-message').textContent = text; $('#on-message').dataset.tone = tone; }
 async function routeSession(session) {
@@ -14,6 +15,7 @@ async function routeSession(session) {
   }
   routing = true;
   try {
+    if(!isPlans&&next==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     const account = await apiRequest('/api/account');
     if (!isPlans) { location.replace(accountDestination(account, next)); return; }
     $('#account-email').textContent = account.email;
@@ -59,14 +61,19 @@ if (!isPlans) {
     $('#account-title').textContent = 'Qué bueno verte de nuevo.';
     $('#account-intro').textContent = 'Entra a tu cuenta y continúa donde te quedaste.';
     $('#account-switch').replaceChildren(document.createTextNode('¿Primera vez aquí? '));
-    const signup = document.createElement('a'); signup.href = '/cuenta/'; signup.textContent = 'Crea tu cuenta'; $('#account-switch').append(signup);
+    const signup = document.createElement('a'); signup.href = next==='editor'?'/cuenta/?next=editor':'/cuenta/'; signup.textContent = 'Crea tu cuenta'; $('#account-switch').append(signup);
+  }
+  if(next==='editor'){
+    $('#account-title').textContent='Tu editor empieza aquí.';$('#account-intro').textContent='Entra para guardar tus clips y editar por conversación.';
+    document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH EDITOR';document.querySelector('.on-bottom').textContent='Tus clips. Tu estilo. Tu video.';
+    $('#account-switch a').href=login?'/cuenta/?next=editor':'/cuenta/?mode=login&next=editor';
   }
   $('#signup-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!ready || waiting || googlePending) return;
     waiting = true; $('#signup-submit').disabled = true; $('#google-signin').disabled = true; message('Enviando tu enlace seguro…');
     try {
       await requestAccess($('#signup-email').value, !login);
-      message('Revisa tu correo y confirma el enlace en este navegador. Después verás tu plan; si ya tienes uno, entrarás a tu estudio.', 'success');
+      message(next==='editor'?'Revisa tu correo y abre el enlace en este navegador para entrar al editor.':'Revisa tu correo y confirma el enlace en este navegador. Después verás tu plan; si ya tienes uno, entrarás a tu estudio.', 'success');
       $('#signup-submit').textContent = 'Enlace enviado';
       setTimeout(() => { waiting = false; $('#signup-submit').disabled = googlePending; $('#signup-submit').textContent = 'Enviar otro enlace'; }, 60000);
     } catch (error) {

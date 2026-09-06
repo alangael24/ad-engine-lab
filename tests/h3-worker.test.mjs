@@ -2,13 +2,28 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {H3Adapter,findVideo} from '../workers/h3-adapter.mjs';
 import {processJob} from '../workers/h3-worker.mjs';
-test('H3 helper uses existing turbo8 settings, unchanged prompt and optional image',async()=>{
-  let form;
+test('H3 builds verified turbo8 graph directly without a helper',async()=>{
+  const h3=new H3Adapter('http://localhost:8188',{fetchImpl:async()=>{throw Error('unexpected network call');}});
+  const {prompt:g}=await h3.build({prompt:'Mi producto gira en la mesa',durationSeconds:5,resolution:'720p',aspectRatio:'9:16'});
+  assert.equal(g['104'].inputs.prompt,'Mi producto gira en la mesa');
+  assert.deepEqual([g['104'].inputs.width,g['104'].inputs.height,g['104'].inputs.length],[736,1312,120]);
+  assert.equal(g['9'].inputs.steps,8);assert.equal(g['17'].inputs.sampler_name,'euler');
+  assert.equal(g['119'].inputs.lora_name,'minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors');
+  assert.equal(g['23'],undefined);assert.equal(g['91'].inputs.audio,undefined);
+});
+test('H3 uploads reference and wires first frame; graphs do not leak across jobs',async()=>{
+  let upload;
   const h3=new H3Adapter('http://localhost:8188',{fetchImpl:async(url,options)=>{
-    assert.equal(url,'http://localhost:8188/h3-simple/build');form=options.body;return Response.json({workflow:{prompt:{node:{}}}});
+    if(url==='https://storage.test/reference')return new Response(new Uint8Array([137,80,78,71]),{headers:{'content-type':'image/png'}});
+    assert.equal(url,'http://localhost:8188/upload/image');upload=options.body;
+    return Response.json({name:'frame.png',subfolder:'test'});
   }});
-  await h3.build({prompt:'Mi producto gira en la mesa',durationSeconds:5,resolution:'720p',aspectRatio:'9:16'});
-  assert.equal(form.get('preset'),'turbo8');assert.equal(form.get('resolution'),'720');assert.equal(form.get('aspect'),'portrait');assert.equal(form.get('duration'),'5');assert.equal(form.get('prompt'),'Mi producto gira en la mesa');assert.equal(form.has('image'),false);
+  const job={prompt:'Animate the product gently',durationSeconds:10,resolution:'480p',aspectRatio:'16:9'};
+  const {prompt:g}=await h3.build({...job,referenceUrl:'https://storage.test/reference'});
+  assert.equal(upload.get('overwrite'),'false');assert.deepEqual(g['104'].inputs.first_frame,['200',0]);
+  assert.equal(g['200'].inputs.image,'test/frame.png');assert.equal(g['104'].inputs.width,832);
+  assert.equal((await h3.build(job)).prompt['200'],undefined);
+  await assert.rejects(()=>h3.build({...job,durationSeconds:100}));
 });
 test('worker processes supplied clip and never invokes GPU again during a recovered submission',async()=>{
   let submitted=0;const calls=[];

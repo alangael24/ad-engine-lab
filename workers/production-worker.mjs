@@ -1,3 +1,4 @@
+import {repairScenes,validateReview} from '../assets/quality-model.js';
 import {pathToFileURL} from 'node:url';
 import {validatePlan,alignScenes} from '../assets/production-model.js';
 import {createProductionProviders} from './production-providers.mjs';
@@ -6,7 +7,7 @@ export async function stableId(scope,key){const b=new Uint8Array(await crypto.su
 export function productionApi({appUrl,token,workerId,fetchImpl=fetch}){
  const u=new URL(appUrl);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPS required');
  if(!token||token.length<32||!/^[\w-]{1,80}$/.test(workerId||''))throw Error('Missing production configuration');
- return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
+ return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(action==='write'&&body.data?.action==='version'?90000:30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
 }
 export async function processProduction(job,api,providers,{pollMs=3000,deadlineMs=90*60*1000}={}){
  const identity={jobId:job.id,leaseToken:job.lease_token},started=Date.now();let lost=false,beating=false,last=Date.now();
@@ -17,12 +18,12 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
  const write=async(key,stage,action,data)=>{check();return (await invoke('write',{key,stage,action,data})).result;};
  const wait=async(predicate)=>{while(true){check();const current=await invoke('inspect');const value=predicate(current);if(value)return value;await sleep(pollMs);}};
  try{
-  await invoke('heartbeat');await providers.ready?.();
+  await invoke('heartbeat');await providers.ready?.();if(typeof providers.review!=='function')throw Error('PRODUCTION_QUALITY_OFFLINE');
   const project=job.snapshot;
   const existing=project.data.scenes||[],revision=existing.length>0;
   const plan=await once('plan','planning',async()=>revision?{
-   continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
-   scenes:existing.map(s=>({...s,motion:'Follow the approved scene direction; preserve continuity.'}))
+   continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.videoContinuity||''} ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
+   scenes:existing.map(s=>({...s,motion:s.motion||'Follow the approved scene direction; preserve continuity.'}))
   }:validatePlan(await providers.plan(project,invoke),project.data.scriptDraft));
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
@@ -33,9 +34,9 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   for(const [i,s] of plan.scenes.entries())images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
   const scenes=timeline.map(s=>{
    const old=existing.find(p=>p.id===s.id),keep=old?.selectedVersionId&&(reuseNarration||s.end-s.start<=old.end-old.start);
-   return {...s,visual:revision?s.visual:`${s.visual}\nMovimiento: ${s.motion}`.slice(0,800),imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
+   return {...s,visual:s.visual,motion:s.motion,imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
   });
-  await write('prepare','images','save_project',{...project.data,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
+  await write('prepare','images','save_project',{...project.data,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
   for(const [i,s] of scenes.entries()){
    if(s.selectedVersionId)continue;
    const source=await once(`source-${i}`,'clips',()=>providers.clip?.({project,plan,scene:s,index:i,invoke})||{});
@@ -43,9 +44,40 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    await wait(c=>{const version=c.versions.find(x=>x.id===v.id);if(version?.status==='failed'||version?.status==='canceled')throw Error('PRODUCTION_CLIP_FAILED');return version?.status==='succeeded';});
    await write(`select-${i}`,'clips','select_version',{versionId:v.id});
   }
-  const render=await write('render','assembly','render',{requestId:await stableId(job.id,'render')});
-  await wait(c=>{const r=c.renders.find(x=>x.id===render.id);if(r?.status==='failed')throw Error('PRODUCTION_RENDER_FAILED');return r?.status==='succeeded';});
-  await invoke('complete',{key:'completed',renderId:render.id});return {ok:true,renderId:render.id};
+  // Render candidates remain private until their exact immutable output passes review.
+  for(let round=0;round<=2;round++){
+   const renderKey=round?`render-${round}`:'render';
+   const render=await write(renderKey,'assembly','render',{requestId:await stableId(job.id,renderKey)});
+   await wait(c=>{const r=c.renders.find(x=>x.id===render.id);if(r?.status==='failed')throw Error('PRODUCTION_RENDER_FAILED');return r?.status==='succeeded';});
+   const current=await invoke('inspect');
+   const review=await once(`quality-${round}`,'quality',async()=>{
+    const report=await providers.review({renderId:render.id,invoke});validateReview(report,current.project.data.scenes);
+    if(report.renderId!==render.id)throw Error('PRODUCTION_QUALITY_INVALID');return report;
+   });
+   if(review.verdict==='pass'){
+    await invoke('complete',{key:'completed',renderId:render.id});return {ok:true,renderId:render.id,quality:review.verdict};
+   }
+   if(round===2||review.verdict!=='repair')throw Error('PRODUCTION_QUALITY_BLOCKED');
+   // Persist the repair decision BEFORE external requests: same keys resume completed work.
+   const next=await once(`repair-plan-${round}`,'repair',()=>repairScenes(current.project,review));
+   const repaired=structuredClone(next),repairPlan={continuity:plan.continuity,scenes:repaired.scenes};
+   for(const issue of review.issues.slice(0,3)){
+    const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId),scene=repaired.scenes[index];
+    if(!scene.imageAssetId){
+     const image=await once(`repair-image-${round}-${index}`,'repair',()=>providers.image({project:{...current.project,data:repaired},plan:repairPlan,index,previous:index?{assetId:repaired.scenes[index-1].imageAssetId}:null,anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id}));
+     scene.imageAssetId=image.assetId;
+    }
+   }
+   await write(`repair-save-${round}`,'repair','save_project',repaired);
+   for(const issue of review.issues.slice(0,3)){
+    const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId),scene=repaired.scenes[index],key=`repair-clip-${round}-${index}`;
+    const source=await once(`repair-source-${round}-${index}`,'repair',()=>providers.clip?.({project:{...current.project,data:repaired},plan:repairPlan,scene,index,invoke})||{});
+    const version=await write(key,'repair','version',{requestId:await stableId(job.id,key),sceneId:scene.id,assetId:source.assetId||null});
+    await wait(c=>{const v=c.versions.find(v=>v.id===version.id);if(v?.status==='failed'||v?.status==='canceled')throw Error('PRODUCTION_CLIP_FAILED');return v?.status==='succeeded';});
+    await write(`repair-select-${round}-${index}`,'repair','select_version',{versionId:version.id});
+   }
+  }
+
  }catch(e){const code=e.code||e.message;await api('fail',{...identity,data:{code:/^[A-Z_]{1,80}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z_]{1,80}$/.test(code)?code:'PRODUCTION_PROVIDER'};}
  finally{clearInterval(timer);}
 }

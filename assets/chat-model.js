@@ -32,7 +32,7 @@ export function applyEdit(project,edit,versions=[]){
   if(d.scenes.length)fail('CHAT_SCRIPT_EXISTS');d.scriptDraft=edit.value;d.narrationAssetId=null;d.timingConfirmed=false;
  }else if(op==='set_look'){
   d.creative={...d.creative,look:edit.value};for(const x of d.scenes){x.selectedVersionId=null;x.imageAssetId=null;}
- }else if(op==='edit_scene'){s.visual=edit.value;s.selectedVersionId=null;s.imageAssetId=null;}
+ }else if(op==='edit_scene'){s.visual=edit.value;delete s.motion;s.selectedVersionId=null;s.imageAssetId=null;}
  else if(op==='edit_text'){s.text=edit.value;s.selectedVersionId=null;d.scriptDraft=d.scenes.map(x=>x.text).join('\n');d.narrationAssetId=null;d.timingConfirmed=false;for(const x of d.scenes)delete x.narrationStart;}
  else if(op==='select_version'){
   if(!versions.some(v=>v.id===edit.versionId&&v.scene_id===s.id&&v.status==='succeeded'))fail('STUDIO_NOT_READY');s.selectedVersionId=edit.versionId;

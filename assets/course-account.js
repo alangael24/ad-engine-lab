@@ -7,8 +7,57 @@ const message = $("#auth-message");
 const submit = $("#auth-submit");
 const accountButton = $("#account-button");
 const nav = $("#course-nav");
+const courseHome = $("#course-home");
+const lessonView = $("#lesson-view");
+const moduleGrid = $("#module-grid");
+const modulesButton = $("#modules-button");
 const completeButton = $("#complete-button");
 const nextButton = $("#next-button");
+const isModulePreview = new URLSearchParams(window.location.search).get("preview") === "modulos";
+
+const MODULE_PREVIEW_COURSE = {
+  title: "Tu primer anuncio con IA",
+  subtitle: "Una ruta práctica para pasar de una oferta a un anuncio vertical listo para probar.",
+  version: "Vista previa del curso",
+  modules: [
+    {
+      id: "inicio",
+      number: "01",
+      title: "Define el anuncio que vas a producir",
+      lessons: [{ slug: "preview-01", summary: "Producto, comprador, problema, resultado, prueba y llamada a la acción.", objective: "Brief de una página" }],
+    },
+    {
+      id: "angulo",
+      number: "02",
+      title: "Elige un ángulo que pueda vender",
+      lessons: [{ slug: "preview-02", summary: "Dolor, deseo y mecanismo: crea tres opciones y selecciona la más clara, urgente y demostrable.", objective: "3 ángulos comparados" }],
+    },
+    {
+      id: "guion",
+      number: "03",
+      title: "Escribe el guion escena por escena",
+      lessons: [{ slug: "preview-03", summary: "Gancho, tensión, mecanismo, prueba y acción divididos en planos de hasta cinco segundos.", objective: "Guion listo para producir" }],
+    },
+    {
+      id: "produccion",
+      number: "04",
+      title: "Genera escenas sin desperdiciar saldo",
+      lessons: [{ slug: "preview-04", summary: "Instrucciones visuales, referencias y continuidad para validar primero y producir después.", objective: "Clips del primer anuncio" }],
+    },
+    {
+      id: "montaje",
+      number: "05",
+      title: "Monta, exporta y prepara variaciones",
+      lessons: [{ slug: "preview-05", summary: "Ritmo, subtítulos, voz, formato 9:16 y dos ganchos distintos para probar.", objective: "Anuncio terminado" }],
+    },
+    {
+      id: "biblioteca",
+      number: "06",
+      title: "Desmonta anuncios de referencia",
+      lessons: [{ slug: "preview-06", summary: "Analiza ejemplos y separa la lógica comercial del estilo para adaptar la estructura a tu oferta.", objective: "Criterio para seguir creando" }],
+    },
+  ],
+};
 
 let supabase = null;
 let session = null;
@@ -46,6 +95,84 @@ function createElement(tag, className, text) {
   return element;
 }
 
+function moduleLessonIndexes(module) {
+  return module.lessons
+    .map((lesson) => lessons.findIndex((item) => item.slug === lesson.slug))
+    .filter((index) => index >= 0);
+}
+
+function renderModules() {
+  moduleGrid.replaceChildren();
+  const coverMarks = {
+    inicio: "◎",
+    angulo: "↗",
+    guion: "✎",
+    produccion: "✦",
+    montaje: "▦",
+    biblioteca: "◫",
+  };
+
+  course.modules.forEach((module) => {
+    const indexes = moduleLessonIndexes(module);
+    const completeCount = module.lessons.filter((lesson) => completed.has(lesson.slug)).length;
+    const percent = module.lessons.length ? Math.round((completeCount / module.lessons.length) * 100) : 0;
+    const firstLesson = module.lessons[0];
+    const card = createElement("a", "module-card");
+    card.href = `#${module.id}`;
+    card.setAttribute("aria-label", `Abrir módulo ${module.number}: ${module.title}`);
+    if (isModulePreview) card.setAttribute("aria-disabled", "true");
+
+    const cover = createElement("div", `module-cover module-cover--${module.id}`);
+    cover.append(
+      createElement("span", "module-cover-number", `MÓDULO ${module.number}`),
+      createElement("span", "module-cover-mark", coverMarks[module.id] || "✦"),
+      createElement("h2", "module-cover-title", module.title),
+    );
+
+    const body = createElement("div", "module-card-body");
+    body.append(
+      createElement("h2", "", module.title),
+      createElement("p", "module-description", firstLesson?.summary || "Abre el módulo para continuar tu ruta."),
+      createElement("p", "module-result", firstLesson ? `Resultado: ${firstLesson.objective}` : "Resultado práctico al completar el módulo."),
+    );
+
+    const progress = createElement("div", "module-card-progress");
+    const progressCopy = createElement("div", "module-progress-copy");
+    progressCopy.append(
+      createElement("span", "", completeCount ? `${completeCount} de ${module.lessons.length} completadas` : "Sin empezar"),
+      createElement("span", "", `${percent}%`),
+    );
+    const progressTrack = createElement("div", "module-progress-track");
+    const progressFill = createElement("div", "module-progress-fill");
+    progressFill.style.width = `${percent}%`;
+    progressTrack.append(progressFill);
+    const open = createElement("div", "module-open");
+    const openCopy = isModulePreview ? "Disponible al entrar" : (percent === 100 ? "Repasar módulo" : "Abrir módulo");
+    open.append(createElement("span", "", openCopy), createElement("span", "", isModulePreview ? "🔒" : "→"));
+    progress.append(progressCopy, progressTrack, open);
+    body.append(progress);
+    card.append(cover, body);
+    card.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (isModulePreview) return;
+      selectLesson(indexes[0] ?? 0, true);
+    });
+    moduleGrid.append(card);
+  });
+}
+
+function showCourseHome({ scroll = true } = {}) {
+  lessonView.hidden = true;
+  courseHome.hidden = false;
+  if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showLessonView() {
+  courseHome.hidden = true;
+  lessonView.hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function renderNavigation() {
   nav.replaceChildren();
   course.modules.forEach((module) => {
@@ -77,6 +204,10 @@ function renderProgress() {
   $("#progress-fill").style.width = `${percent}%`;
   $("#progress-label").textContent = `${count} de ${total} completadas`;
   $("#progress-percent").textContent = `${percent}%`;
+  $("#home-progress-fill").style.width = `${percent}%`;
+  $("#home-progress-label").textContent = `${count} de ${total} completadas`;
+  $("#home-progress-percent").textContent = `${percent}%`;
+  renderModules();
 }
 
 function renderLesson() {
@@ -139,10 +270,10 @@ function renderLesson() {
   });
 }
 
-function selectLesson(index) {
+function selectLesson(index, openView = true) {
   currentIndex = Math.max(0, Math.min(index, lessons.length - 1));
   renderLesson();
-  if (window.innerWidth < 861) $(".lesson-main")?.scrollIntoView({ behavior: "smooth" });
+  if (openView) showLessonView();
 }
 
 async function loadProgress() {
@@ -184,10 +315,14 @@ async function openCourse(nextSession) {
     $("#course-version").textContent = course.version;
     $("#course-name").textContent = course.title;
     $("#course-subtitle").textContent = course.subtitle;
+    $("#home-version").textContent = course.version;
+    $("#home-course-name").textContent = course.title;
+    $("#home-course-subtitle").textContent = course.subtitle;
     currentIndex = Math.max(0, lessons.findIndex((lesson) => !completed.has(lesson.slug)));
     renderNavigation();
     renderProgress();
     renderLesson();
+    showCourseHome({ scroll: false });
     gate.hidden = true;
     app.hidden = false;
     accountButton.hidden = false;
@@ -199,6 +334,21 @@ async function openCourse(nextSession) {
 }
 
 async function boot() {
+  if (isModulePreview) {
+    course = MODULE_PREVIEW_COURSE;
+    lessons = flattenLessons(course);
+    completed = new Set();
+    $("#home-version").textContent = course.version;
+    $("#home-course-name").textContent = course.title;
+    $("#home-course-subtitle").textContent = course.subtitle;
+    renderProgress();
+    gate.hidden = true;
+    app.hidden = false;
+    accountButton.hidden = true;
+    showCourseHome({ scroll: false });
+    return;
+  }
+
   if (window.location.protocol === "file:") {
     showGate("El curso protegido funciona en la versión publicada del sitio.");
     return;
@@ -265,6 +415,7 @@ completeButton.addEventListener("click", async () => {
 });
 
 nextButton.addEventListener("click", () => selectLesson(currentIndex + 1));
+modulesButton.addEventListener("click", () => showCourseHome());
 accountButton.addEventListener("click", async () => {
   if (!supabase) return;
   accountButton.disabled = true;

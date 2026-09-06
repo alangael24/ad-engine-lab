@@ -10,7 +10,7 @@ export async function database() {
     grant usage on schema auth to authenticated, service_role;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
   `);
-  for (const file of ['202608250001_accounts_and_credits.sql','20260830011058_saas_generation_jobs.sql','20260904230633_brand_storyboard_versions.sql','20260905015812_studio_reference_analysis.sql','20260905045330_studio_chat_edits.sql','20260905071152_studio_production_pipeline.sql','20260905095537_chat_revision_followups.sql']) {
+  for (const file of ['202608250001_accounts_and_credits.sql','20260830011058_saas_generation_jobs.sql','20260904230633_brand_storyboard_versions.sql','20260905015812_studio_reference_analysis.sql','20260905045330_studio_chat_edits.sql','20260905071152_studio_production_pipeline.sql','20260905095537_chat_revision_followups.sql','20260906002544_production_quality_gate.sql']) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url),'utf8'));
   }
   return db;

@@ -1,3 +1,4 @@
+import {reviewProduction} from '../../workers/production-quality.mjs';
 // Private local test data is injected via an explicit path; never bundled/deployed.
 import {readFile} from 'node:fs/promises';
 import {join,extname} from 'node:path';
@@ -24,6 +25,7 @@ export async function nebulaProduction(db,stub,root,env,fetchImpl=fetch){
  const project=await write('create_project',crypto.randomUUID(),{title:'Nebula · Producción automática con material existente',brandId:brand.id,idea:'Quiero un anuncio explicativo como la referencia, con el producto consistente.',creative:{format:'explainer',look:'3d'},referenceUrl:'',referenceNotes:'CGI azul grisáceo. Ir de cabello y cutícula al agua y al filtro; finalizar con el producto.',aspectRatio:'9:16',scriptDraft:script,narrationAssetId:null,timingConfirmed:false,scenes:[]});
  const choose=s=>{const c=catalog.find(c=>c.sourceKey===s.sourceKey);if(!c||compact(c.text)!==compact(s.text))throw Error('PRODUCTION_PLAN');return c;};
  let planCalls=0;const providers={
+  review:args=>reviewProduction({...args,env,fetchImpl}),
   async ready(){},
   async plan(p){planCalls++;const result=await callDirector(p,env,{fetchImpl,catalog:[...catalog].reverse().map(({sourceKey,text,visual,continuity,duration})=>({sourceKey,text,visual,continuity,duration}))});for(const s of result.scenes)choose(s);return result;},
   async speech(p){if(compact(p.data.scriptDraft)!==compact(script))throw Error('PRODUCTION_TIMING');return {assetId:voice.id,duration:voice.duration_seconds,alignment:alignmentFromWords(transcript.words)};},

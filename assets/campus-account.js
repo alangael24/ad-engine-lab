@@ -6,7 +6,7 @@ const emailInput = $("#auth-email");
 const submit = $("#auth-submit");
 const message = $("#auth-message");
 const signout = $("#signout");
-const planNames = { esencial: "Plan Esencial", pro: "Plan Pro" };
+const planNames = { esencial: "Primer Video Incluido", pro: "Plan Pro" };
 
 let supabase = null;
 let session = null;

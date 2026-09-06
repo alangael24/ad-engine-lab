@@ -1,5 +1,7 @@
+import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
+import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
 import {getSupabaseAdmin,json} from '../../src/backend.js';
-import {readJson,rpc,UUID,ApiError} from '../../src/generations.js';
+import {readJson,rpc,UUID,ApiError,generationAvailability} from '../../src/generations.js';
 import {verifyWorker} from './worker.js';
 import {signed,own} from '../../src/studio.js';
 import {productionError} from '../../src/studio-production.js';
@@ -14,8 +16,22 @@ export async function onRequestPost(context){try{
   return json({job:await rpc(db,'studio_production_work',args)});
  }
  if(!UUID.test(b.jobId||'')||!UUID.test(b.leaseToken||''))throw new ApiError('LEASE_LOST');
- if(['heartbeat','inspect','begin_step','finish_step','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
+ if(['heartbeat','inspect','begin_step','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
+ if(b.action==='review_media'){
+  const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);
+  if(r.production_id!==j.id||r.project_id!==j.project_id||r.project_revision!==j.expected_revision||r.status!=='succeeded')throw Error('PRODUCTION_QUALITY_INVALID');
+  return json({url:await signed(db,'studio-media',r.result_path),manifest:r.manifest,project:await own(db,'studio_projects',j.user_id,j.project_id)});
+ }
+ if(b.action==='finish_step'){
+  if(b.data?.stage==='quality'){
+   const r=await own(db,'studio_renders',j.user_id,b.data?.result?.renderId),report=b.data.result;
+   if(r.production_id!==j.id||r.project_revision!==j.expected_revision||r.status!=='succeeded'||report.version!==QUALITY_VERSION||!/^[a-f0-9]{64}$/.test(report.sha256||''))throw Error('PRODUCTION_QUALITY_INVALID');
+   validateReview(report,r.manifest.scenes);
+   if(!Array.isArray(report.sampleTimes)||report.sampleTimes.length!==r.manifest.scenes.length||r.manifest.scenes.some(s=>!report.sampleTimes.some(t=>t.sceneId===s.id&&t.times?.length===3&&t.times.every(n=>Number.isFinite(n)&&n>=s.start&&n<=s.end))))throw Error('PRODUCTION_QUALITY_INVALID');
+  }
+  return json({value:await rpc(db,'studio_production_work',args)});
+ }
  if(b.action==='asset'){
   const a=await own(db,'studio_assets',j.user_id,b.data?.assetId);return json({asset:a,url:await signed(db,a.bucket,a.storage_path)});
  }
@@ -34,9 +50,15 @@ export async function onRequestPost(context){try{
   if(d.action==='save_project')d.data=projectData(d.data);
   if(d.action==='version'){
    if(!UUID.test(d.data?.requestId||'')||!UUID.test(d.data?.sceneId||''))throw Error('PRODUCTION_INVALID');
-   if(!d.data.assetId&&context.env.GENERATION_ENABLED!=='true')throw new ApiError('WORKER_OFFLINE');
-   const p=await own(db,'studio_projects',j.user_id,j.project_id);
-   d.data={requestId:d.data.requestId,sceneId:d.data.sceneId,assetId:d.data.assetId||null,instruction:'Producción automática',prompt:scenePrompt(p,d.data.sceneId)};
+   const request={requestId:d.data.requestId,sceneId:d.data.sceneId,assetId:d.data.assetId||null,instruction:'Producción automática'};
+   const previous=await previousVideoRequest(db,j.user_id,j.project_id,request);
+   if(previous)d.data=previous;
+   else{
+    if(!request.assetId&&!await generationAvailability(db,context.env))throw new ApiError('WORKER_OFFLINE');
+    const p=await own(db,'studio_projects',j.user_id,j.project_id);
+    const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',context.env);
+    d.data={...request,prompt};
+   }
   }
   return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});
  }

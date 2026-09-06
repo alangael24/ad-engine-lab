@@ -6,7 +6,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "inicio",
       number: "01",
-      title: "Empieza por el resultado",
+      title: "Define el anuncio que vas a producir",
       lessons: [
         {
           slug: "define-tu-primer-anuncio",
@@ -40,7 +40,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "angulo",
       number: "02",
-      title: "Encuentra el ángulo que vende",
+      title: "Elige un ángulo que pueda vender",
       lessons: [
         {
           slug: "elige-un-angulo",
@@ -74,7 +74,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "guion",
       number: "03",
-      title: "Escribe el guion",
+      title: "Escribe el guion escena por escena",
       lessons: [
         {
           slug: "guion-escena-por-escena",
@@ -108,7 +108,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "produccion",
       number: "04",
-      title: "Produce con la herramienta",
+      title: "Genera escenas sin desperdiciar saldo",
       lessons: [
         {
           slug: "genera-tus-escenas",
@@ -143,7 +143,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "montaje",
       number: "05",
-      title: "Monta y publica",
+      title: "Monta, exporta y prepara variaciones",
       lessons: [
         {
           slug: "monta-y-prueba",
@@ -177,7 +177,7 @@ export const COURSE_CATALOG = Object.freeze({
     {
       id: "biblioteca",
       number: "06",
-      title: "Biblioteca de referencias",
+      title: "Desmonta anuncios de referencia",
       lessons: [
         {
           slug: "desmonta-anuncios",

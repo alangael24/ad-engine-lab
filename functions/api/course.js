@@ -11,6 +11,7 @@ export async function onRequestGet({ request, env }) {
       .from("purchases")
       .select("plan_code,granted_at")
       .eq("user_id", user.id)
+      .eq("course_access", true)
       .not("granted_at", "is", null)
       .order("granted_at", { ascending: false })
       .limit(1)

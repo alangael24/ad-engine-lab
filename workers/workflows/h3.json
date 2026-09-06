@@ -1,0 +1,111 @@
+{
+  "prompt": {
+    "6": {
+      "inputs": {
+        "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      },
+      "class_type": "UNETLoader"
+    },
+    "13": {
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      },
+      "class_type": "CLIPLoader"
+    },
+    "11": {
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+      },
+      "class_type": "VAELoader"
+    },
+    "24": {
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      },
+      "class_type": "VAELoader"
+    },
+    "104": {
+      "inputs": {
+        "clip": ["13", 0],
+        "vae": ["11", 0],
+        "width": 832,
+        "height": 480,
+        "length": 124,
+        "prompt": "[Shot 1] Natural commercial video with coherent motion.\n\noverall_soundscape: Natural synchronized ambience and sound effects.\nnon_diegetic_music: N/A."
+      },
+      "class_type": "MiniMaxH3ImageToVideo"
+    },
+    "16": {
+      "inputs": {
+        "model": ["6", 0],
+        "conditioning": ["104", 0]
+      },
+      "class_type": "BasicGuider"
+    },
+    "17": {
+      "inputs": {
+        "sampler_name": "res_multistep"
+      },
+      "class_type": "KSamplerSelect"
+    },
+    "9": {
+      "inputs": {
+        "model": ["6", 0],
+        "scheduler": "simple",
+        "steps": 20,
+        "denoise": 1
+      },
+      "class_type": "BasicScheduler"
+    },
+    "15": {
+      "inputs": {
+        "noise_seed": 7
+      },
+      "class_type": "RandomNoise"
+    },
+    "14": {
+      "inputs": {
+        "noise": ["15", 0],
+        "guider": ["16", 0],
+        "sampler": ["17", 0],
+        "sigmas": ["9", 0],
+        "latent_image": ["104", 1]
+      },
+      "class_type": "SamplerCustomAdvanced"
+    },
+    "10": {
+      "inputs": {
+        "samples": ["14", 0],
+        "vae": ["11", 0]
+      },
+      "class_type": "VAEDecode"
+    },
+    "23": {
+      "inputs": {
+        "samples": ["14", 0],
+        "vae": ["24", 0]
+      },
+      "class_type": "VAEDecodeAudio"
+    },
+    "91": {
+      "inputs": {
+        "images": ["10", 0],
+        "audio": ["23", 0],
+        "fps": 24
+      },
+      "class_type": "CreateVideo"
+    },
+    "92": {
+      "inputs": {
+        "video": ["91", 0],
+        "filename_prefix": "video/h3_t2v",
+        "format": "auto",
+        "codec": "auto"
+      },
+      "class_type": "SaveVideo"
+    }
+  }
+}

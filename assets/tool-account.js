@@ -1,142 +1,46 @@
-const $ = (selector) => document.querySelector(selector);
-const gate = $("#auth-gate");
-const form = $("#auth-form");
-const emailInput = $("#auth-email");
-const message = $("#auth-message");
-const submit = $("#auth-submit");
-const accountButton = $("#account-button");
-const desktopCredit = $("#desktop-credit-copy");
-const mobileCredit = $("#mobile-credit-copy");
-
-let supabase = null;
-let currentSession = null;
-
-function emitAuth(authenticated, backendEnabled = true) {
-  window.dispatchEvent(new CustomEvent("ad-engine:auth-state", {
-    detail: { authenticated, backendEnabled },
-  }));
-}
-
-function setCredits(video = null, images = null, copy = "Saldo pendiente") {
-  const desktop = video === null ? copy : `${video} clips · ${images} imágenes`;
-  const mobile = video === null ? copy : `${video} clips · ${images} imgs`;
-  if (desktopCredit) desktopCredit.textContent = desktop;
-  if (mobileCredit) mobileCredit.textContent = mobile;
-}
-
-function setMessage(copy, tone = "neutral") {
-  if (!message) return;
-  message.textContent = copy;
-  message.dataset.tone = tone;
-}
-
-function showGate() {
-  gate?.removeAttribute("hidden");
-  accountButton?.setAttribute("hidden", "");
-  emitAuth(false);
-  window.setTimeout(() => emailInput?.focus(), 50);
-}
-
-function hideGate() {
-  gate?.setAttribute("hidden", "");
-  accountButton?.removeAttribute("hidden");
-  emitAuth(true);
-}
-
-async function loadBalance(session) {
-  const { data, error } = await supabase
-    .from("credit_balances")
-    .select("video_credits,image_credits")
-    .eq("user_id", session.user.id)
-    .single();
-
-  if (error) {
-    console.error("credit_balance_failed", error.message);
-    setCredits(null, null, "Activando saldo…");
-    return;
-  }
-
-  setCredits(data.video_credits, data.image_credits);
-}
-
-async function applySession(session) {
-  currentSession = session;
-  if (!session) {
-    setCredits(null, null, "Inicia sesión");
-    showGate();
-    return;
-  }
-
-  accountButton.textContent = session.user.email || "Mi cuenta";
-  hideGate();
-  await loadBalance(session);
-}
-
-async function boot() {
-  if (window.location.protocol === "file:") {
-    setCredits(null, null, "Vista previa");
-    gate?.setAttribute("hidden", "");
-    emitAuth(true, false);
-    return;
-  }
-
+import { getAuthClient, apiRequest, accountDestination } from './auth-client.js';
+export { apiRequest } from './auth-client.js';
+const $ = selector => document.querySelector(selector);
+let supabase = null, session = null, revision = 0;
+const listeners = new Set();
+export const onAccountChange = callback => { listeners.add(callback); callback(session); };
+export const setCredits = (video, images) => {
+  $('#desktop-credit-copy').textContent = video == null ? 'Saldo no disponible' : `${video} clips · ${images} imágenes`;
+  $('#mobile-credit-copy').textContent = video == null ? 'Saldo…' : `${video} clips · ${images} imgs`;
+};
+async function applySession(next) {
+  const current = ++revision;
+  if (!next) { location.replace('/cuenta/'); return; }
   try {
-    const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
-    const config = await response.json();
-    if (!response.ok || !config.enabled) throw new Error("La activación del acceso está pendiente.");
-
-    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/+esm");
-    supabase = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: { detectSessionInUrl: true, persistSession: true, flowType: "pkce" },
-    });
-
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    await applySession(session);
-
-    supabase.auth.onAuthStateChange((_event, nextSession) => {
-      window.setTimeout(() => applySession(nextSession), 0);
-    });
+    if(sessionStorage.getItem('creative-rush-return')==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
+    const account = await apiRequest('/api/account');
+    if (current !== revision) return;
+    const destination = accountDestination(account);
+    if (destination !== '/herramienta/') { location.replace(destination); return; }
+    session = next;
+    $('#auth-gate').hidden = true;
+    $('#account-button').hidden = false;
+    $('#account-button').textContent = account.email;
+    setCredits(account.balance.video_credits, account.balance.image_credits);
+    for (const callback of listeners) callback(next);
   } catch (error) {
-    console.warn("account_boot_failed", error?.message || error);
-    setCredits(null, null, "Activación pendiente");
-    setMessage("El acceso automático todavía no está disponible. Inténtalo de nuevo en unos minutos.", "error");
-    showGate();
-    emailInput?.setAttribute("disabled", "");
-    submit?.setAttribute("disabled", "");
+    if (error.code === 'UNAUTHORIZED') { location.replace('/cuenta/'); return; }
+    $('#auth-gate').hidden = false;
+    $('#auth-message').textContent = 'No pudimos comprobar tu cuenta. Recarga esta página; no se descontó saldo.';
   }
 }
-
-form?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!supabase) return;
-  const email = emailInput.value.trim().toLowerCase();
-  if (!email) return;
-
-  submit.disabled = true;
-  setMessage("Enviando tu enlace seguro…");
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: `${window.location.origin}/herramienta/`,
-    },
-  });
-
-  if (error) {
-    setMessage("No encontramos una compra con ese correo. Usa exactamente el correo de Stripe.", "error");
-    submit.disabled = false;
-    return;
+async function boot() {
+  try {
+    supabase = await getAuthClient();
+    const { data } = await supabase.auth.getSession();
+    await applySession(data.session);
+    supabase.auth.onAuthStateChange((_event, next) => { setTimeout(() => applySession(next), 0); });
+  } catch (error) {
+    if (error.code === 'AUTH_CALLBACK_ERROR') { location.replace('/cuenta/?auth_error=retry'); return; }
+    $('#auth-gate').hidden = false;
+    $('#auth-message').textContent = 'No pudimos conectar con tu cuenta. Puedes volver al registro e intentarlo otra vez.';
+    $('#service-status').textContent = 'Backend sin conectar · generación desactivada';
   }
-
-  setMessage("Listo. Revisa tu correo y abre el enlace para entrar.", "success");
-});
-
-accountButton?.addEventListener("click", async () => {
-  if (!supabase || !currentSession) return;
-  accountButton.disabled = true;
-  await supabase.auth.signOut();
-  accountButton.disabled = false;
-});
-
+}
+$('#account-button').addEventListener('click', async () => { if (supabase) { await supabase.auth.signOut(); location.replace('/cuenta/?mode=login'); } });
 boot();

@@ -1,0 +1,20 @@
+// Always-on host for the production coordinator and CPU renderer. No public job API.
+import {spawn,execFileSync} from 'node:child_process';
+import {createServer} from 'node:http';
+import {fileURLToPath} from 'node:url';
+import {createProductionProviders} from './production-providers.mjs';
+import {productionApi} from './production-worker.mjs';
+import {studioApi} from './studio-worker.mjs';
+await createProductionProviders(process.env).ready();
+productionApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.PRODUCTION_WORKER_TOKEN,workerId:process.env.PRODUCTION_WORKER_ID});
+studioApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.STUDIO_WORKER_TOKEN,workerId:process.env.STUDIO_WORKER_ID});
+for(const bin of ['ffmpeg','ffprobe'])execFileSync(bin,['-version'],{stdio:'ignore'});
+let stopping=false;const children=new Set();
+const server=createServer((req,res)=>{if(req.url!=='/health'||req.method!=='GET'){res.writeHead(404).end();return;}res.writeHead(!stopping&&children.size===2?200:503,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({status:!stopping&&children.size===2?'ok':'stopping'}));});
+function shutdown(code){if(stopping)return;stopping=true;server.close();for(const child of children)child.kill('SIGTERM');const deadline=setTimeout(()=>process.exit(code),25000);deadline.unref();if(!children.size)process.exit(code);}
+for(const file of ['production-worker.mjs','studio-worker.mjs']){
+ const child=spawn(process.execPath,['--max-old-space-size=512',fileURLToPath(new URL(file,import.meta.url))],{stdio:'inherit'});children.add(child);
+ child.on('error',()=>shutdown(1));child.on('exit',()=>{children.delete(child);if(stopping){if(!children.size)process.exit(0);}else shutdown(1);});
+}
+for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>shutdown(0));
+server.listen(Number(process.env.PORT||10000),'0.0.0.0');
