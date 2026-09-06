@@ -72,7 +72,10 @@ End-to-end render and chat revision results: pending final verification.
 - Local suite: 133 passed, 1 optional separate-editor sandbox check skipped.
 - Stripe checkout currently sells the existing $999 MXN bundle. This rollout
   does not change pricing. Real payment/webhook verification is pending because
-  the Stripe connector requires reauthentication.
+  the Stripe connector requires reauthentication. The deployed endpoint rejects
+  unsigned requests with HTTP 400. The Checkout page also still mentions course
+  access while the Launch entitlement mapping is software-only; reconcile that
+  published offer before opening purchases for the new product.
 
 ## Fixed infrastructure cost
 

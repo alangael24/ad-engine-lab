@@ -29,7 +29,17 @@ export function referencePanel({api,task,tell,getProject,isDirty,onApplied}){
    note('Referencia lista.');
    if(autoAdopt===a.id){await adopt(a);return;}
    button('Usar referencia',()=>adopt(a));
-  }else{note('No pude terminar el análisis.');button('Comprobar resultado',refresh);}
+  }else{
+   note('No pude terminar el análisis.');
+   // Rechecking an immutable failed request can never restart its provider.
+   // Only this explicit user action creates a new attempt; HTTP retries keep
+   // their original request ID and recover any already-completed result.
+   button(file?'Reintentar':'Adjuntar referencia',async()=>{
+    if(!file){input.click();return;}
+    if(pending)pending={...pending,requestId:crypto.randomUUID()};
+    await analyze(pending?.silent||false);
+   });
+  }
  }
  async function analyze(silent=false){
   if(!file||working||!current)return;
@@ -44,6 +54,7 @@ export function referencePanel({api,task,tell,getProject,isDirty,onApplied}){
   }catch(e){
    if(current!==id)return;
    if(e.code==='REFERENCE_AUDIO_UNREADABLE'){note('No pude leer el audio de este video.');button('Usar solo las imágenes',()=>analyze(true));}
+   else if(['REFERENCE_PROVIDER','REFERENCE_OUTPUT_INVALID'].includes(e.code)){await refresh();}
    else{note('No pude completar el análisis.');button('Reintentar',()=>analyze(silent));}
   }finally{working=false;if(current===id)send.disabled=wasDisabled;}
  }
