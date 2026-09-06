@@ -15,6 +15,10 @@ export async function database() {
   }
   await db.exec(await readFile(new URL('../../supabase/migrations/20260906032225_production_service_permissions.sql', import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/20260906033406_production_credit_guards.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260906044611_production_spending_limits.sql', import.meta.url),'utf8'));
+  // Existing test scenarios explicitly receive a fake, generously funded policy.
+  // The actual migration defaults to zero; budget tests verify that separately.
+  await db.exec(`update production_spend_policy set project_limit=1000000000,total_limit=10000000000,rates='{"planning":10000,"image":300000,"narration":10000,"clip":100000,"quality":10000,"assembly":10000}'`);
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

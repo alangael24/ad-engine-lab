@@ -1,3 +1,4 @@
+import {paidStep} from '../../src/production-spend.js';
 import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
 import {getSupabaseAdmin,json} from '../../src/backend.js';
@@ -16,8 +17,14 @@ export async function onRequestPost(context){try{
   return json({job:await rpc(db,'studio_production_work',args)});
  }
  if(!UUID.test(b.jobId||'')||!UUID.test(b.leaseToken||''))throw new ApiError('LEASE_LOST');
- if(['heartbeat','inspect','begin_step','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
+ if(['heartbeat','inspect','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
+ const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
+ if(b.action==='begin_step'){
+  const key=b.data?.key,kind=paidStep(key);
+  if(kind&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind);
+  return json({value:await rpc(db,'studio_production_work',args)});
+ }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);
   if(r.production_id!==j.id||r.project_id!==j.project_id||r.project_revision!==j.expected_revision||r.status!=='succeeded')throw Error('PRODUCTION_QUALITY_INVALID');
@@ -56,10 +63,16 @@ export async function onRequestPost(context){try{
    else{
     if(!request.assetId&&!await generationAvailability(db,context.env))throw new ApiError('WORKER_OFFLINE');
     const p=await own(db,'studio_projects',j.user_id,j.project_id);
+    if(!request.assetId){
+     const scene=p.data.scenes.find(s=>s.id===request.sceneId);
+     if(!scene)throw Error('PRODUCTION_INVALID');
+     await reserve(d.key,'clip',Math.ceil((scene.end-scene.start)/5));
+    }
     const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',context.env);
     d.data={...request,prompt};
    }
   }
+  if(d.action==='render'&&j.steps?.[d.key]?.status!=='done')await reserve(d.key,'assembly');
   return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});
  }
  throw Error('PRODUCTION_INVALID');

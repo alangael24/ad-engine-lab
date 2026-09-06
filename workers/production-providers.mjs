@@ -61,7 +61,7 @@ export function createProductionProviders(env,{fetchImpl=fetch}={}){
    const r=await fetchImpl('https://api.openai.com/v1/images/edits',{method:'POST',headers:{authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(300000)});
    if(!r.ok)await providerFailure(r,'openai_image');const d=JSON.parse(new TextDecoder().decode(await readBounded(r,12000000)));if(!d.data?.[0]?.b64_json)fail('PRODUCTION_PROVIDER');
    const bytes=Buffer.from(d.data[0].b64_json,'base64');if(bytes.length>6291456||imageType(bytes)[0]!=='image/png')fail('PRODUCTION_PROVIDER');
-   return saveAsset('image',bytes,invoke,fetchImpl);
+   return {...await saveAsset('image',bytes,invoke,fetchImpl),provider:'openai',model,quality:'high',size:form.get('size'),referenceCount:ids.length,requestId:r.headers.get('x-request-id'),usage:d.usage||null};
   },
   // No direct GPU submission here: the existing version queue owns H3 leases and billing.
   async clip(){return {};},

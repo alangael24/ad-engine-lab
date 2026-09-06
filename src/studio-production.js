@@ -2,6 +2,8 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_BUDGET_DISABLED:[503,'La generación está pausada. Tu avance está guardado.'],
+ PRODUCTION_BUDGET_EXCEEDED:[409,'Alcanzamos el presupuesto de generación. Conservamos tu avance y detuvimos los intentos.'],
  PRODUCTION_IMAGE_QUOTA:[503,'La creación de imágenes no está disponible ahora. Tu avance está guardado y el crédito del intento fue devuelto.'],
  INSUFFICIENT_CREDITS:[402,'No hay créditos suficientes para terminar este anuncio. El avance está guardado.'],
  PRODUCTION_QUALITY_REQUIRED:[409,'Tu video sigue en revisión.'],
