@@ -3,6 +3,7 @@ import {partialFields,previewEmitter} from '../src/chat-stream.js';
 import {readEvents,readChatResponse} from '../assets/chat-stream.js';
 import {callEditor,postStudioChat} from '../src/studio-chat.js';
 import {CHAT_MODEL} from '../assets/chat-model.js';
+import {SCRIPT_MODEL} from '../assets/model-routing.js';
 import {database,user,call} from './helpers/database.mjs';
 import {mockSupabase} from './helpers/supabase-http.mjs';
 const encoder=new TextEncoder(),event=d=>'data: '+JSON.stringify(d)+'\n\n';
@@ -26,15 +27,15 @@ test('director previews arrive before upstream completes; truncated tool output 
  let controller,first;const received=new Promise(r=>first=r),out=[];
  const response=new Response(new ReadableStream({start(c){controller=c;}}));
  const result=callEditor({data:{}},[],[],'Hola',{},async()=>response,d=>{out.push(d);first();});
- controller.enqueue(encoder.encode(event(piece('{"operation":"draft_script","message":"Hola mundo. ","value":"Una'))));
+ controller.enqueue(encoder.encode(event(piece('{"operation":"set_look","message":"Hola mundo. ","value":"cl'))));
  await received;assert.ok(out.length);let settled=false;result.finally(()=>{settled=true;}).catch(()=>{});await Promise.resolve();assert.equal(settled,false);
- controller.enqueue(encoder.encode(event({choices:[{delta:{tool_calls:[{index:0,function:{arguments:' frase."}'}}]},finish_reason:'tool_calls'}]})));controller.close();assert.equal((await result).edit.value,'Una frase.');
+ controller.enqueue(encoder.encode(event({choices:[{delta:{tool_calls:[{index:0,function:{arguments:'ay"}'}}]},finish_reason:'tool_calls'}]})));controller.close();assert.equal((await result).edit.value,'clay');
  await assert.rejects(callEditor({data:{}},[],[],'X',{},async()=>new Response(event(piece('{"operation":"draft_script","message":"Hola')))),/CHAT_INVALID/);
 });
 test('stream preview never commits until validation; lost browser does not duplicate the completed request',async()=>{
  const db=await database(),owner=await user(db),stub=mockSupabase(db),original=globalThis.fetch;stub.users.set('alice',owner);let providerCalls=0,controller;
  const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'fixture'};
- globalThis.fetch=async(url,options)=>{if(String(url).includes('opencode.ai')){providerCalls++;return new Response(new ReadableStream({start(c){controller=c;}}));}return stub.fetch(url,options);};
+ globalThis.fetch=async(url,options)=>{if(String(url).includes('opencode.ai')){providerCalls++;if(JSON.parse(options.body).model===SCRIPT_MODEL)return new Response(event({model:SCRIPT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_script',arguments:JSON.stringify({value:'Hola mundo.'})}}]},finish_reason:'tool_calls'}]}));return new Response(new ReadableStream({start(c){controller=c;}}));}return stub.fetch(url,options);};
  try{
   const b=await call(db,'studio_write',[owner.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Nebula',product:'Filtro'}),null]);
   const p=await call(db,'studio_write',[owner.id,'create_project',crypto.randomUUID(),JSON.stringify({title:'Test',brandId:b.id,scenes:[],aspectRatio:'9:16',referenceUrl:'',referenceNotes:''}),null]);
@@ -49,6 +50,6 @@ test('stream preview never commits until validation; lost browser does not dupli
   await reader.cancel();
   controller.enqueue(encoder.encode(event({choices:[{delta:{tool_calls:[{index:0,function:{arguments:'mundo."}'}}]},finish_reason:'tool_calls'}]})));controller.close();await Promise.all(pending);
   assert.equal((await call(db,'studio_read',[owner.id,p.id])).project.data.scriptDraft,'Hola mundo.');
-  const replay=await postStudioChat(ctx());assert.equal((await replay.json()).edit.status,'succeeded');assert.equal(providerCalls,1);
+  const replay=await postStudioChat(ctx());assert.equal((await replay.json()).edit.status,'succeeded');assert.equal(providerCalls,2);
  }finally{globalThis.fetch=original;await db.close();}
 });

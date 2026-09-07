@@ -1,0 +1,7 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>CreativeRush Editor</title><link rel="stylesheet" href="/assets/video-use.css"></head><body>
+<header><a href="/editor/">CreativeRush Editor</a><a href="/editor/">Nuevo video</a></header>
+<main><section id="intro"><h1>¿Cómo quieres editar tu video?</h1><p>Sube tus clips. Añade una referencia para mostrar el estilo que buscas.</p></section>
+<div id="history" role="log" aria-live="polite"></div><video id="preview" controls playsinline hidden></video><a id="download" hidden>Descargar video</a>
+<form id="composer"><label class="sr-only" for="message">Describe cómo quieres tu video</label><textarea id="message" rows="2" maxlength="3000" placeholder="Por ejemplo: hazlo más ágil, con subtítulos como en la referencia…" required></textarea><div id="files"></div><div class="actions"><label class="attach">＋ Clips<input id="footage" type="file" accept="video/mp4" multiple hidden></label><label class="attach">＋ Referencia<input id="reference" type="file" accept="video/mp4" hidden></label><button id="send" type="submit">Enviar ↑</button></div></form>
+<button id="approve" hidden>Me gusta, edítalo</button><p id="status" role="status" aria-live="polite"></p><a id="login" href="/cuenta/?mode=login&next=editor" hidden>Iniciar sesión</a><p class="limits">Hasta 8 archivos MP4 de 50 MB y 3 minutos cada uno.</p>
+</main><script type="module" src="/assets/video-use.js"></script></body></html>

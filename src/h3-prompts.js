@@ -1,3 +1,5 @@
+import {creativeContext} from '../assets/creative-context.js';
+import {modelFetch} from './model-provider.js';
 // MiniMax H3 base/keyframe guide, reviewed 2026-09-05:
 // https://github.com/MiniMax-AI/MiniMax-H3/blob/main/skills/h3-prompt-writing/references/base-en.txt
 import {CHAT_MODEL} from '../assets/chat-model.js';
@@ -14,7 +16,7 @@ export function sceneVideoContext(project,sceneId,instruction=''){
  const referenceId=scene.imageAssetId||project.brand_snapshot?.productAssetId||null;
  const neighbor=s=>s?{text:s.text,visual:s.visual,motion:s.motion||''}:null;
  return {mode:referenceId?'I2VA':'T2VA',referenceId,generatedDuration:Math.min(15,Math.ceil(used/5)*5),usedDuration:used,
-  brand:project.brand_snapshot,scene:neighbor(scene),continuity:project.data.videoContinuity||'',
+  projectMemory:creativeContext(project),brand:project.brand_snapshot,scene:neighbor(scene),continuity:project.data.videoContinuity||'',
   previous:neighbor(scenes[index-1]),next:neighbor(scenes[index+1]),creativeGuide:creativeGuide(project.data.creative),referenceNotes:project.data.referenceNotes,correction:instruction};
 }
 export function formatH3Prompt(raw,hasImage){
@@ -31,7 +33,7 @@ export async function writeH3Prompt(context,env,{referenceUrl=null,fetchImpl=fet
  const {referenceId,...details}=context;
  const content=[{type:'text',text:JSON.stringify(details)},...(referenceUrl?[{type:'image_url',image_url:{url:referenceUrl}}]:[])];
  const request={model:CHAT_MODEL,reasoning_effort:'none',stream:true,max_tokens:1600,tool_choice:{type:'function',function:{name:'write_h3_prompt'}},tools:[{type:'function',function:{name:'write_h3_prompt',parameters:{type:'object',additionalProperties:false,properties:{integrated_multimodal_description:{type:'string',maxLength:1100}},required:['integrated_multimodal_description']}}}],messages:[{role:'system',content:H3_PROMPT_SYSTEM},{role:'user',content}]};
- let r;try{r=await fetchImpl('https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(60000)});}catch{fail('H3_PROMPT_PROVIDER');}
+ let r;try{r=await modelFetch(fetchImpl,'https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(60000)});}catch{fail('H3_PROMPT_PROVIDER');}
  if(!r.ok)fail('H3_PROMPT_PROVIDER');
  const calls=new Map();let model,finish;
  try{await readEvents(r,d=>{if(d.error)fail('H3_PROMPT_PROVIDER');if(d.model)model=d.model;for(const c of d.choices||[]){finish=c.finish_reason||finish;for(const t of c.delta?.tool_calls||[]){const v=calls.get(t.index)||{name:'',args:''};v.name+=t.function?.name||'';v.args+=t.function?.arguments||'';calls.set(t.index,v);}}},50000);}catch{fail('H3_PROMPT_PROVIDER');}

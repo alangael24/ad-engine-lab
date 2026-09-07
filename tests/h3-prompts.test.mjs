@@ -23,7 +23,7 @@ test('H3 serializer applies base guide fields and image header only for an actua
 test('Flash sees the first frame, writes H3 content, and unexpected provider/model/format fails before GPU submission',async()=>{
  const context=sceneVideoContext(project,scene.id);let request;
  const p=await writeH3Prompt(context,{REFERENCE_FLASH_KEY:'test-only'},{referenceUrl:'https://owned.test/frame.png',fetchImpl:async(url,opts)=>{request=JSON.parse(opts.body);return h3Response();}});
- assert.equal(request.model,CHAT_MODEL);assert.deepEqual(request.messages[1].content[1],{type:'image_url',image_url:{url:'https://owned.test/frame.png'}});assert.match(request.messages[0].content,/untrusted/);assert.match(p,/continues through the final frame/);
+ assert.equal(request.model,CHAT_MODEL);assert.deepEqual(request.input[1].content[1],{type:'input_image',image_url:'https://owned.test/frame.png'});assert.match(request.input[0].content,/untrusted/);assert.match(p,/continues through the final frame/);
  for(const response of [()=>h3Response(undefined,'substituted-model'),()=>h3Response(undefined,CHAT_MODEL,'length'),()=>new Response('failed',{status:503})])await assert.rejects(()=>writeH3Prompt(context,{REFERENCE_FLASH_KEY:'test-only'},{referenceUrl:'https://owned.test/frame.png',fetchImpl:async()=>response()}),/H3_PROMPT_/);
  await assert.rejects(()=>writeH3Prompt(context,{}),/H3_PROMPT_OFFLINE/);
 });

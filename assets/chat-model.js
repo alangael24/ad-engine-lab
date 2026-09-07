@@ -1,6 +1,7 @@
+import {remember} from './creative-context.js';
 import {projectData,fail,ID} from './studio-model.js';
-export const CHAT_MODEL='deepseek-v4-flash-vision-exp';
-export const OPS=['clarify','set_hook','draft_script','set_look','edit_scene','remove_scene','move_scene','select_version','undo','render','produce','batch','edit_text'];
+export {WORKFLOW_MODEL as CHAT_MODEL} from './model-routing.js';
+export const OPS=['clarify','set_hook','draft_script','set_look','edit_scene','remove_scene','move_scene','select_version','undo','render','produce','batch','edit_text','finish_edit'];
 export function validateEdit(raw){
  if(!raw||!OPS.includes(raw.operation)||typeof raw.message!=='string'||!raw.message.trim()||raw.message.length>1000)fail('CHAT_INVALID');
  const edit={operation:raw.operation,message:raw.message.trim()};
@@ -9,7 +10,7 @@ export function validateEdit(raw){
   edit.changes=raw.changes.map(c=>{if(!c||['batch','clarify','undo','render','produce'].includes(c.operation))fail('CHAT_INVALID');return validateEdit({...c,message:edit.message});});
   return edit;
  }
- if(['set_hook','draft_script','set_look','edit_scene','edit_text'].includes(edit.operation)){
+ if(['set_hook','draft_script','set_look','edit_scene','edit_text','finish_edit'].includes(edit.operation)){
   if(typeof raw.value!=='string'||!raw.value.trim()||raw.value.length>(edit.operation==='draft_script'?10000:['set_hook','edit_text'].includes(edit.operation)?500:800))fail('CHAT_INVALID');edit.value=raw.value.trim();
  }
  if(['edit_scene','edit_text','remove_scene','move_scene','select_version'].includes(edit.operation)){if(!ID.test(raw.sceneId||''))fail('CHAT_INVALID');edit.sceneId=raw.sceneId;}
@@ -24,7 +25,7 @@ export function applyEdit(project,edit,versions=[]){
  if(['clarify','undo','render','produce'].includes(op))return null;
  const idx=d.scenes.findIndex(s=>s.id===edit.sceneId),s=d.scenes[idx];
  if(['edit_scene','edit_text','remove_scene','move_scene','select_version'].includes(op)&&!s)fail('STUDIO_NOT_FOUND');
- if(op==='set_hook'){
+ if(op==='finish_edit'){if(!d.scenes.length)fail('CHAT_INVALID');d.creativeMemory=remember({data:d},{decision:edit.value}).data.creativeMemory;}else if(op==='set_hook'){
   if(d.scenes.length){d.scenes[0].text=edit.value;d.scenes[0].selectedVersionId=null;d.scriptDraft=d.scenes.map(x=>x.text).join('\n');}
   else{d.scriptDraft=(d.scriptDraft||'').replace(/^[\s\S]*?(?:[.!?](?:\s|$)|\n|$)/,()=>edit.value+' ');}
   d.narrationAssetId=null;d.timingConfirmed=false;for(const x of d.scenes)delete x.narrationStart;
@@ -51,7 +52,7 @@ export function applyEdit(project,edit,versions=[]){
 export function editFollowup(project,edit,next){
  const changes=edit.operation==='batch'?edit.changes:[edit];
  if(!next||!next.scenes.length)return null;
- if(changes.some(c=>['set_hook','edit_text','set_look','edit_scene'].includes(c.operation))&&project.data.scenes.length)return 'produce';
+ if(changes.some(c=>['set_hook','edit_text','set_look','edit_scene','finish_edit'].includes(c.operation))&&project.data.scenes.length)return 'produce';
  if(changes.some(c=>['remove_scene','move_scene','select_version'].includes(c.operation)))return 'render';
  return null;
 }

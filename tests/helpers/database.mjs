@@ -20,6 +20,7 @@ export async function database() {
   // The actual migration defaults to zero; budget tests verify that separately.
   await db.exec(`update production_spend_policy set project_limit=1000000000,total_limit=10000000000,rates='{"planning":10000,"image":300000,"narration":10000,"clip":100000,"quality":10000,"assembly":10000}'`);
   await db.exec(await readFile(new URL('../../supabase/migrations/20260906051327_production_attempt_allowances.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260907110000_editorial_render.sql', import.meta.url),'utf8'));
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

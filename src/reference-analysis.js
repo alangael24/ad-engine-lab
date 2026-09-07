@@ -1,3 +1,4 @@
+import {modelFetch} from './model-provider.js';
 import {json} from './backend.js';
 import {authContext,readJson,readBounded,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
@@ -42,7 +43,7 @@ export async function transcribeReference(input,env,request=fetch){
   return {mode:'asr',text,wordCount:words.length};
 }
 export async function callFlash(input,transcript,env,request=fetch){
-  const response=await request(ENDPOINT,{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(modelRequest(input,transcript)),signal:AbortSignal.timeout(90000)});
+  const response=await modelFetch(request,ENDPOINT,{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(modelRequest(input,transcript)),signal:AbortSignal.timeout(90000)});
   if(!response.ok)referenceError('REFERENCE_PROVIDER');
   const stream=new TextDecoder().decode(await readBounded(response,500000));let answer='',finish=null,usage=null,model=null;
   for(const line of stream.split('\n')){if(!line.startsWith('data: ')||line.trim()==='data: [DONE]')continue;let d;try{d=JSON.parse(line.slice(6));}catch{referenceError('REFERENCE_OUTPUT_INVALID');}if(d.error)referenceError('REFERENCE_PROVIDER');if(d.model)model=d.model;if(d.usage)usage=d.usage;for(const c of d.choices||[]){answer+=c.delta?.content||'';finish=c.finish_reason||finish;}}
@@ -51,7 +52,7 @@ export async function callFlash(input,transcript,env,request=fetch){
   const result=validateAnalysis(answer,input.frames);
   return {result,usage:usage?{prompt_tokens:usage.prompt_tokens,completion_tokens:usage.completion_tokens}:null,model:FLASH_MODEL};
 }
-function publicAnalysis(row){return {id:row.id,projectId:row.project_id,status:row.status==='running'&&Date.parse(row.started_at)<Date.now()-240000?'uncertain':row.status,source:row.source,result:row.result,transcript:row.transcript,usage:row.usage,createdAt:row.created_at,adoptedAt:row.adopted_at};}
+function publicAnalysis(row){return {id:row.id,projectId:row.project_id,status:row.status==='running'&&Date.parse(row.started_at)<Date.now()-240000?'uncertain':row.status,source:row.source,result:row.result?Object.fromEntries(Object.entries(row.result).filter(([k])=>k!=='visualEvidence')):row.result,transcript:row.transcript,usage:row.usage,createdAt:row.created_at,adoptedAt:row.adopted_at};}
 export async function getReferenceAnalysis(context){try{const {db,user}=await authContext(context),url=new URL(context.request.url),projectId=url.searchParams.get('project');await own(db,'studio_projects',user.id,projectId);const rows=await db.from('studio_reference_analyses').select('*').eq('user_id',user.id).eq('project_id',projectId).order('created_at',{ascending:false}).limit(10);if(rows.error)throw rows.error;return json({enabled:analysisAvailability(context.env),analyses:rows.data.map(publicAnalysis)});}catch(e){return analysisError(e);}}
 export async function postReferenceAnalysis(context){try{
   const {db,user}=await authContext(context);const b=await readJson(context.request,12000000);
@@ -67,7 +68,7 @@ export async function postReferenceAnalysis(context){try{
     const transcript=await transcribeReference(input,context.env);
     await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'transcript',p_id:row.id,p_project:input.projectId,p_data:{transcript}});
     const output=await callFlash(input,transcript,context.env);
-    const done=await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'complete',p_id:row.id,p_project:input.projectId,p_data:{...output,result:{...output.result,suggestedDirection:referenceDirection(output.result)}}});
+    const done=await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'complete',p_id:row.id,p_project:input.projectId,p_data:{...output,result:{...output.result,visualEvidence:input.sheets,suggestedDirection:referenceDirection(output.result)}}});
     return json({analysis:publicAnalysis(done)});
   }catch(e){
     // Unknown provider completion never retries automatically. A new user request is explicit.

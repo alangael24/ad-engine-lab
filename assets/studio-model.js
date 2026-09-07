@@ -1,3 +1,4 @@
+import {normalizeCreativeMemory} from './creative-context.js';
 import {creativeSettings,creativeShotRule} from './creative-formats.js';
 // Shared editorial rules, used by the browser and the authenticated API.
 export const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -21,7 +22,7 @@ export function projectData(input){
   if(narrationStart!==null&&(!Number.isFinite(narrationStart)||narrationStart<0||narrationStart+end-start>180))fail('STUDIO_AUDIO_TIMING');
   return {...(narrationStart!==null?{narrationStart}:{}),id:s.id,...(s.motion!=null?{motion:string(s.motion,400)}:{}),text:string(s.text,500,true),visual:string(s.visual,800,true),start:Math.round(start*1000)/1000,end:Math.round(end*1000)/1000,imageAssetId:id(s.imageAssetId),selectedVersionId:id(s.selectedVersionId)};
  });
- return {...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
+ return {...(input.creativeMemory?{creativeMemory:normalizeCreativeMemory(input.creativeMemory)}:{}),...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
 }
 export function draftScenes(script,duration,newId=()=>crypto.randomUUID()){
  const phrases=script.trim().match(/[^.!?¿]+[.!?]?/g)?.map(s=>s.trim()).filter(Boolean)||[];

@@ -2,6 +2,10 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_REFERENCE_REQUIRED:[422,'Necesitamos la referencia visual del producto antes de generar.'],
+ PRODUCTION_IMAGES_BLOCKED:[422,'Las imágenes necesitan correcciones. No se generaron clips con esas imágenes.'],
+ PRODUCTION_IMAGE_REVIEW_INVALID:[422,'No pudimos confirmar la revisión de las imágenes.'],
+ PRODUCTION_REPAIR_NO_CHANGE:[422,'La corrección no produjo cambios. Conservamos el avance sin repetirla.'],
  PRODUCTION_BUDGET_DISABLED:[503,'La generación está pausada. Tu avance está guardado.'],
  PRODUCTION_BUDGET_EXCEEDED:[409,'Alcanzamos el presupuesto de generación. Conservamos tu avance y detuvimos los intentos.'],
  PRODUCTION_IMAGE_QUOTA:[503,'La creación de imágenes no está disponible ahora. Tu avance está guardado y el crédito del intento fue devuelto.'],

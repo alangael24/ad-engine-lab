@@ -1,0 +1,13 @@
+# CreativeRush AI
+
+> Plataforma para producir escenas de video para anuncios de marcas ecommerce.
+
+## Disponibilidad
+
+La generación de video está pausada. La generación de imágenes está pendiente de activación. No se ofrece todavía edición automática de un anuncio completo. La guía y la plantilla de guion sí están disponibles.
+
+## Producto y recursos públicos
+
+- [Inicio](https://creativerushai.com/): ejemplos, alcance, funcionamiento y disponibilidad del producto.
+- [Cómo crear anuncios con IA](https://creativerushai.com/guias/crear-anuncios-con-ia/): guía sobre referencia, guion, voz, escenas y montaje.
+- [Plantilla de guion para anuncios](https://creativerushai.com/plantilla-guion-anuncio/): plantilla gratuita editable y ejemplos de anuncios de producto.

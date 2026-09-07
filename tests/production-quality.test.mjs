@@ -48,7 +48,7 @@ function pipelineFixture(){
    steps[data.key]={status:'done',result:structuredClone(result)};return {value:steps[data.key]};
   }return {};
  };
- const providers={image:async()=>{counts.images++;return {assetId:crypto.randomUUID()};},clip:async()=>({}),review:async({renderId})=>{counts.reviews++;return review(state.project.data.scenes,counts.reviews===1?'repair':'pass',renderId);}};
+ const providers={reviewImages:async({images})=>({verdict:'pass',summary:'Reviewed',issues:[],assetIds:images.map(x=>x.assetId)}),image:async()=>{counts.images++;return {assetId:crypto.randomUUID()};},clip:async()=>({}),review:async({renderId})=>{counts.reviews++;return review(state.project.data.scenes,counts.reviews===1?'repair':'pass',renderId);}};
  return {job,api,providers,counts,state,steps,writes};
 }
 test('production repairs one scene, rerenders and only completes after the new render passes',async()=>{
@@ -120,10 +120,41 @@ test('malformed reviewer response cannot reach completion or paid repairs',async
 function reviewStream(raw){return new Response('data: '+JSON.stringify({model:CHAT_MODEL,usage:{prompt_tokens:100,completion_tokens:30,total_tokens:130},choices:[{delta:{tool_calls:[{index:0,function:{name:'review_ad',arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n');}
 test('malformed review gets one bounded correction without waiving an actual defect',async()=>{
  const scenes=[scene('a')],bad={...review(scenes,'repair'),issues:[{...issue(scenes[0]),motion:'x'.repeat(401)}]},good=review(scenes,'repair');let calls=0;
- const result=await askReview('Review actual frames',[],{REFERENCE_FLASH_KEY:'fixture'},async(_url,init)=>{calls++;if(calls===2)assert.match(JSON.parse(init.body).messages[0].content,/text_limit_400/);return reviewStream(calls===1?bad:good);},null,scenes);
+ const result=await askReview('Review actual frames',[],{REFERENCE_FLASH_KEY:'fixture'},async(_url,init)=>{calls++;if(calls===2)assert.match(JSON.parse(init.body).input[0].content,/text_limit_400/);return reviewStream(calls===1?bad:good);},null,scenes);
  assert.equal(calls,2);assert.equal(result.raw.verdict,'repair');assert.equal(result.raw.issues.length,1);assert.equal(result.usage.total_tokens,260);
 });
 test('two invalid reviews remain blocked and provider failures are not automatically retried',async()=>{
  const scenes=[scene('a')];let calls=0;await assert.rejects(askReview('Review',[],{REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return reviewStream({...review(scenes,'pass'),issues:[issue(scenes[0])]});},null,scenes),/QUALITY_INVALID/);assert.equal(calls,2);
  calls=0;await assert.rejects(askReview('Review',[],{REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return new Response('',{status:503});},null,scenes),/QUALITY_OFFLINE/);assert.equal(calls,1);
+});
+
+test('defective still blocks H3 and delivery when the review cannot offer a safe correction',async()=>{
+ const f=pipelineFixture();f.providers.reviewImages=async({plan,images})=>({verdict:'blocked',summary:'Wrong product',issues:[{...issue({...plan.scenes[0],start:0}),action:'none',visual:'',motion:''}],assetIds:images.map(x=>x.assetId)});
+ const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(r.code,'PRODUCTION_IMAGES_BLOCKED');assert.equal(f.counts.clips,0);assert.equal(f.counts.complete,0);assert.equal(f.state.renders.length,0);
+ assert.match(f.state.project.data.creativeMemory.rejections[0],/Same comb/);
+});
+test('still correction reaches H3 only after new asset is reviewed; old clip is invalidated',async()=>{
+ const f=pipelineFixture();let reviews=0;const before=f.job.snapshot.data.scenes[0].imageAssetId;
+ f.providers.review=async({renderId})=>review(f.state.project.data.scenes,'pass',renderId);
+ f.providers.reviewImages=async({plan,images,project})=>{
+  reviews++;if(reviews>1){assert.notEqual(images[0].assetId,before);assert.ok(project.data.creativeMemory.rejections.length);}
+  return {verdict:reviews===1?'repair':'pass',summary:'Still review',issues:reviews===1?[issue({...plan.scenes[0],start:0})]:[],assetIds:images.map(x=>x.assetId)};
+ };
+ const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(r.ok,true);assert.equal(reviews,2);assert.equal(f.counts.clips,1);assert.equal(f.counts.images,1);
+ assert.ok(f.state.project.data.creativeMemory.approvedAssets.includes(f.state.project.data.scenes[0].imageAssetId));
+});
+test('review of another asset and a no-change repair both fail closed before H3',async()=>{
+ for(const kind of ['wrong-asset','no-change']){
+  const f=pipelineFixture();f.providers.reviewImages=async({plan,images})=>({verdict:kind==='wrong-asset'?'pass':'repair',summary:'Review',issues:kind==='wrong-asset'?[]:[{...issue({...plan.scenes[0],start:0}),visual:plan.scenes[0].visual,motion:plan.scenes[0].motion}],assetIds:kind==='wrong-asset'?images.map(()=>crypto.randomUUID()):images.map(x=>x.assetId)});
+  const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(r.code,kind==='wrong-asset'?'PRODUCTION_IMAGE_REVIEW_INVALID':'PRODUCTION_REPAIR_NO_CHANGE');assert.equal(f.counts.clips,0);assert.equal(f.counts.images,0);
+ }
+});
+
+test('caption/timing feedback returns to the editor without regenerating images or clips',async()=>{
+ const f=pipelineFixture();let n=0;
+ f.providers.review=async({renderId})=>++n===1?{...review(f.state.project.data.scenes,'blocked',renderId),issues:[{...issue(f.state.project.data.scenes[0]),kind:'caption',action:'none',visual:'',motion:'',evidence:'Caption stays on screen after the line ends.'}]}:review(f.state.project.data.scenes,'pass',renderId);
+ const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(result.ok,true);assert.equal(f.state.renders.length,2);assert.equal(f.counts.images,0);assert.equal(f.counts.clips,0);assert.match(f.state.project.data.creativeMemory.rejections.join(' '),/Caption stays/);assert.equal(f.counts.complete,1);
 });

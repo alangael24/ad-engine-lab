@@ -1,6 +1,6 @@
 // Shared limits and deterministic frame identity. Model output never supplies edit times.
-export const ANALYSIS_VERSION = 'flash-reference-v1';
-export const FLASH_MODEL = 'deepseek-v4-flash-vision-exp';
+export const ANALYSIS_VERSION = 'luna-reference-v2';
+export {WORKFLOW_MODEL as FLASH_MODEL} from './model-routing.js';
 export function referenceError(code='REFERENCE_INVALID'){throw Object.assign(new Error(code),{code});}
 export function sampleFrames(duration){
   if(typeof duration!=='number'||!Number.isFinite(duration)||duration<2||duration>120)referenceError();

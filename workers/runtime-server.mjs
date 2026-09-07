@@ -1,3 +1,7 @@
+import {mkdtemp,mkdir,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createSandbox} from './video-use/sandbox.mjs';
 // Always-on host for the production coordinator and CPU renderer. No public job API.
 import {spawn,execFileSync} from 'node:child_process';
 import {createServer} from 'node:http';
@@ -9,6 +13,8 @@ await createProductionProviders(process.env).ready();
 productionApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.PRODUCTION_WORKER_TOKEN,workerId:process.env.PRODUCTION_WORKER_ID});
 studioApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.STUDIO_WORKER_TOKEN,workerId:process.env.STUDIO_WORKER_ID});
 for(const bin of ['ffmpeg','ffprobe'])execFileSync(bin,['-version'],{stdio:'ignore'});
+const check=await mkdtemp(join(tmpdir(),'editor-ready-'));
+try{await mkdir(join(check,'edit'));const sandbox=await createSandbox(check,{python:process.env.VIDEO_USE_PYTHON});await sandbox.run([sandbox.python,'-c','import PIL, numpy'],30000);}finally{await rm(check,{recursive:true,force:true});}
 const processes=['production-worker.mjs','studio-worker.mjs',...(process.env.GPU_IDLE_ENABLED==='true'?['gpu-idle-worker.mjs']:[])];
 let stopping=false;const children=new Set();
 const server=createServer((req,res)=>{if(req.url!=='/health'||req.method!=='GET'){res.writeHead(404).end();return;}res.writeHead(!stopping&&children.size===processes.length?200:503,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({status:!stopping&&children.size===processes.length?'ok':'stopping'}));});

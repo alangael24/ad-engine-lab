@@ -22,8 +22,19 @@ export async function onRequestPost(context){try{
  const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
  if(b.action==='begin_step'){
   const key=b.data?.key,kind=paidStep(key);
-  if(kind&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind);
+  if(kind&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
   return json({value:await rpc(db,'studio_production_work',args)});
+ }
+ if(b.action==='creative_context'){
+  const project=await own(db,'studio_projects',j.user_id,j.project_id);
+  let referenceEvidence=[];
+  if(project.data.referenceAnalysisId){
+   const a=await own(db,'studio_reference_analyses',j.user_id,project.data.referenceAnalysisId);
+   if(a.project_id!==j.project_id||a.status!=='succeeded')throw Error('PRODUCTION_REFERENCE_REQUIRED');
+   referenceEvidence=a.result?.visualEvidence||[];
+   if(!referenceEvidence.length)throw Error('PRODUCTION_REFERENCE_REQUIRED');
+  }
+  return json({value:{referenceEvidence}});
  }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);
@@ -34,6 +45,7 @@ export async function onRequestPost(context){try{
   if(b.data?.stage==='quality'){
    const r=await own(db,'studio_renders',j.user_id,b.data?.result?.renderId),report=b.data.result;
    if(r.production_id!==j.id||r.project_revision!==j.expected_revision||r.status!=='succeeded'||report.version!==QUALITY_VERSION||!/^[a-f0-9]{64}$/.test(report.sha256||''))throw Error('PRODUCTION_QUALITY_INVALID');
+   if(r.manifest.editorial?.sha256&&r.manifest.editorial.sha256!==report.sha256)throw Error('PRODUCTION_QUALITY_INVALID');
    validateReview(report,r.manifest.scenes);
    if(!Array.isArray(report.sampleTimes)||report.sampleTimes.length!==r.manifest.scenes.length||r.manifest.scenes.some(s=>!report.sampleTimes.some(t=>t.sceneId===s.id&&t.times?.length===3&&t.times.every(n=>Number.isFinite(n)&&n>=s.start&&n<=s.end))))throw Error('PRODUCTION_QUALITY_INVALID');
   }
@@ -72,7 +84,7 @@ export async function onRequestPost(context){try{
     d.data={...request,prompt};
    }
   }
-  if(d.action==='render'&&j.steps?.[d.key]?.status!=='done')await reserve(d.key,'assembly');
+  if(d.action==='render'&&j.steps?.[d.key]?.status!=='done'){await reserve(d.key,'assembly');await reserve(d.key+'-editor','planning',120);}
   return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});
  }
  throw Error('PRODUCTION_INVALID');

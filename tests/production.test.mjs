@@ -132,7 +132,7 @@ test('automatic version writes use H3 image-aware prompts and reuse frozen outpu
  const stub=mockSupabase(db),network=globalThis.fetch;let llm=0;
  globalThis.fetch=async(input,opts)=>{
   if(String(input).startsWith('https://opencode.ai/')){
-   llm++;const req=JSON.parse(opts.body);assert.equal(req.messages[1].content[1].type,'image_url');
+   llm++;const req=JSON.parse(opts.body);assert.equal(req.input[1].content[1].type,'input_image');
    return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})}}]},finish_reason:'tool_calls'}]})+'\n\n');
   }return stub.fetch(input,opts);
  };
