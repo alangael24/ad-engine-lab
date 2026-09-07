@@ -19,7 +19,9 @@ export function responsesRequest(chat) {
 
 // Normalize Responses SSE into the existing, validated streaming tool protocol.
 // No model fallback: callers still verify the actual returned model and completion.
+export function openCodeHeaders(headers){return {...headers,'x-opencode-session':headers?.['x-opencode-session']||'creativerush-'+crypto.randomUUID()};}
 export async function modelFetch(fetchImpl,url,init) {
+ init={...init,headers:openCodeHeaders(init.headers)};
  const chat=JSON.parse(init.body);
  if(chat.model!==WORKFLOW_MODEL)return fetchImpl(url,init);
  const response=await fetchImpl(url.replace(/chat\/completions$/, 'responses'),{...init,body:JSON.stringify(responsesRequest(chat))});
