@@ -80,11 +80,11 @@ test('durable steps replay completed results and stop ambiguous external submiss
 test('browser roles cannot access production state or privileged worker RPC',async()=>{
  await db.exec('set role authenticated');try{await assert.rejects(db.query('select * from studio_productions'),/permission denied/);await assert.rejects(call(db,'studio_production_work',['test-producer','claim']),/permission denied/);}finally{await db.exec('reset role');}
 });
-test('director must preserve the approved script and every scene retains product and neighbor context',()=>{
+test('director preserves script and legacy direction without copying neighboring shots into current image',()=>{
  const raw={continuity:'Same chrome cylinder, same person, blue CGI.',scenes:[{text:'Hola mundo.',visual:'Man looks at a comb.',motion:'Slow push in.'},{text:'Conoce el producto.',visual:'Show the full filter.',motion:'Slow arc.'}]};
  const p=validatePlan(raw,'Hola mundo. Conoce el producto.');assert.equal(p.scenes.length,2);
  assert.throws(()=>validatePlan(raw,'Hola mundo. Compra ahora.'),/PRODUCTION_SCRIPT_CHANGED/);
- const prompt=imageDirection({brand_snapshot:{appearance:'Cylinder must remain visible'},data:{aspectRatio:'9:16',referenceNotes:'Macro'}},p,1);assert.match(prompt,/Cylinder must remain visible/);assert.match(prompt,/Man looks at a comb/);assert.match(prompt,/Same chrome cylinder/);
+ const prompt=imageDirection({brand_snapshot:{appearance:'Cylinder must remain visible'},data:{aspectRatio:'9:16',referenceNotes:'Macro'}},p,1);assert.match(prompt,/Cylinder must remain visible/);assert.doesNotMatch(prompt,/Man looks at a comb/);assert.match(prompt,/Same chrome cylinder/);
 });
 test('timings follow actual word boundaries and reject missing, reordered or invalid alignment',()=>{
  const p=validatePlan({continuity:'Same set',scenes:[{text:'Hola mundo.',visual:'First',motion:'Pan'},{text:'Conoce el producto.',visual:'Second',motion:'Pan'}]},'Hola mundo. Conoce el producto.');

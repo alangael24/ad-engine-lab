@@ -1,0 +1,19 @@
+{
+  "full_suite": {
+    "passed": 150,
+    "failed": 1,
+    "skipped": 1,
+    "failure": "onboarding test reads missing ecom-index.html",
+    "failure_reproduced_on_baseline": true
+  },
+  "subsequent_routing_and_video_use_suite": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 1
+  },
+  "static_build": "passed",
+  "live_tool_call": "passed",
+  "live_vision_json": "passed",
+  "deployed": false,
+  "gpu_operations": 0
+}

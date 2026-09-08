@@ -1,0 +1,33 @@
+{
+  "date": "2026-09-08",
+  "status": "implemented_and_validated_locally",
+  "deployment": "not_deployed_paid_services_remain_off",
+  "tests": {
+    "total": 185,
+    "passed": 182,
+    "failed": 0,
+    "skipped": 3,
+    "command": "node --test tests/*.test.mjs"
+  },
+  "build_static": "passed",
+  "functions_bundle": "passed",
+  "diff_whitespace": "passed",
+  "live_paid_provider_calls": 0,
+  "experimental_basis": [
+    "video-continuity-05",
+    "video-continuity-06"
+  ],
+  "implemented": [
+    "planned opening and ending state",
+    "scene contract propagated to H3/editor/reviewer",
+    "near-cut samples",
+    "separated overview tiles",
+    "individual-frame confirmation before regeneration",
+    "editor guidance to adjust cuts without dropping narration"
+  ],
+  "not_implemented": [
+    "automatic previous-video-last-frame chaining",
+    "guaranteed geometric reconstruction of rooms",
+    "universal model reliability"
+  ]
+}

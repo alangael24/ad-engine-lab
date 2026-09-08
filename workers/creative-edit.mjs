@@ -28,7 +28,7 @@ export async function finishCreativeProject({root,project,shots,narration,words,
   const out=resolve(root,'prepared',id+'.mp4');
   await processCommand('ffmpeg',['-v','error','-y','-ss',String(shot.sourceStart||0),'-i',resolve(shot.path),'-ss',String(from),'-i',resolve(narration),'-map','0:v:0','-map','1:a:0','-t',String(duration),'-c:v','libx264','-preset','fast','-crf','18','-pix_fmt','yuv420p','-c:a','aac',out],{signal});
   await add(out,id,s.text,{text:selected.map(w=>w.text).join(' '),words:selected});
-  metadata[id]={sceneId:s.id,visual:s.visual,motion:s.motion};
+  metadata[id]={sceneId:s.id,visual:s.visual,motion:s.motion,shotContract:s.shotContract||null};
  }
  if(reference?.path)await add(resolve(reference.path),'S99','Original style reference',reference.transcript||{text:'',words:[],limitation:'Visual reference only; no verified transcript supplied.'},true);
  const input=await prepareInputs({sources},root,{env,fetchImpl,signal,sandboxOptions,cachedTranscripts});

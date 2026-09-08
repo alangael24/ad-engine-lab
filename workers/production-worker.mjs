@@ -32,9 +32,32 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
   const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
   // Existing stills anchor regenerated scenes even when the first shot changes.
+  const imageRepairCounts=plan.scenes.map(()=>0);
   const images=[],existingAnchor=existing.find(s=>s.imageAssetId);
   const reusable=s=>s.selectedVersionId&&(reuseNarration||timeline.filter(t=>t.planSceneId===s.id).every(t=>t.id===s.id&&t.end-t.start<=s.end-s.start));
-  for(const [i,s] of plan.scenes.entries())images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
+  for(const [i,s] of plan.scenes.entries()){
+   images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
+   // Production providers review each still before the next one may inherit it.
+   if(providers.reviewImage)for(let attempt=0;attempt<=2;attempt++){
+    const key=1000+i*3+attempt;
+    const report=await once(`still-check-${i}-${attempt}`,'images',()=>providers.reviewImage({project,plan,images,index:i,invoke}));
+    validateReview(report,plan.scenes.map((x,j)=>({...x,start:j,end:j+1})));
+    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId))||report.issues.some(x=>x.sceneId!==s.id))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
+    if(report.verdict==='pass'){
+     project=remember(project,{approvedAssets:images.map(x=>x.assetId),observedStates:report.observedStates||[]});
+     break;
+    }
+    project=remember(project,{rejection:report.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; '),rejectedAssets:report.issues.map(x=>images[plan.scenes.findIndex(s=>s.id===x.sceneId)]?.assetId)});
+    await write(`image-rejection-${key}`,'images','save_project',project.data);
+    if(attempt===2||report.verdict!=='repair'||report.issues.some(x=>x.action!=='replace_image'))throw Error('PRODUCTION_IMAGES_BLOCKED');
+    const issue=report.issues[0];
+    if(!issue||(s.visual===issue.visual&&s.motion===issue.motion))throw Error('PRODUCTION_REPAIR_NO_CHANGE');
+    s.visual=issue.visual;s.motion=issue.motion;
+    const old=images[i].assetId;imageRepairCounts[i]++;
+    images[i]=await once(`repair-image-${key}-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images[i-1],anchor:images[0],invoke,jobId:job.id}));
+    if(old===images[i].assetId)throw Error('PRODUCTION_REPAIR_NO_CHANGE');
+   }
+  }
   // Fail closed on still quality: no clip/version request precedes this gate.
   for(let round=0;round<=2;round++){
    const report=await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
@@ -42,16 +65,17 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    validateReview(report,reviewScenes);
    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
    if(report.verdict==='pass'){
-    project=remember(project,{decision:'Product, character and scene images approved before animation.',approvedAssets:images.map(x=>x.assetId)});break;
+    project=remember(project,{decision:'Product, character and scene images approved before animation.',approvedAssets:images.map(x=>x.assetId),observedStates:report.observedStates||[]});break;
    }
-   project=remember(project,{rejection:report.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; ')});
+   project=remember(project,{rejection:report.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; '),rejectedAssets:report.issues.map(x=>images[plan.scenes.findIndex(s=>s.id===x.sceneId)]?.assetId)});
    await write(`image-rejection-${round}`,'images','save_project',project.data);
    if(round===2||report.verdict!=='repair'||report.issues.some(x=>x.action!=='replace_image'))throw Error('PRODUCTION_IMAGES_BLOCKED');
    for(const issue of report.issues){
     const index=plan.scenes.findIndex(x=>x.id===issue.sceneId),scene=plan.scenes[index];
     if(scene.visual===issue.visual&&scene.motion===issue.motion)throw Error('PRODUCTION_REPAIR_NO_CHANGE');
     scene.visual=issue.visual;scene.motion=issue.motion;
-    const old=images[index].assetId;
+    if(imageRepairCounts[index]>=2)throw Error('PRODUCTION_IMAGES_BLOCKED');
+    imageRepairCounts[index]++;const old=images[index].assetId;
     images[index]=await once(`repair-image-${round+100}-${index}`,'images',()=>providers.image({project,plan,index,previous:images[index-1],anchor:images.find((_,i)=>!report.issues.some(x=>x.sceneId===plan.scenes[i].id)),invoke,jobId:job.id}));
     if(images[index].assetId===old)throw Error('PRODUCTION_REPAIR_NO_CHANGE');
    }
@@ -59,7 +83,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   const scenes=timeline.map(s=>{
    const old=existing.find(p=>p.id===s.id),keep=old?.selectedVersionId&&old.imageAssetId===images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId&&(reuseNarration||s.end-s.start<=old.end-old.start);
    const approved=plan.scenes.find(p=>p.id===s.planSceneId);
-   return {...s,visual:approved.visual,motion:approved.motion,imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
+   return {...s,visual:approved.visual,motion:approved.motion,...(approved.shotContract?{shotContract:approved.shotContract}:{}),imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
   });
   await write('prepare','images','save_project',{...project.data,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
   for(const [i,s] of scenes.entries()){
@@ -92,7 +116,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    if(review.verdict!=='repair')throw Error('PRODUCTION_QUALITY_BLOCKED');
    // Persist the repair decision BEFORE external requests: same keys resume completed work.
    const next=await once(`repair-plan-${round}`,'repair',()=>repairScenes(current.project,repairOnOriginalTimeline(review,current.project.data.scenes,reviewedScenes)));
-   const repaired=remember({data:structuredClone(next)},{rejection:review.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; ')}).data,repairPlan={continuity:plan.continuity,scenes:repaired.scenes};
+   const repaired=remember({data:structuredClone(next)},{rejection:review.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; '),rejectedAssets:review.issues.filter(x=>x.action==='replace_image').map(x=>current.project.data.scenes.find(s=>s.id===x.sceneId)?.imageAssetId)}).data,repairPlan={continuity:plan.continuity,scenes:repaired.scenes};
    for(const issue of review.issues.slice(0,3)){
     const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId),scene=repaired.scenes[index];
     if(!scene.imageAssetId){
@@ -104,6 +128,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    const stillReview=await once(`repair-still-review-${round}`,'images',()=>providers.reviewImages({project:{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},plan:repairPlan,images:repairedImages,invoke}));
    validateReview(stillReview,repairPlan.scenes.map((s,i)=>({...s,start:i,end:i+1})));
    if(stillReview.verdict!=='pass'||JSON.stringify(stillReview.assetIds)!==JSON.stringify(repairedImages.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGES_BLOCKED');
+   Object.assign(repaired,remember({data:repaired},{approvedAssets:repairedImages.map(x=>x.assetId),observedStates:stillReview.observedStates||[]}).data);
    await write(`repair-save-${round}`,'repair','save_project',repaired);
    for(const issue of review.issues.slice(0,3)){
     const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId),scene=repaired.scenes[index],key=`repair-clip-${round}-${index}`;

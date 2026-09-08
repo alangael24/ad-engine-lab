@@ -293,6 +293,51 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
     concat_list.unlink(missing_ok=True)
 
 
+def measured_timeline(edl: dict, durations: list[float], base_duration: float) -> dict:
+    """Use encoded segment durations for captions and overlays, not fractional EDL sums.
+
+    Lossless concat advances by each file's encoded duration; AAC/video frame rounding
+    is cumulative. Preserve source word times and remap only output positions.
+    """
+    if len(durations) != len(edl["ranges"]):
+        raise ValueError("Segment timing count mismatch")
+    planned = 0.0
+    actual = 0.0
+    spans = []
+    for r, duration in zip(edl["ranges"], durations):
+        wanted = float(r["end"]) - float(r["start"])
+        if not math.isfinite(duration) or duration <= 0 or abs(duration - wanted) > 0.12:
+            raise ValueError("Encoded segment duration differs beyond frame/audio rounding")
+        spans.append({"planned_start": planned, "planned_duration": wanted,
+                      "output_start": actual, "output_duration": duration})
+        r["rendered_start"] = actual
+        r["rendered_duration"] = duration
+        planned += wanted
+        actual += duration
+    if abs(base_duration - actual) > 0.12:
+        raise ValueError("Concat duration does not match measured segments")
+    def output_time(value):
+        if value >= planned - 1e-6:
+            return actual
+        for span in spans:
+            if value < span["planned_start"] + span["planned_duration"] - 1e-6:
+                return span["output_start"] + max(0.0, value - span["planned_start"])
+        return actual
+    for window in edl.get("caption_exclusions", []):
+        window["start"], window["end"] = output_time(window["start"]), output_time(window["end"])
+    for ov in edl.get("overlays", []):
+        start = float(ov["start_in_output"])
+        end = start + float(ov["duration"])
+        ov["start_in_output"] = output_time(start)
+        ov["duration"] = max(0.0, output_time(end) - ov["start_in_output"])
+    return {"planned_duration": planned, "duration": base_duration, "ranges": spans, "overlays": [dict(o) for o in edl.get("overlays", [])]}
+
+
+def media_duration(path: Path) -> float:
+    info = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_format", "-of", "json", str(path)]))
+    return float(info["format"]["duration"])
+
+
 # -------- Master SRT (Rule 5) ------------------------------------------------
 
 
@@ -339,7 +384,8 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
         src_name = r["source"]
         seg_start = float(r["start"])
         seg_end = float(r["end"])
-        seg_duration = seg_end - seg_start
+        seg_duration = float(r.get("rendered_duration", seg_end - seg_start))
+        seg_offset = float(r.get("rendered_start", seg_offset))
 
         tr_path = transcripts_dir / f"{src_name}.json"
         if not tr_path.exists():
@@ -379,6 +425,8 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             text = text.rstrip(",;:")
             if edl.get("caption_case", "natural") == "upper":
                 text = text.upper()
+            if any(float(w["start"]) < out_end and float(w["end"]) > out_start for w in edl.get("caption_exclusions", [])):
+                continue
             entries.append((out_start, out_end, text))
 
         seg_offset += seg_duration
@@ -533,21 +581,21 @@ def build_final_composite(
         ov_path = resolve_path(ov["file"], edit_dir)
         inputs += ["-i", str(ov_path)]
 
-    filter_parts: list[str] = []
+    filter_parts: list[str] = ["[0:v]setpts=PTS-STARTPTS[basev]"]
     # PTS-shift every overlay so its frame 0 lands at start_in_output
     for idx, ov in enumerate(overlays, start=1):
         t = float(ov["start_in_output"])
         filter_parts.append(f"[{idx}:v]setpts=PTS-STARTPTS+{t}/TB[a{idx}]")
 
     # Chain overlays on top of base
-    current = "[0:v]"
+    current = "[basev]"
     for idx, ov in enumerate(overlays, start=1):
         t = float(ov["start_in_output"])
         dur = float(ov["duration"])
         end = t + dur
         next_label = f"[v{idx}]"
         filter_parts.append(
-            f"{current}[a{idx}]overlay=enable='between(t,{t:.3f},{end:.3f})'{next_label}"
+            f"{current}[a{idx}]overlay=eof_action=pass:repeatlast=0:enable='between(t,{t:.3f},{end:.3f})'{next_label}"
         )
         current = next_label
 
@@ -574,6 +622,7 @@ def build_final_composite(
         "-filter_complex", filter_complex,
         "-map", out_label,
         "-map", "0:a",
+        "-t", f"{media_duration(base_path):.6f}",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-pix_fmt", "yuv420p",
         "-c:a", "copy",
@@ -641,6 +690,8 @@ def main() -> None:
         base_name = "base.mp4"
     base_path = edit_dir / base_name
     concat_segments(segment_paths, base_path, edit_dir)
+    timeline = measured_timeline(edl, [media_duration(f) for f in segment_paths], media_duration(base_path))
+    (edit_dir / "rendered-timeline.json").write_text(json.dumps(timeline, indent=2))
 
     # 3. Subtitles: build if requested, resolve final path
     subs_path: Path | None = None

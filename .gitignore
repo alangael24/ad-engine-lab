@@ -5,3 +5,7 @@ node_modules/
 dist/
 .DS_Store
 supabase/.temp/
+
+# Python runtime cache
+__pycache__/
+*.pyc

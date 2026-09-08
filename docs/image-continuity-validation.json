@@ -1,0 +1,14 @@
+{
+  "tests": 65,
+  "passed": 64,
+  "failed": 0,
+  "skipped": 1,
+  "skipped_scope": "Existing opt-in creative finishing real-render integration",
+  "static_build": "pass",
+  "pages_functions_compile": "pass",
+  "syntax": "pass",
+  "diff_check": "pass",
+  "paid_provider_calls": 0,
+  "gpu_started": false,
+  "deployed": false
+}

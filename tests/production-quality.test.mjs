@@ -51,6 +51,31 @@ function pipelineFixture(){
  const providers={reviewImages:async({images})=>({verdict:'pass',summary:'Reviewed',issues:[],assetIds:images.map(x=>x.assetId)}),image:async()=>{counts.images++;return {assetId:crypto.randomUUID()};},clip:async()=>({}),review:async({renderId})=>{counts.reviews++;return review(state.project.data.scenes,counts.reviews===1?'repair':'pass',renderId);}};
  return {job,api,providers,counts,state,steps,writes};
 }
+test('sequential still gate repairs before the next image inherits approved observed state and resumes without charges',async()=>{
+ const f=pipelineFixture(),events=[];let rejected=false;
+ for(const s of f.job.snapshot.data.scenes){s.imageAssetId=null;s.selectedVersionId=null;}
+ f.providers.image=async({index,previous,project})=>{
+  events.push(`image-${index}`);f.counts.images++;
+  if(index===1){assert.ok(project.data.creativeMemory.approvedAssets.includes(previous.assetId));assert.equal(project.data.creativeMemory.observedStates[0].assetId,previous.assetId);}
+  return {assetId:crypto.randomUUID()};
+ };
+ f.providers.reviewImage=async({index,plan,images})=>{
+  events.push(`review-${index}`);
+  if(index===0&&!rejected){rejected=true;return {verdict:'repair',summary:'Wrong action',issues:[issue({...plan.scenes[index],start:index})],assetIds:images.map(x=>x.assetId)};}
+  return {verdict:'pass',summary:'Observed',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[{sceneId:plan.scenes[index].id,assetId:images[index].assetId,summary:'Left hand visibly holds one closed bottle'}]};
+ };
+ f.providers.review=async({renderId})=>review(f.state.project.data.scenes,'pass',renderId);
+ const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(result.ok,true);assert.deepEqual(events,['image-0','review-0','image-0','review-0','image-1','review-1']);
+ assert.equal(f.state.project.data.creativeMemory.observedStates.length,2);
+ const again=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(again.ok,true);assert.equal(events.length,6);
+});
+test('blocked first still prevents generating the second and submitting H3',async()=>{
+ const f=pipelineFixture();for(const s of f.job.snapshot.data.scenes){s.imageAssetId=null;s.selectedVersionId=null;}
+ f.providers.reviewImage=async({plan,images})=>({verdict:'blocked',summary:'Wrong product',issues:[{...issue({...plan.scenes[0],start:0}),action:'none',visual:'',motion:''}],assetIds:images.map(x=>x.assetId)});
+ const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(result.code,'PRODUCTION_IMAGES_BLOCKED');assert.equal(f.counts.images,1);assert.equal(f.counts.clips,0);assert.equal(f.counts.complete,0);
+});
 test('production repairs one scene, rerenders and only completes after the new render passes',async()=>{
  const f=pipelineFixture(),result=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(result.ok,true);assert.equal(f.counts.complete,1);assert.equal(f.counts.reviews,2);assert.equal(f.counts.images,1);assert.equal(f.counts.clips,1);assert.equal(f.state.renders.length,2);assert.equal(result.renderId,f.state.renders[1].id);
  assert.deepEqual(Object.fromEntries(Object.entries(f.state.project.data.scenes[1]).filter(([k])=>k!=='planSceneId')),f.job.snapshot.data.scenes[1]);assert.equal(f.state.project.data.narrationAssetId,'voice');

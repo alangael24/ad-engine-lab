@@ -30,7 +30,7 @@ test('director receives the actual product and reference images, bounded to four
  await callDirector(project,{REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>({url:'https://storage.test/image'}),fetchImpl:async(url,options)=>{
   if(String(url).startsWith('https://storage.test/'))return new Response(Buffer.from([137,80,78,71,13,10,26,10]));
   request=JSON.parse(options.body);
-  return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand'}]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+  return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered after waving',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}}]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
  }});
  const content=request.input[1].content;assert.equal(content.filter(x=>x.type==='input_image').length,4);assert.match(JSON.stringify(content),/Actual product, authoritative geometry/);assert.match(JSON.stringify(content),/Large eyes/);
 });
