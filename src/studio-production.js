@@ -2,6 +2,9 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_REPAIR_OUTSIDE_SCOPE:[409,'La revisión encontró otro cambio necesario fuera de lo solicitado. Conservamos el video anterior sin generar tomas adicionales.'],
+ PRODUCTION_NARRATION_BASE:[409,'Falta la narración editable de esta versión. Conservamos el audio y no generamos una narración completa.'],
+ PRODUCTION_NARRATION_BOUNDARY:[409,'La frase necesita un corte de audio más preciso. Conservamos la versión anterior.'],
  PRODUCTION_REFERENCE_REQUIRED:[422,'Necesitamos la referencia visual del producto antes de generar.'],
  PRODUCTION_IMAGES_BLOCKED:[422,'Las imágenes necesitan correcciones. No se generaron clips con esas imágenes.'],
  PRODUCTION_IMAGE_REVIEW_INVALID:[422,'No pudimos confirmar la revisión de las imágenes.'],

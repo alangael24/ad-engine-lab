@@ -4,6 +4,7 @@ import {creativeContext} from '../assets/creative-context.js';
 import {askReview} from './production-quality.mjs';
 import {modelFetch} from '../src/model-provider.js';
 import {synthesizeMiniMax} from './minimax-speech.mjs';
+import {composeNarration} from './narration-revision.mjs';
 import {reviewProduction} from './production-quality.mjs';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -53,6 +54,7 @@ export function createProductionProviders(env,{fetchImpl=fetch}={}){
   plan:(project,invoke)=>callDirector(project,env,{fetchImpl,invoke}),
   reviewImages:args=>reviewImages({...args,env,fetchImpl}),
   reviewImage:args=>reviewImages({...args,targetIndex:args.index,env,fetchImpl}),
+  composeSpeech:args=>composeNarration({...args,fetchImpl,save:(bytes,duration)=>saveAsset('narration',bytes,args.invoke,fetchImpl,duration)}),
   async speech(project,plan,invoke){
    if(env.MINIMAX_API_KEY){
     const {bytes,alignment,usage}=await synthesizeMiniMax(project.data.scriptDraft,env,{fetchImpl});

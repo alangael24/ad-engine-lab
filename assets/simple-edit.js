@@ -5,7 +5,7 @@ export function validateSimpleEdit(edl,scenes,words){
  let last=-1;const groups=scenes.map(()=>[]);
  for(const r of edl.segments){
   const i=Number(/^S(\d{2})$/.exec(r.source||'')?.[1])-1,s=scenes[i];
-  if(!s||i<last||i>last+1||!Number.isFinite(r.in)||!Number.isFinite(r.out)||r.in<0||r.out>s.end-s.start+.002||r.out-r.in<.15||!Number.isInteger(r.frames)||r.frames<6||!Number.isFinite(r.crop)||r.crop<1||r.crop>1.12)throw Error('EDITORIAL_SEGMENTS');
+  if(!s||i<last||i>last+1||!Number.isFinite(r.in)||!Number.isFinite(r.out)||r.in<0||r.out>(s.sourceDuration??s.media?.duration??s.end-s.start)+.002||r.out-r.in<.15||!Number.isInteger(r.frames)||r.frames<6||!Number.isFinite(r.crop)||r.crop<1||r.crop>1.12)throw Error('EDITORIAL_SEGMENTS');
   const speed=(r.out-r.in)/(r.frames/24);
   if(speed<.75||speed>1.6||groups[i].some(p=>r.in<p.out-.001))throw Error('EDITORIAL_REUSE_OR_SPEED');
   groups[i].push({...r});last=i;

@@ -1,4 +1,5 @@
 import {paidStep} from '../../src/production-spend.js';
+import {narrationAlignment,approvedBase} from '../../src/partial-edit.js';
 import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
 import {getSupabaseAdmin,json} from '../../src/backend.js';
@@ -22,11 +23,12 @@ export async function onRequestPost(context){try{
  const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
  if(b.action==='begin_step'){
   const key=b.data?.key,kind=paidStep(key);
-  if(kind&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
+  if(kind&&!(key==='narration'&&j.snapshot?.data?.narrationRevision)&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
   return json({value:await rpc(db,'studio_production_work',args)});
  }
  if(b.action==='creative_context'){
   const project=await own(db,'studio_projects',j.user_id,j.project_id);
+  if(j.snapshot?.data?.editing?.baseRenderId)await approvedBase(db,j.user_id,j.snapshot);
   let referenceEvidence=[];
   if(project.data.referenceAnalysisId){
    const a=await own(db,'studio_reference_analyses',j.user_id,project.data.referenceAnalysisId);
@@ -53,6 +55,11 @@ export async function onRequestPost(context){try{
  }
  if(b.action==='asset'){
   const a=await own(db,'studio_assets',j.user_id,b.data?.assetId);return json({asset:a,url:await signed(db,a.bucket,a.storage_path)});
+ }
+ if(b.action==='narration_source'){
+  if(b.data?.assetId!==j.snapshot?.data?.narrationRevision?.assetId)throw Error('PRODUCTION_NARRATION_BASE');
+  const a=await own(db,'studio_assets',j.user_id,b.data.assetId);if(a.kind!=='narration')throw Error('PRODUCTION_NARRATION_BASE');
+  return json({value:{alignment:await narrationAlignment(db,j.user_id,j.project_id,a.id)}});
  }
  if(b.action==='upload'||b.action==='register'){
   const d=b.data;if(!UUID.test(d?.assetId||'')||!['image','narration'].includes(d.kind))throw Error('PRODUCTION_INVALID');

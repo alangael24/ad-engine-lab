@@ -1,4 +1,5 @@
 import {normalizeShotContract} from './image-continuity.js';
+import {normalizeEditing,normalizeNarrationRevision} from './partial-edit.js';
 import {normalizeCreativeMemory} from './creative-context.js';
 import {creativeSettings,creativeShotRule} from './creative-formats.js';
 // Shared editorial rules, used by the browser and the authenticated API.
@@ -11,6 +12,7 @@ export function brandData(input){
  return {sourceUrl,sourceText:string(input.sourceText??'',6000),name:string(input.name,80,true),product:string(input.product,600,true),appearance:string(input.appearance,600),benefits:string(input.benefits,600),claims:string(input.claims,600),avoid:string(input.avoid,600),voiceName:string(input.voiceName??'',100),voiceNotes:string(input.voiceNotes??'',300),productAssetId:id(input.productAssetId),voiceAssetId:id(input.voiceAssetId)};
 }
 export function projectData(input){
+ const revisionFields={...(input.editing?{editing:normalizeEditing(input.editing)}:{}),...(input.narrationRevision?{narrationRevision:normalizeNarrationRevision(input.narrationRevision)}:{})};
  const referenceUrl=string(input.referenceUrl,2000);if(referenceUrl){let u;try{u=new URL(referenceUrl);}catch{fail();}if(!['https:','http:'].includes(u.protocol)||u.username||u.password)fail();}
  if(!['9:16','16:9','1:1'].includes(input.aspectRatio)||!Array.isArray(input.scenes)||input.scenes.length>24)fail();
  const ids=new Set();let previous=0;
@@ -23,7 +25,7 @@ export function projectData(input){
   if(narrationStart!==null&&(!Number.isFinite(narrationStart)||narrationStart<0||narrationStart+end-start>180))fail('STUDIO_AUDIO_TIMING');
   return {...(narrationStart!==null?{narrationStart}:{}),id:s.id,...(s.shotContract?{shotContract:normalizeShotContract(s.shotContract)}:{}),...(s.motion!=null?{motion:string(s.motion,400)}:{}),text:string(s.text,500,true),visual:string(s.visual,800,true),start:Math.round(start*1000)/1000,end:Math.round(end*1000)/1000,imageAssetId:id(s.imageAssetId),selectedVersionId:id(s.selectedVersionId)};
  });
- return {...(input.creativeMemory?{creativeMemory:normalizeCreativeMemory(input.creativeMemory)}:{}),...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
+ return {...revisionFields,...(input.creativeMemory?{creativeMemory:normalizeCreativeMemory(input.creativeMemory)}:{}),...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
 }
 export function draftScenes(script,duration,newId=()=>crypto.randomUUID()){
  const phrases=script.trim().match(/[^.!?¿]+[.!?]?/g)?.map(s=>s.trim()).filter(Boolean)||[];

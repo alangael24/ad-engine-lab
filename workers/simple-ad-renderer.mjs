@@ -1,4 +1,4 @@
-import {mkdir,writeFile,readFile,stat} from 'node:fs/promises';
+import {mkdir,writeFile,readFile,stat,rename,rm,readdir,utimes} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {command,probe,subtitles} from './studio-renderer.mjs';
@@ -47,7 +47,7 @@ export async function prepareSimpleSources({root,project,shots,narration,words,s
   const meta=await probe(shot.path,{signal});
   if(!meta.streams.some(x=>x.codec_type==='video')||Number(meta.format.duration)<duration-.025)throw Error('EDITORIAL_CLIP_SHORT');
   const sceneWords=sourceWords.filter(w=>w.start>=from-.015&&w.start<from+duration-.015).map(w=>({...w,start:w.start-from+s.start,end:w.end-from+s.start}));
-  mapped.push(...sceneWords);local.push({...s,path:resolve(shot.path),number:i+1,source:'S'+String(i+1).padStart(2,'0'),frames:Math.round(s.end*24)-Math.round(s.start*24)});end=s.end;
+  mapped.push(...sceneWords);local.push({...s,sourceDuration:Number(meta.format.duration),path:resolve(shot.path),number:i+1,source:'S'+String(i+1).padStart(2,'0'),frames:Math.round(s.end*24)-Math.round(s.start*24)});end=s.end;
  }
  const norm=s=>(s.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).join(' ');
  if(norm(mapped.map(x=>x.text).join(' '))!==norm(project.data.scriptDraft)||mapped.some(w=>w.end>end+.05))throw Error('EDITORIAL_SCRIPT_COVERAGE');
@@ -60,17 +60,24 @@ export async function prepareSimpleSources({root,project,shots,narration,words,s
  }else if(Math.abs(audioDuration-end)>.15)throw Error('EDITORIAL_AUDIO_TIMING');
  return {scenes:local,words:mapped,narration:voice,duration:Math.round(end*24)/24};
 }
-export async function renderSimpleAd({edl,scenes,words,narration,duration,root,aspectRatio='9:16',signal}){
+export async function renderSimpleAd({edl,scenes,words,narration,duration,root,cacheDirectory,cacheNamespace='',aspectRatio='9:16',signal}){
  validateSimpleEdit(edl,scenes,words);
  const dims={'9:16':[720,1280],'16:9':[1280,720],'1:1':[720,720]}[aspectRatio];if(!dims)throw Error('EDITORIAL_RATIO');
- const [w,h]=dims;await mkdir(resolve(root,'parts'),{recursive:true});const parts=[];
+ const [w,h]=dims,cache=resolve(cacheDirectory||root,'parts');await mkdir(cache,{recursive:true});await mkdir(root,{recursive:true});const parts=[],hashes=new Map(),reuse={reused:0,encoded:0};
+ // Bounded, disposable CPU cache. Source content and encoding settings define
+ // identity; temporary download paths and subtitle changes do not invalidate it.
+ const entries=await Promise.all((await readdir(cache)).filter(n=>/^[a-f0-9]{64}\.mp4$/.test(n)).map(async n=>({path:resolve(cache,n),...(await stat(resolve(cache,n)).catch(()=>({size:0,mtimeMs:0})))})));
+ let bytes=entries.reduce((n,e)=>n+e.size,0);for(const e of entries.sort((a,b)=>a.mtimeMs-b.mtimeMs))if(Date.now()-e.mtimeMs>7*86400000||bytes>536870912){await rm(e.path,{force:true});bytes-=e.size;}
  for(const [i,r] of edl.segments.entries()){
-  const s=scenes.find(s=>s.source===r.source),key=digest(JSON.stringify({r,w,h,path:s.path})),p=resolve(root,'parts',key+'.mp4');
+  const s=scenes.find(s=>s.source===r.source);if(!hashes.has(s.path))hashes.set(s.path,digest(await readFile(s.path)));
+  const key=digest(JSON.stringify({version:2,namespace:cacheNamespace,in:r.in,out:r.out,frames:r.frames,crop:r.crop,w,h,sha256:hashes.get(s.path)})),p=resolve(cache,key+'.mp4');
   if(!(await stat(p).catch(()=>null))){
    const rate=r.frames/24/(r.out-r.in),vf=`trim=start=${r.in}:end=${r.out},setpts=(PTS-STARTPTS)*${rate},fps=24,scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},crop=iw/${r.crop}:ih/${r.crop},scale=${w}:${h},setsar=1,tpad=stop_mode=clone:stop_duration=0.05,format=yuv420p`;
-   await command('ffmpeg',['-v','error','-y','-protocol_whitelist','file,pipe','-i',s.path,'-an','-vf',vf,'-frames:v',String(r.frames),'-c:v','libx264','-threads','2','-preset','veryfast','-crf','20','-video_track_timescale','12288',p],{signal});
-   const m=await probe(p,{signal});if(Math.abs(Number(m.format.duration)-r.frames/24)>.025)throw Error('EDITORIAL_SEGMENT_DURATION');
-  }
+   const pending=resolve(cache,`${key}.${crypto.randomUUID()}.tmp.mp4`);
+   try{await command('ffmpeg',['-v','error','-y','-protocol_whitelist','file,pipe','-i',s.path,'-an','-vf',vf,'-frames:v',String(r.frames),'-c:v','libx264','-threads','2','-preset','veryfast','-crf','20','-video_track_timescale','12288',pending],{signal});
+    const m=await probe(pending,{signal});if(Math.abs(Number(m.format.duration)-r.frames/24)>.025)throw Error('EDITORIAL_SEGMENT_DURATION');await rename(pending,p);reuse.encoded++;
+   }finally{await rm(pending,{force:true});}
+  }else{reuse.reused++;const now=new Date();await utimes(p,now,now);}
   parts.push(p);
  }
  const list=resolve(root,'concat.txt'),picture=resolve(root,'picture.mp4'),ass=resolve(root,'captions.ass'),final=resolve(root,'final.mp4');
@@ -80,5 +87,5 @@ export async function renderSimpleAd({edl,scenes,words,narration,duration,root,a
  await command('ffmpeg',['-v','error','-y','-i',picture,'-i',narration,'-map','0:v:0','-map','1:a:0','-vf',`ass=filename='${filterPath(ass)}'`,'-af','apad=pad_dur=0.05','-t',String(duration),'-c:v','libx264','-threads','2','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart',final],{signal});
  const meta=await probe(final,{signal});if(Math.abs(Number(meta.format.duration)-duration)>.06||!meta.streams.some(x=>x.codec_type==='audio')||(await stat(final)).size>52428800)throw Error('EDITORIAL_RENDER_INVALID');
  await command('ffmpeg',['-v','error','-i',final,'-f','null','-'],{signal});
- return {path:final,sha256:digest(await readFile(final)),meta};
+ return {path:final,sha256:digest(await readFile(final)),meta,reuse};
 }

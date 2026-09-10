@@ -1,4 +1,5 @@
 import {repairOnOriginalTimeline} from '../assets/editorial-timeline.js';
+import {patchNarration} from './narration-revision.mjs';
 import {remember} from '../assets/creative-context.js';
 import {repairScenes,validateReview} from '../assets/quality-model.js';
 import {pathToFileURL} from 'node:url';
@@ -23,14 +24,14 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   await invoke('heartbeat');await providers.ready?.();if(typeof providers.review!=='function'||typeof providers.reviewImages!=='function')throw Error('PRODUCTION_QUALITY_OFFLINE');
   let project=structuredClone(job.snapshot);
   if(providers.context)project={...project,...await providers.context(project,invoke)};
-  const existing=project.data.scenes||[],revision=existing.length>0;
+  const existing=project.data.scenes||[],revision=existing.length>0,reuseApprovedStills=revision&&!!project.data.editing?.baseRenderId;
   const plan=await once('plan','planning',async()=>revision?{
    continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.videoContinuity||''} ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
    scenes:existing.map(s=>({...s,motion:s.motion||'Follow the approved scene direction; preserve continuity.'}))
   }:validatePlan(await providers.plan(project,invoke),project.data.scriptDraft));
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
-  const narration=reuseNarration?{assetId:project.data.narrationAssetId}:await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
-  const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
+  const narration=reuseNarration?{assetId:project.data.narrationAssetId}:project.data.narrationRevision?await patchNarration(project,plan,providers,invoke,once,job.id):await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
+  const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):narration.timeline||alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
   // Existing stills anchor regenerated scenes even when the first shot changes.
   const imageRepairCounts=plan.scenes.map(()=>0);
   const images=[],existingAnchor=existing.find(s=>s.imageAssetId);
@@ -38,7 +39,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   for(const [i,s] of plan.scenes.entries()){
    images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
    // Production providers review each still before the next one may inherit it.
-   if(providers.reviewImage)for(let attempt=0;attempt<=2;attempt++){
+   if(providers.reviewImage&&!(reuseApprovedStills&&s.imageAssetId))for(let attempt=0;attempt<=2;attempt++){
     const key=1000+i*3+attempt;
     const report=await once(`still-check-${i}-${attempt}`,'images',()=>providers.reviewImage({project,plan,images,index:i,invoke}));
     validateReview(report,plan.scenes.map((x,j)=>({...x,start:j,end:j+1})));
@@ -60,7 +61,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   }
   // Fail closed on still quality: no clip/version request precedes this gate.
   for(let round=0;round<=2;round++){
-   const report=await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
+   const unchanged=reuseApprovedStills&&images.every((im,i)=>im.assetId===existing.find(s=>s.id===plan.scenes[i].id)?.imageAssetId);
+   const report=unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
    const reviewScenes=plan.scenes.map((s,i)=>({...s,start:i,end:i+1}));
    validateReview(report,reviewScenes);
    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
@@ -71,6 +73,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    await write(`image-rejection-${round}`,'images','save_project',project.data);
    if(round===2||report.verdict!=='repair'||report.issues.some(x=>x.action!=='replace_image'))throw Error('PRODUCTION_IMAGES_BLOCKED');
    for(const issue of report.issues){
+    if(project.data.editing?.scoped&&!project.data.editing.changedSceneIds.includes(issue.sceneId))throw Error('PRODUCTION_REPAIR_OUTSIDE_SCOPE');
     const index=plan.scenes.findIndex(x=>x.id===issue.sceneId),scene=plan.scenes[index];
     if(scene.visual===issue.visual&&scene.motion===issue.motion)throw Error('PRODUCTION_REPAIR_NO_CHANGE');
     scene.visual=issue.visual;scene.motion=issue.motion;
@@ -85,7 +88,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    const approved=plan.scenes.find(p=>p.id===s.planSceneId);
    return {...s,visual:approved.visual,motion:approved.motion,...(approved.shotContract?{shotContract:approved.shotContract}:{}),imageAssetId:images[plan.scenes.findIndex(p=>p.id===s.planSceneId)].assetId,selectedVersionId:keep?old.selectedVersionId:null};
   });
-  await write('prepare','images','save_project',{...project.data,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
+  const {narrationRevision,...savedData}=project.data;
+  await write('prepare','images','save_project',{...savedData,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
   for(const [i,s] of scenes.entries()){
    if(s.selectedVersionId)continue;
    const source=await once(`source-${i}`,'clips',()=>providers.clip?.({project,plan,scene:s,index:i,invoke})||{});
@@ -114,6 +118,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
     continue;
    }
    if(review.verdict!=='repair')throw Error('PRODUCTION_QUALITY_BLOCKED');
+   if(project.data.editing?.scoped&&review.issues.some(i=>!project.data.editing.changedSceneIds.includes(i.sceneId)))throw Error('PRODUCTION_REPAIR_OUTSIDE_SCOPE');
    // Persist the repair decision BEFORE external requests: same keys resume completed work.
    const next=await once(`repair-plan-${round}`,'repair',()=>repairScenes(current.project,repairOnOriginalTimeline(review,current.project.data.scenes,reviewedScenes)));
    const repaired=remember({data:structuredClone(next)},{rejection:review.issues.map(x=>`${x.sceneId}: ${x.evidence}`).join('; '),rejectedAssets:review.issues.filter(x=>x.action==='replace_image').map(x=>current.project.data.scenes.find(s=>s.id===x.sceneId)?.imageAssetId)}).data,repairPlan={continuity:plan.continuity,scenes:repaired.scenes};
