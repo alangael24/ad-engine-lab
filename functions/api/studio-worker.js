@@ -1,4 +1,6 @@
 import {editorialTimeline,alignmentWords} from '../../assets/editorial-timeline.js';
+import {simpleEditTimeline,SIMPLE_EDIT_VERSION} from '../../assets/simple-edit.js';
+import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {getSupabaseAdmin,json} from '../../src/backend.js';
 import {readJson,rpc,ApiError,UUID} from '../../src/generations.js';
 import {verifyWorker} from './worker.js';
@@ -40,8 +42,15 @@ export async function onRequestPost(context){try{
  }
  if(b.action==='begin_editorial')return json(await rpc(db,'studio_editorial_begin',{p_worker:b.workerId,p_id:r.id,p_lease:b.leaseToken}));
  if(b.action==='editorial'){
-  const scenes=editorialTimeline(r.manifest.originalScenes||r.manifest.scenes,b.ranges);
+  const original=r.manifest.originalScenes||r.manifest.scenes;
+  const scenes=b.version===SIMPLE_EDIT_VERSION?simpleEditTimeline(original,b.segments):editorialTimeline(original,b.ranges);
   const editorial={sha256:b.sha256,usage:b.usage||null,message:String(b.message||'').slice(0,3000)};
+  if(b.version===SIMPLE_EDIT_VERSION){
+   const review=b.review;
+   validateReview(review,scenes);
+   if(review.version!==QUALITY_VERSION||!Number.isFinite(review.duration)||review.editorialVersion!==SIMPLE_EDIT_VERSION||review.model!=='gpt-5.6-sol'||review.sha256!==b.sha256||!['pass','repair'].includes(review.verdict)||JSON.stringify(review.coverage)!==JSON.stringify(scenes.map(s=>s.id))||Math.abs(review.duration-scenes.at(-1).end)>.15)throw Error('EDITORIAL_REVIEW_INVALID');
+   editorial.version=SIMPLE_EDIT_VERSION;editorial.review=review;
+  }
   return json(await rpc(db,'studio_editorial_manifest',{p_worker:b.workerId,p_id:r.id,p_lease:b.leaseToken,p_scenes:scenes,p_editorial:editorial}));
  }
  if(b.action==='complete'){

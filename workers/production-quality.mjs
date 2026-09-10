@@ -122,6 +122,16 @@ export async function reviewProduction({renderId,invoke,env,fetchImpl=fetch}){
  try{
   const r=await fetchImpl(media.url,{redirect:'error',signal:AbortSignal.timeout(120000)});if(!r.ok)throw Error('PRODUCTION_QUALITY_MEDIA');
   const path=join(dir,'render.mp4');await writeFile(path,await readBounded(r,52428800));
+  // A trusted, lease-fenced editor already reviewed this exact immutable candidate.
+  // Reuse its Sol decision; do not pay a second model to inspect identical frames.
+  const editorial=media.manifest.editorial,review=editorial?.review;
+  if(editorial?.version==='sol-luna-v1'){
+   validateReview(review,media.manifest.scenes);
+   const actual=sha(await readFile(path));
+   if(review?.version!==QUALITY_VERSION||!Number.isFinite(review.duration)||review.editorialVersion!=='sol-luna-v1'||review.model!=='gpt-5.6-sol'||review.sha256!==actual||editorial.sha256!==actual||JSON.stringify(review.coverage)!==JSON.stringify(media.manifest.scenes.map(s=>s.id)))throw Error('PRODUCTION_QUALITY_INVALID');
+   const meta=await probe(path);if(Math.abs(Number(meta.format.duration)-review.duration)>.06)throw Error('PRODUCTION_QUALITY_MEDIA');
+   return {...review,renderId,usage:editorial.usage};
+  }
   return await reviewVideo({path,renderId,scenes:media.manifest.scenes,project:media.project,env,fetchImpl,directory:dir});
  }finally{await rm(dir,{recursive:true,force:true});}
 }
