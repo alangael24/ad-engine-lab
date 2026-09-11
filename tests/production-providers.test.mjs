@@ -13,7 +13,7 @@ test('generated image retains provider usage and request ID for reconciliation',
  const usage={input_tokens:40,output_tokens:6250,total_tokens:6290};
  const providers=createProductionProviders({OPENAI_API_KEY:'fixture'},{fetchImpl:async(url)=>String(url).startsWith('https://api.openai.com/')?Response.json({usage,data:[{b64_json:Buffer.from([137,80,78,71,13,10,26,10]).toString('base64')}]},{headers:{'x-request-id':'request-fixture'}}):new Response(null,{status:200})});
  const result=await providers.image({project:{brand_snapshot:{},data:{aspectRatio:'9:16'}},plan:{continuity:'Same product',scenes:[{text:'Hello',visual:'Product'}]},index:0,invoke:async(action,data)=>action==='upload'?{uploadUrl:'https://storage.test/upload'}:{result:{id:data.assetId}}});
- assert.deepEqual(result.usage,usage);assert.equal(result.requestId,'request-fixture');assert.equal(result.model,'gpt-image-1.5');assert.equal(result.size,'1024x1536');assert.equal(result.quality,'medium');
+ assert.deepEqual(result.usage,usage);assert.equal(result.requestId,'request-fixture');assert.equal(result.model,'gpt-image-2');assert.equal(result.size,'1024x1536');assert.equal(result.quality,'medium');
 });
 
 test('explicit GPT Image 2 medium reaches the provider without legacy fidelity parameter',async()=>{
@@ -27,7 +27,7 @@ test('director receives the actual product and reference images, bounded to four
  const {callDirector}=await import('../workers/production-providers.mjs'),{CHAT_MODEL}=await import('../assets/chat-model.js');
  let request;const image='data:image/png;base64,iVBORw0KGgo=';
  const project={brand_snapshot:{productAssetId:crypto.randomUUID()},data:{scriptDraft:'Hello.',referenceNotes:'Large eyes',creativeMemory:{referenceAssetIds:[crypto.randomUUID(),crypto.randomUUID()]}},referenceEvidence:[image,image,image]};
- await callDirector(project,{REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>({url:'https://storage.test/image'}),fetchImpl:async(url,options)=>{
+ await callDirector(project,{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>({url:'https://storage.test/image'}),fetchImpl:async(url,options)=>{
   if(String(url).startsWith('https://storage.test/'))return new Response(Buffer.from([137,80,78,71,13,10,26,10]));
   request=JSON.parse(options.body);
   return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered after waving',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}}]})}}]},finish_reason:'tool_calls'}]})+'\n\n');

@@ -55,6 +55,7 @@ export function applyLocalLayers(edl,editing,scenes){
 export function rebaseApprovedEdit(base,scenes,words,editing){
  if(!base?.edl||!Array.isArray(base.scenes))throw Error('EDITORIAL_BASE_REQUIRED');
  const edl=structuredClone(base.edl);edl.segments=[];
+ if(edl.sourceCaptionScenes)edl.sourceCaptionScenes=base.scenes.flatMap((old,i)=>base.edl.sourceCaptionScenes.includes('S'+String(i+1).padStart(2,'0'))?scenes.filter(s=>s.id===old.id&&(old.versionId||old.selectedVersionId)===(s.versionId||s.selectedVersionId)).map(s=>s.source):[]);
  for(const [i,s] of scenes.entries()){
   const oldIndex=base.scenes.findIndex(x=>x.id===s.id),old=base.scenes[oldIndex];
   if(!old)throw Error('EDITORIAL_BASE_REQUIRED');

@@ -1,3 +1,5 @@
+> Current integration: [Astra + DeepSeek](astra-deepseek-workflow.md). Enabled exclusive-pod idle control now defaults to verified deletion; `GPU_IDLE_ACTION=stop` explicitly retains the historical stop-only behavior described below. No external spending policy was enabled by this code change.
+
 # Production spending controls
 
 Implemented on 2026-09-05 and deployed for the authorized Medium trial on 2026-09-06. The production admission ledger was enabled with a bounded allowance; see [the trial report](medium-e2e-2026-09-06.md) for results and shutdown status. GPU idle shutdown remains optional and was not enabled in that trial.

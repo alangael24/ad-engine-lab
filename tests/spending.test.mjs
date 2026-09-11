@@ -52,7 +52,7 @@ test('idle shutdown waits for complete productions then prevents late claims',as
   assert.equal(await call(db,'claim_generation',['late-worker']),null);
  }finally{await db.close();}
 });
-const env={GPU_MANAGED_EXCLUSIVE:'true',GPU_IDLE_ENABLED:'true',GPU_MANAGED_POD_ID:'allowed-pod',RUNPOD_API_KEY:'fixture',PRODUCTION_WORKER_TOKEN:'a'.repeat(40),CREATIVE_RUSH_URL:'https://app.test'};
+const env={GPU_IDLE_ACTION:'stop',GPU_MANAGED_EXCLUSIVE:'true',GPU_IDLE_ENABLED:'true',GPU_MANAGED_POD_ID:'allowed-pod',RUNPOD_API_KEY:'fixture',PRODUCTION_WORKER_TOKEN:'a'.repeat(40),CREATIVE_RUSH_URL:'https://app.test'};
 test('GPU is never started, rented or stopped without an affirmative idle decision',async()=>{
  for(const reason of ['disabled','absent','busy','stop']){
   const calls=[];

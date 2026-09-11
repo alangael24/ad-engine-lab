@@ -1,3 +1,4 @@
+import {productionWorkflow} from '../assets/production-workflow.js';
 import {mkdtemp,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -20,7 +21,7 @@ if(process.env.STUDIO_EDITORIAL_ENGINE==='legacy'){
 }else editorialConfig(process.env);
 const processes=['production-worker.mjs','studio-worker.mjs',...(process.env.GPU_IDLE_ENABLED==='true'?['gpu-idle-worker.mjs']:[])];
 let stopping=false;const children=new Set();
-const server=createServer((req,res)=>{if(req.url!=='/health'||req.method!=='GET'){res.writeHead(404).end();return;}res.writeHead(!stopping&&children.size===processes.length?200:503,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({status:!stopping&&children.size===processes.length?'ok':'stopping',commit:process.env.RENDER_GIT_COMMIT||null,editorial:process.env.STUDIO_EDITORIAL_ENGINE==='legacy'?'legacy':EDITORIAL_VERSION,models:EDITORIAL_MODELS}));});
+const server=createServer((req,res)=>{if(req.url!=='/health'||req.method!=='GET'){res.writeHead(404).end();return;}res.writeHead(!stopping&&children.size===processes.length?200:503,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({status:!stopping&&children.size===processes.length?'ok':'stopping',commit:process.env.RENDER_GIT_COMMIT||null,editorial:process.env.STUDIO_EDITORIAL_ENGINE==='legacy'?'legacy':EDITORIAL_VERSION,workflow:productionWorkflow(process.env).version,models:productionWorkflow(process.env)}));});
 function shutdown(code){if(stopping)return;stopping=true;server.close();for(const child of children)child.kill('SIGTERM');const deadline=setTimeout(()=>process.exit(code),25000);deadline.unref();if(!children.size)process.exit(code);}
 for(const file of processes){
  const child=spawn(process.execPath,['--max-old-space-size=512',fileURLToPath(new URL(file,import.meta.url))],{stdio:'inherit'});children.add(child);

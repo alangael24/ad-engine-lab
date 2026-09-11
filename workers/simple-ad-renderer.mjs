@@ -7,22 +7,27 @@ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const filterPath=p=>p.replaceAll('\\','\\\\').replaceAll("'","'\\''").replaceAll(':','\\:');
 const time=t=>{const n=Math.round(t*100);return `${Math.floor(n/360000)}:${String(Math.floor(n/6000)%60).padStart(2,'0')}:${String(Math.floor(n/100)%60).padStart(2,'0')}.${String(n%100).padStart(2,'0')}`;};
 const clean=s=>String(s).replace(/[{}\\\r\n]/g,' ').trim();
-export function wordCaptions(edl,words,w,h){
+export function wordCaptions(edl,words,w,h,scenes=[]){
  let ass=subtitles([],w,h).replace(`Arial,${Math.round(w*.061)},`,`DejaVu Sans,${Math.round(w*edl.captionSize/720)},`);
+ // The hook is a separate layer. Changing subtitle color must not recolor it.
+ const hookStyle=ass.split('\n').find(line=>line.startsWith('Style: Default,')).replace('Style: Default,','Style: Hook,');
  if(edl.captionColor==='yellow')ass=ass.replace('&H00FFFFFF','&H0000EFFF');
+ ass=ass.replace('[Events]',hookStyle+'\n\n[Events]');
  if(edl.captions)for(const [a,b] of edl.captionGroups){
-  const text=clean(words.slice(a,b+1).map(x=>x.text).join(' '));
+  if((edl.sourceCaptionScenes||[]).some(id=>{const s=scenes.find(s=>s.source===id);return s&&words[a].start>=s.start-.001&&words[b].end<=s.end+.001;}))continue;
+  const text=edl.captionHighlight?words.slice(a,b+1).map((x,i,ws)=>`{\\k${Math.max(1,Math.round(((ws[i+1]?.start??x.end)-x.start)*100))}}${clean(x.text)}`).join(' '):clean(words.slice(a,b+1).map(x=>x.text).join(' '));
+  const fade=edl.captionFadeMs?`{\\fad(${edl.captionFadeMs},${edl.captionFadeMs})}`:'';
   const end=Math.min(words[b].end+.06,words[b+1]?.start??Infinity);
-  ass+=`Dialogue: 0,${time(words[a].start)},${time(end)},Default,,0,0,0,,${text}\n`;
+  ass+=`Dialogue: 0,${time(words[a].start)},${time(end)},Default,,0,0,0,,${fade}${text}\n`;
  }
- if(edl.hook)ass+=`Dialogue: 1,0:00:00.00,${time(Math.min(3,words.at(-1).end))},Default,,0,0,0,,{\\an8\\pos(${Math.round(w/2)},${Math.round(h*.12)})}${clean(edl.hook)}\n`;
+ if(edl.hook)ass+=`Dialogue: 1,0:00:00.00,${time(Math.min(3,words.at(-1).end))},Hook,,0,0,0,,{\\an8\\pos(${Math.round(w/2)},${Math.round(h*.12)})}${clean(edl.hook)}\n`;
  return ass;
 }
 export async function sourceBoards(scenes,directory,{signal}={}){
  await mkdir(directory,{recursive:true});const images=[];
  for(const [i,s] of scenes.entries()){
-  const frames=[];
-  for(const [k,t] of [0,(s.end-s.start)/2,Math.max(0,s.end-s.start-.08)].entries()){
+  const frames=[],length=s.sourceDuration??s.end-s.start;
+  for(const [k,t] of [0,length/2,Math.max(0,length-.08)].entries()){
    const p=resolve(directory,`s${i}-${k}.jpg`);
    await command('ffmpeg',['-v','error','-y','-protocol_whitelist','file,pipe','-ss',String(t),'-i',s.path,'-frames:v','1','-vf','scale=240:426:force_original_aspect_ratio=decrease,pad=240:426:(ow-iw)/2:(oh-ih)/2','-update','1',p],{signal});frames.push(p);
   }
@@ -82,7 +87,7 @@ export async function renderSimpleAd({edl,scenes,words,narration,duration,root,c
  }
  const list=resolve(root,'concat.txt'),picture=resolve(root,'picture.mp4'),ass=resolve(root,'captions.ass'),final=resolve(root,'final.mp4');
  await writeFile(list,parts.map(p=>`file '${p.replaceAll("'","'\\''")}'`).join('\n'));
- await writeFile(ass,wordCaptions(edl,words,w,h));
+ await writeFile(ass,wordCaptions(edl,words,w,h,scenes));
  await command('ffmpeg',['-v','error','-y','-f','concat','-safe','0','-i',list,'-c','copy',picture],{signal});
  await command('ffmpeg',['-v','error','-y','-i',picture,'-i',narration,'-map','0:v:0','-map','1:a:0','-vf',`ass=filename='${filterPath(ass)}'`,'-af','apad=pad_dur=0.05','-t',String(duration),'-c:v','libx264','-threads','2','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart',final],{signal});
  const meta=await probe(final,{signal});if(Math.abs(Number(meta.format.duration)-duration)>.06||!meta.streams.some(x=>x.codec_type==='audio')||(await stat(final)).size>52428800)throw Error('EDITORIAL_RENDER_INVALID');

@@ -1,3 +1,4 @@
+import {editorialReviewModelMatches} from '../../assets/production-workflow.js';
 import {editorialRevisionContext,approvedBase,projectFingerprint} from '../../src/partial-edit.js';
 import {editorialTimeline,alignmentWords} from '../../assets/editorial-timeline.js';
 import {simpleEditTimeline,validateSimpleEdit,SIMPLE_EDIT_VERSION} from '../../assets/simple-edit.js';
@@ -24,6 +25,12 @@ export async function onRequestPost(context){try{
     if(!project.data.editing&&restoreBase)project.data.editing={baseRenderId:restoreBase.id,scoped:true,changedSceneIds:[],settings:{},sceneRanges:{}};
     if(project.revision!==r.project_revision)throw Error('STUDIO_CONFLICT');
     editorial=await editorialRevisionContext(db,r.user_id,project);
+    if(!editorial.base&&r.production_id){
+     const prior=await db.from('studio_renders').select('*').eq('user_id',r.user_id).eq('project_id',r.project_id).eq('production_id',r.production_id).eq('status','succeeded').order('created_at',{ascending:false}).limit(10);
+     if(prior.error)throw prior.error;
+     const candidate=prior.data.find(p=>p.id!==r.id&&p.manifest?.editorial?.edit&&p.manifest.editorial.review?.verdict==='repair'&&editorialReviewModelMatches(p.manifest.editorial.review));
+     if(candidate)editorial.base={id:candidate.id,scenes:candidate.manifest.originalScenes||candidate.manifest.scenes,edl:candidate.manifest.editorial.edit,words:candidate.manifest.editorial.words||[],review:candidate.manifest.editorial.review,privateRepair:true};
+    }
     if(project.data.referenceAnalysisId){const a=await own(db,'studio_reference_analyses',r.user_id,project.data.referenceAnalysisId);if(a.project_id!==r.project_id||a.status!=='succeeded')throw Error('EDITORIAL_INVALID');project.referenceEvidence=a.result?.visualEvidence||[];}
   }
   }catch(error){await rpc(db,'studio_render_worker',{p_worker:b.workerId,p_action:'complete',p_id:r.id,p_lease:r.lease_token,p_success:false});throw error;}
@@ -48,7 +55,7 @@ export async function onRequestPost(context){try{
   if(b.version===SIMPLE_EDIT_VERSION){
    const review=b.review;
    validateReview(review,scenes);
-   if(review.version!==QUALITY_VERSION||!Number.isFinite(review.duration)||review.editorialVersion!==SIMPLE_EDIT_VERSION||review.model!=='gpt-5.6-sol'||review.sha256!==b.sha256||!['pass','repair'].includes(review.verdict)||JSON.stringify(review.coverage)!==JSON.stringify(scenes.map(s=>s.id))||Math.abs(review.duration-scenes.at(-1).end)>.15)throw Error('EDITORIAL_REVIEW_INVALID');
+   if(review.version!==QUALITY_VERSION||!Number.isFinite(review.duration)||review.editorialVersion!==SIMPLE_EDIT_VERSION||!editorialReviewModelMatches(review)||review.sha256!==b.sha256||!['pass','repair'].includes(review.verdict)||JSON.stringify(review.coverage)!==JSON.stringify(scenes.map(s=>s.id))||Math.abs(review.duration-scenes.at(-1).end)>.15)throw Error('EDITORIAL_REVIEW_INVALID');
    if(b.edit){
     const words=b.words;
     if(!Array.isArray(words)||!words.length||words.length>600||words.some((w,i)=>typeof w.text!=='string'||w.text.length>100||!Number.isFinite(w.start)||!Number.isFinite(w.end)||w.start<0||w.end<w.start||w.end>scenes.at(-1).end+.05||i&&w.start<words[i-1].start))throw Error('EDITORIAL_WORDS');

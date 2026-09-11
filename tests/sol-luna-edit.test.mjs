@@ -14,7 +14,7 @@ const words=[{text:'Hello',type:'word',start:.1,end:.7},{text:'world.',type:'wor
 const edl={segments:[{source:'S01',in:0,out:2,frames:48,crop:1}],captions:true,captionGroups:[[0,1]],captionColor:'white',captionSize:46,hook:''};
 const plan={direction:'Clear movement, readable words.',scenes:[{source:'S01',direction:'Keep the moving pattern.'}],captions:true,captionColor:'white',hook:''};
 const pass={verdict:'pass',summary:'Revisado.',issues:[],coverage:['one']};
-const env={OPENAI_API_KEY:'fixture-sol',REFERENCE_FLASH_KEY:'fixture-luna'};
+const env={PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',OPENAI_API_KEY:'fixture-sol',REFERENCE_FLASH_KEY:'fixture-luna'};
 test('picture EDL preserves exact scene duration and excludes overlapping footage',()=>{
  assert.deepEqual(validateSimpleEdit(edl,[scene],words),edl);
  assert.equal(simpleEditTimeline([scene],edl.segments)[0].end,2);
@@ -55,7 +55,7 @@ test('Sol directs, Luna edits, Sol reviews; one repair requires a changed EDL',a
  const root=await mkdtemp(join(tmpdir(),'sol-luna-test-'));try{
   const img=join(root,'panel.jpg');await writeFile(img,'fixture');const seen=[];let reviews=0;
   const options={root,project:{data:{scriptDraft:scene.text,scenes:[scene],aspectRatio:'9:16'}},shots:[],words,narration:'fixture',env,
-   prepare:async()=>({scenes:[scene],words,narration:'fixture',duration:2}),boards:async()=>['data:image/jpeg;base64,fixture'],render:async()=>({path:join(root,'final.mp4')}),evidence:async()=>({sha256:'a'.repeat(64),duration:2,sheets:[img],sampleTimes:[],duplicates:[]}),
+   auditCaptions:async({review})=>review,prepare:async()=>({scenes:[scene],words,narration:'fixture',duration:2}),boards:async()=>['data:image/jpeg;base64,fixture'],render:async()=>({path:join(root,'final.mp4')}),evidence:async()=>({sha256:'a'.repeat(64),duration:2,sheets:[img],sampleTimes:[],duplicates:[]}),
    call:async a=>{seen.push(a.role+':'+a.name);if(a.name==='direct_edit')return plan;if(a.name==='edit_ad'){assert.equal(a.images,undefined);return {...edl,captionSize:reviews?44:46};}return ++reviews===1?{verdict:'blocked',summary:'Caption covers product.',coverage:['one'],issues:[{sceneId:'one',relatedSceneId:null,kind:'caption',at:1,evidence:'Caption covers the product; reduce size.',action:'none',visual:'',motion:''}]}:pass;}};
   const r=await finishSolLunaProject(options);assert.equal(r.status,'succeeded');assert.equal(r.review.verdict,'pass');assert.deepEqual(seen,['director:direct_edit','editor:edit_ad','director:review_edit','editor:edit_ad','director:review_edit']);
   reviews=0;options.call=async a=>a.name==='direct_edit'?plan:a.name==='edit_ad'?edl:{verdict:'blocked',summary:'Caption defect.',coverage:['one'],issues:[{sceneId:'one',relatedSceneId:null,kind:'caption',at:1,evidence:'Caption unreadable.',action:'none',visual:'',motion:''}]};

@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import {finishCreativeProject} from './creative-edit.mjs';
-import {finishSolLunaProject} from './sol-luna-edit.mjs';
+import {finishProductionAd} from './sol-luna-edit.mjs';
 import {pathToFileURL} from 'node:url';
-import {mkdtemp,rm,writeFile,readFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {renderTimeline} from './studio-renderer.mjs';
@@ -18,7 +18,7 @@ async function download(url,path,fetchImpl){
  const chunks=[];let total=0;for await(const chunk of r.body){total+=chunk.length;if(total>52428800)throw Error('Media too large');chunks.push(chunk);}await writeFile(path,Buffer.concat(chunks));
 }
 export async function processRender(job,api,{fetchImpl=fetch,render=renderTimeline,edit,env=process.env}={}){
- edit ||= env.STUDIO_EDITORIAL_ENGINE==='legacy'?finishCreativeProject:finishSolLunaProject;
+ edit ||= env.STUDIO_EDITORIAL_ENGINE==='legacy'?finishCreativeProject:finishProductionAd;
  const dir=await mkdtemp(join(tmpdir(),'creativerush-render-')),identity={jobId:job.id,leaseToken:job.leaseToken},abort=new AbortController();
  let beating=false,last=Date.now();const timer=setInterval(async()=>{if(beating)return;beating=true;try{await api('heartbeat',identity);last=Date.now();}catch(e){if(e.code==='LEASE_LOST'||Date.now()-last>110000)abort.abort();}finally{beating=false;}},20000);
  const deadline=setTimeout(()=>abort.abort(),40*60*1000);
@@ -28,12 +28,14 @@ export async function processRender(job,api,{fetchImpl=fetch,render=renderTimeli
   let result;
   if(job.editorial){
    await api('begin_editorial',identity);
+   const auditDir=env.PRODUCTION_AUDIT_DIR||join(tmpdir(),'creativerush-cost-audit');await mkdir(auditDir,{recursive:true});
+   const onUsage=async usage=>writeFile(join(auditDir,`${job.id}-${job.leaseToken}.json`),JSON.stringify({jobId:job.id,leaseToken:job.leaseToken,usage},null,2));
    const {project,words,base}=job.editorial;
    project.data={...project.data,scenes:m.scenes.map((s,i)=>({...project.data.scenes.find(x=>x.id===s.id),...s})),scriptDraft:m.scenes.map(s=>s.text).join(' ')};
-   result=await edit({root:join(dir,'creative'),project,shots:m.scenes.map(s=>({sceneId:s.id,path:s.path})),narration:m.narration.path,words,base,cacheDirectory:env.STUDIO_EDIT_CACHE_DIR||join(tmpdir(),'creativerush-edit-cache'),cacheNamespace:createHash('sha256').update(String(project.user_id)+':'+project.id).digest('hex'),strategy:`Finish the approved ad with clear pacing. Use readable word-synchronized captions by default; the latest customer request overrides defaults, including removing captions. Follow this approved direction and applied customer requests: ${JSON.stringify(project.data.creativeMemory||{})}. Keep every scene and spoken word in order; trim unnecessary silence within scenes. Match the reference.`,env,fetchImpl,signal:abort.signal,sandboxOptions:{python:env.VIDEO_USE_PYTHON}});
+   result=await edit({root:join(dir,'creative'),onUsage,project,shots:m.scenes.map(s=>({sceneId:s.id,path:s.path})),narration:m.narration.path,words,base,cacheDirectory:env.STUDIO_EDIT_CACHE_DIR||join(tmpdir(),'creativerush-edit-cache'),cacheNamespace:createHash('sha256').update(String(project.user_id)+':'+project.id).digest('hex'),strategy:`Finish the approved ad with clear pacing. Use readable word-synchronized captions by default; the latest customer request overrides defaults, including removing captions. Follow this approved direction and applied customer requests: ${JSON.stringify(project.data.creativeMemory||{})}. Keep every scene and spoken word in order; Keep the narration continuous; adjust picture timing without removing spoken audio. Match the reference.`,env,fetchImpl,signal:abort.signal,sandboxOptions:{python:env.VIDEO_USE_PYTHON}});
    if(result.status!=='succeeded'||!result.path)throw Error('EDITORIAL_REVIEW_BLOCKED');
    const sha256=createHash('sha256').update(await readFile(result.path)).digest('hex');
-   await api('editorial',{...identity,ranges:result.edl.ranges,segments:result.edl.segments,version:result.edl.version,review:result.review,edit:result.edl.version?{captions:result.edl.captions,captionGroups:result.edl.captionGroups,captionColor:result.edl.captionColor,captionSize:result.edl.captionSize,hook:result.edl.hook}:undefined,words:result.edl.words,sha256,usage:result.usage,message:result.message});
+   await api('editorial',{...identity,ranges:result.edl.ranges,segments:result.edl.segments,version:result.edl.version,review:result.review,edit:result.edl.version?{captions:result.edl.captions,captionGroups:result.edl.captionGroups,captionColor:result.edl.captionColor,captionSize:result.edl.captionSize,hook:result.edl.hook,sourceCaptionScenes:result.edl.sourceCaptionScenes,captionFadeMs:result.edl.captionFadeMs,captionHighlight:result.edl.captionHighlight}:undefined,words:result.edl.words,sha256,usage:result.usage,message:result.message});
   }else result=await render(m,dir,{signal:abort.signal});
   if(abort.signal.aborted)throw Error('Lease lost');
   const {uploadUrl}=await api('upload',identity),r=await fetchImpl(uploadUrl,{method:'PUT',headers:{'content-type':'video/mp4','x-upsert':'false'},body:await readFile(result.path),signal:AbortSignal.timeout(120000)});

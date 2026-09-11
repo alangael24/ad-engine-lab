@@ -7,7 +7,7 @@ export function validateSimpleEdit(edl,scenes,words){
   const i=Number(/^S(\d{2})$/.exec(r.source||'')?.[1])-1,s=scenes[i];
   if(!s||i<last||i>last+1||!Number.isFinite(r.in)||!Number.isFinite(r.out)||r.in<0||r.out>(s.sourceDuration??s.media?.duration??s.end-s.start)+.002||r.out-r.in<.15||!Number.isInteger(r.frames)||r.frames<6||!Number.isFinite(r.crop)||r.crop<1||r.crop>1.12)throw Error('EDITORIAL_SEGMENTS');
   const speed=(r.out-r.in)/(r.frames/24);
-  if(speed<.75||speed>1.6||groups[i].some(p=>r.in<p.out-.001))throw Error('EDITORIAL_REUSE_OR_SPEED');
+  if(speed<.75-1e-9||speed>1.6+1e-9||groups[i].some(p=>r.in<p.out-.001))throw Error('EDITORIAL_REUSE_OR_SPEED');
   groups[i].push({...r});last=i;
  }
  for(const [i,s] of scenes.entries())if(groups[i].reduce((n,r)=>n+r.frames,0)!==Math.round(s.end*24)-Math.round(s.start*24))throw Error('EDITORIAL_SPEECH_TIMING');
@@ -18,6 +18,14 @@ export function validateSimpleEdit(edl,scenes,words){
   for(const g of edl.captionGroups){if(!Array.isArray(g)||g.length!==2||g.some(x=>!Number.isInteger(x))||g[0]!==expected||g[1]<g[0]||g[1]>=words.length||g[1]-g[0]>7)throw Error('EDITORIAL_CAPTION_COVERAGE');expected=g[1]+1;}
   if(expected!==words.length)throw Error('EDITORIAL_CAPTION_COVERAGE');
  }else if(edl.captionGroups.length)throw Error('EDITORIAL_CAPTIONS');
+ if(edl.captionFadeMs!=null&&(!Number.isInteger(edl.captionFadeMs)||edl.captionFadeMs<0||edl.captionFadeMs>100))throw Error('EDITORIAL_CAPTIONS');
+ if(edl.captionHighlight!=null&&typeof edl.captionHighlight!=='boolean')throw Error('EDITORIAL_CAPTIONS');
+ const sourceCaptions=edl.sourceCaptionScenes||[];
+ if(!Array.isArray(sourceCaptions)||new Set(sourceCaptions).size!==sourceCaptions.length||sourceCaptions.some(id=>!scenes.some(s=>s.source===id)))throw Error('EDITORIAL_CAPTIONS');
+ for(const [a,b] of edl.captionGroups)for(const scene of scenes.filter(s=>sourceCaptions.includes(s.source))){
+  const start=words[a]?.start,end=words[b]?.end;
+  if(start<scene.end-.001&&end>scene.start+.001&&!(start>=scene.start-.001&&end<=scene.end+.001))throw Error('EDITORIAL_CAPTION_BOUNDARY');
+ }
  if(typeof edl.hook!=='string'||edl.hook.length>100)throw Error('EDITORIAL_HOOK');
  return {...edl,segments:groups.flat()};
 }

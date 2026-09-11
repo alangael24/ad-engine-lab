@@ -136,7 +136,7 @@ test('automatic version writes use H3 image-aware prompts and reuse frozen outpu
    return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})}}]},finish_reason:'tool_calls'}]})+'\n\n');
   }return stub.fetch(input,opts);
  };
- const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',REFERENCE_FLASH_KEY:'test-only'};
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'test-only'};
  const data={workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'write',data:{key:'clip-test',stage:'clips',action:'version',data:{requestId:crypto.randomUUID(),sceneId:scene.id}}};
  const invoke=()=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify(data)})});
  try{

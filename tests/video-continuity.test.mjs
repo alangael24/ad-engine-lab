@@ -23,7 +23,7 @@ test('review confirms continuity allegation with separate actual frames, prior s
  const dir=await mkdtemp(join(tmpdir(),'continuity-test-'));try{
  const path=join(dir,'test.mp4');await command('ffmpeg',['-v','error','-y','-f','lavfi','-i','color=c=blue:s=96x160:r=24:d=2','-f','lavfi','-i','anullsrc=r=44100:cl=mono','-t','2','-c:v','libx264','-c:a','aac',path]);
  const scenes=[{id:'a',start:0,end:1,text:'First',shotContract:contract},{id:'b',start:1,end:2,text:'Second',shotContract:contract}];let calls=0;
- const result=await reviewVideo({path,scenes,directory:dir,project:{data:{}},env:{REFERENCE_FLASH_KEY:'fixture'},fetchImpl:async(_url,opts)=>{
+ const result=await reviewVideo({path,scenes,directory:dir,project:{data:{}},env:{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},fetchImpl:async(_url,opts)=>{
  const req=JSON.parse(opts.body),content=req.messages?.[1].content||req.input[1].content;
  const context=JSON.parse(content[0].text);calls++;
  assert.ok((req.messages||req.input)[0].content.includes(MATERIAL_REVIEW_RULES), 'overview and focused review share materiality criteria');

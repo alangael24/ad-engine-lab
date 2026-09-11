@@ -10,7 +10,7 @@ export async function stableId(scope,key){const b=new Uint8Array(await crypto.su
 export function productionApi({appUrl,token,workerId,fetchImpl=fetch}){
  const u=new URL(appUrl);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPS required');
  if(!token||token.length<32||!/^[\w-]{1,80}$/.test(workerId||''))throw Error('Missing production configuration');
- return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(action==='write'&&body.data?.action==='version'?90000:30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
+ return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(action==='write'&&body.data?.action==='version'?960000:30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
 }
 export async function processProduction(job,api,providers,{pollMs=3000,deadlineMs=90*60*1000}={}){
  const identity={jobId:job.id,leaseToken:job.lease_token},started=Date.now();let lost=false,beating=false,last=Date.now();
@@ -28,12 +28,12 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   const plan=await once('plan','planning',async()=>revision?{
    continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.videoContinuity||''} ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
    scenes:existing.map(s=>({...s,motion:s.motion||'Follow the approved scene direction; preserve continuity.'}))
-  }:validatePlan(await providers.plan(project,invoke),project.data.scriptDraft));
+  }:await (async()=>{const raw=await providers.plan(project,invoke);return {...validatePlan(raw,project.data.scriptDraft),providerUsage:raw.providerUsage||null};})());
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:project.data.narrationRevision?await patchNarration(project,plan,providers,invoke,once,job.id):await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
   const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):narration.timeline||alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
   // Existing stills anchor regenerated scenes even when the first shot changes.
-  const imageRepairCounts=plan.scenes.map(()=>0);
+  const imageRepairCounts=plan.scenes.map(()=>0),imageApprovals=new Map();
   const images=[],existingAnchor=existing.find(s=>s.imageAssetId);
   const reusable=s=>s.selectedVersionId&&(reuseNarration||timeline.filter(t=>t.planSceneId===s.id).every(t=>t.id===s.id&&t.end-t.start<=s.end-s.start));
   for(const [i,s] of plan.scenes.entries()){
@@ -45,6 +45,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
     validateReview(report,plan.scenes.map((x,j)=>({...x,start:j,end:j+1})));
     if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId))||report.issues.some(x=>x.sceneId!==s.id))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
     if(report.verdict==='pass'){
+     imageApprovals.set(s.id,{assetId:images[i].assetId,report});
      project=remember(project,{approvedAssets:images.map(x=>x.assetId),observedStates:report.observedStates||[]});
      break;
     }
@@ -62,7 +63,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   // Fail closed on still quality: no clip/version request precedes this gate.
   for(let round=0;round<=2;round++){
    const unchanged=reuseApprovedStills&&images.every((im,i)=>im.assetId===existing.find(s=>s.id===plan.scenes[i].id)?.imageAssetId);
-   const report=unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
+   const checked=plan.scenes.every((s,i)=>imageApprovals.get(s.id)?.assetId===images[i].assetId);
+   const report=checked?{verdict:'pass',summary:'Every immutable still already passed its own contextual review.',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[...imageApprovals.values()].flatMap(x=>x.report.observedStates||[]),reusedReviews:true}:unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
    const reviewScenes=plan.scenes.map((s,i)=>({...s,start:i,end:i+1}));
    validateReview(report,reviewScenes);
    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');

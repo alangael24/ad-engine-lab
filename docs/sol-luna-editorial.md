@@ -1,3 +1,6 @@
+> Updated default: see [Astra + DeepSeek workflow](astra-deepseek-workflow.md).
+> This document describes the explicit `sol-luna-v1` compatibility profile.
+
 # Sol + Luna production editing
 
 This adapter finishes an approved ad from its own numbered clips, scene context,

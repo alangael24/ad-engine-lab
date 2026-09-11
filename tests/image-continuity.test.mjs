@@ -67,7 +67,7 @@ test('actual multipart request uses scoped reference roles and omits old filmstr
 test('focused reviewer inspects only the requested target and binds observed state to its immutable asset',async()=>{
  const f=fixture(),images=[{assetId:uuid()},{assetId:uuid()}];
  f.plan.scenes.push({...f.plan.scenes[0],id:uuid()});let calls=0;
- const providers=createProductionProviders({REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
+ const providers=createProductionProviders({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
   if(String(url).startsWith('https://storage.test/'))return new Response(Buffer.from([137,80,78,71,13,10,26,10]));
   calls++;assert.match(JSON.stringify(JSON.parse(options.body)),/ACTUAL target state/);
   return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'review_ad',arguments:JSON.stringify({verdict:'pass',summary:'Hands empty; no bottle visible in close-up.',issues:[]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
@@ -78,5 +78,5 @@ test('focused reviewer inspects only the requested target and binds observed sta
 });
 test('new director output without a scoped shot contract fails instead of silently using legacy prompts',async()=>{
  const f=fixture();
- await assert.rejects(callDirector(f.project,{REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async()=>new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Same person',scenes:[{text:'Tell a story',visual:'Face reaction',motion:'Raise eyebrow'}]})}}]},finish_reason:'tool_calls'}]})+'\n\n')}),/PRODUCTION_PLAN/);
+ await assert.rejects(callDirector(f.project,{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async()=>new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Same person',scenes:[{text:'Tell a story',visual:'Face reaction',motion:'Raise eyebrow'}]})}}]},finish_reason:'tool_calls'}]})+'\n\n')}),/PRODUCTION_PLAN/);
 });
