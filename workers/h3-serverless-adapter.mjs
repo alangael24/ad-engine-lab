@@ -15,7 +15,10 @@ export class H3ServerlessAdapter {
     if(!response.ok)throw Error('H3_SERVERLESS_UNAVAILABLE');
     return response.json();
   }
-  async ready(){await this.request('health');}
+  async ready(){
+    const health=await this.request('health'),w=health.workers||{};
+    if(w.unhealthy>0 && !(w.initializing||w.ready||w.running||w.idle))throw Error('H3_SERVERLESS_UNHEALTHY');
+  }
   async build(job,{uploadUrl}={}) {
     // Run exactly the same validation as the GPU graph, without downloading media.
     await new H3Adapter('http://127.0.0.1:8188').build({...job,referenceUrl:null});

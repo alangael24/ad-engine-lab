@@ -12,6 +12,10 @@ test('scale-to-zero health does not submit paid work',async()=>{
  const urls=[];const a=make(async(url,opts)=>{urls.push(url);assert.equal(opts.method,undefined);return Response.json({workers:{idle:0,running:0}});});
  await a.ready();assert.deepEqual(urls,[`https://api.runpod.ai/v2/${endpointId}/health`]);
 });
+test('a failed GPU deployment does not advertise availability',async()=>{
+ const a=make(async()=>Response.json({workers:{unhealthy:1,initializing:0,running:0,ready:0,idle:0}}));
+ await assert.rejects(()=>a.ready(),/UNHEALTHY/);
+});
 test('serverless stores provider ID and uploads directly without CPU video transfer',async()=>{
  const calls=[];let submitted=0;
  const a=make(async(url,opts)=>{

@@ -89,7 +89,7 @@
     "workers/editorial-models.mjs": "04563ca68c784595e8817075af216f67c97362242e41644ca8d86dc83a4afdc7",
     "workers/gpu-idle-worker.mjs": "3772c197d900f3fd65ce42627a8e4dd5d8e3c6878e0e0d8a169e8451be408602",
     "workers/h3-adapter.mjs": "3666896b08cd86eef247f5e03196a9e368bc81669125296b3bf5e6b9500f2cb7",
-    "workers/h3-serverless-adapter.mjs": "1d6f97170fdf0836ae252f9485648e4f16d2a8c4a73be7af76e2dbd8dce34458",
+    "workers/h3-serverless-adapter.mjs": "3245272de00fb6749c78f243d0e88fc0e7e7e609bb0b2ef7ef5bd14cea8905eb",
     "workers/h3-worker.mjs": "58db90ebd4c65452b83eb4d68f56adc54589bcb3a73b8d208cf2f1936134c44b",
     "workers/minimax-speech.mjs": "3bfd0336c812599e23b66224120c4e2a72e3ac35dbc4bb2ed9c6a92072a3d20e",
     "workers/narration-revision.mjs": "1a5f78382a9f3f00974a1a5e456464d4e4dad91192ca1a6b319173a78ac5ab5b",
