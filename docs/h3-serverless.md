@@ -8,7 +8,7 @@ CreativeRush's CPU host runs `h3-worker.mjs` when `H3_SERVERLESS_ENDPOINT_ID` is
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
 - Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled.
 - Cached model: `Comfy-Org/MiniMax-H3`. The handler checks all eight known files and links Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time.
-- Container disk 30 GB; no persistent network volume needed.
+- Container disk 30 GB; no persistent network volume needed. The current upstream repository includes multiple quantizations (~477 GB total), although this worker links only the eight required files (~69 GB). Runpod currently caches the whole repository; the first uncached provisioning can therefore be slow. Do not substitute a paid, in-container download as a workaround.
 - Endpoint environment: `H3_STORAGE_ORIGIN=https://<project>.supabase.co`. Do not expose the app worker token, Runpod key, or Supabase service role to GPU jobs.
 - Temporary test-only `H3_ALLOW_SMOKE_OUTPUT=true` permits a small base64 MP4 without signed storage. Remove after validation.
 
@@ -23,3 +23,9 @@ Persist `rp:<endpoint>:<job-id>` in the existing provider ID field. A coordinato
 Only one clip is submitted at a time by the bridge. The 60-second idle window can reuse a worker for the next ready clip. Long planning pauses can still cause another cold start; this is not a promise of a permanently warm GPU or fixed total ad cost. No worker stays permanently active. Cached models still require loading into memory at worker startup.
 
 Validate with a real H3 generation, a second queued job, the private upload/completion path, and endpoint worker count returning to zero. Unit/DB tests cover recovery and duplicate-submission handling; they do not prove CUDA execution.
+
+## Release verification
+
+Keep `GENERATION_ENABLED=false` until the first container initializes successfully. Then enable it in Pages and deploy the updated environment snapshot. Verify that `h3-serverless-main` records a recent heartbeat before accepting generation requests. Test one text-to-video and one image-to-video job through the deployed database queue, keeping their request IDs stable across retries. Check the stored provider IDs, completed private MP4 metadata, endpoint job results and endpoint billing. Finally verify that billable workers return to zero after the idle timeout.
+
+If initialization fails, leave generation paused and investigate container/system logs. A healthy CPU server or passing unit tests does not establish that CUDA inference is working.
