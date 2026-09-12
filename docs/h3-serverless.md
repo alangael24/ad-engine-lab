@@ -6,7 +6,7 @@ CreativeRush's CPU host runs `h3-worker.mjs` when `H3_SERVERLESS_ENDPOINT_ID` is
 
 - Image: build `.github/workflows/h3-serverless.yml`; deploy its immutable commit tag/digest from `ghcr.io/alangael24/creativerush-h3`.
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
-- Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled.
+- Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled. Job TTL is 42 minutes; the CPU waits at most 43 minutes, below the existing 45-minute database sweep. This accommodates the measured first cache preparation without increasing the 20-minute inference limit.
 - Cached model: `Comfy-Org/MiniMax-H3`. The handler checks all eight known files and links Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time.
 - Container disk 30 GB; no persistent network volume needed. The current upstream repository includes multiple quantizations (~477 GB total), although this worker links only the eight required files (~69 GB). Runpod currently caches the whole repository; the first uncached provisioning can therefore be slow. Do not substitute a paid, in-container download as a workaround.
 - Endpoint environment: `H3_STORAGE_ORIGIN=https://<project>.supabase.co`. Do not expose the app worker token, Runpod key, or Supabase service role to GPU jobs.
@@ -26,6 +26,12 @@ Validate with a real H3 generation, a second queued job, the private upload/comp
 
 ## Release verification
 
-Keep `GENERATION_ENABLED=false` until the first container initializes successfully. Then enable it in Pages and deploy the updated environment snapshot. Verify that `h3-serverless-main` records a recent heartbeat before accepting generation requests. Test one text-to-video and one image-to-video job through the deployed database queue, keeping their request IDs stable across retries. Check the stored provider IDs, completed private MP4 metadata, endpoint job results and endpoint billing. Finally verify that billable workers return to zero after the idle timeout.
+Keep customer generation paused during release validation. Temporarily enable `GENERATION_ENABLED` in Pages and deploy the updated environment snapshot to dispatch controlled smoke jobs through the real queue; pausing again stops new claims without interrupting an already assigned job. Enable it permanently after the smoke checks pass. Verify that `h3-serverless-main` records a recent heartbeat before accepting generation requests. Test one text-to-video and one image-to-video job through the deployed database queue, keeping their request IDs stable across retries. Check the stored provider IDs, completed private MP4 metadata, endpoint job results and endpoint billing. Finally verify that billable workers return to zero after the idle timeout.
 
 If initialization fails, leave generation paused and investigate container/system logs. A healthy CPU server or passing unit tests does not establish that CUDA inference is working.
+
+### Recorded smoke test (2026-09-11, America/Denver)
+
+Both real production-queue jobs succeeded with zero provider retries: a 5-second 480p text-to-video clip (37.972 s handler execution) and a 5-second 720p image-to-video clip (117.912 s). They used the same RTX 5090; the second provider queue delay was 0.131 s. The GPU uploaded both private MP4s and the backend verified their metadata before completion. No client API image or narration generation was used. The test's two internal app credits were restored with idempotent ledger entries.
+
+Initial model-cache preparation took 1,850 seconds (~31 minutes), preceding container initialization. These execution timings exclude that preparation, container startup, inter-job idle time and the final idle timeout. After both jobs, the authenticated inference health API reported `running=0`, `inQueue=0`, `inProgress=0`; the console displayed a spend rate of `$0.00000/s`. FlashBoot may retain `ready`/`idle` cached records, and the control-plane worker list may show pre-caching records. Such records are not evidence of a billable GPU running. Do not equate a cached worker record with active GPU rental. Billing reconciliation can lag; do not report an empty billing response as a free generation.

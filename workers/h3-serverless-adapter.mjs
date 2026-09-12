@@ -28,7 +28,9 @@ export class H3ServerlessAdapter {
   }
   async submit(input) {
     // Never retry POST /run: a lost acknowledgement is not proof of rejection.
-    const response=await this.request('run',{input,policy:{executionTimeout:1200000,ttl:1800000}});
+    // Allow the observed ~31-minute uncached H3 provisioning, while keeping
+    // inference capped at 20 minutes and total waiting below the DB's 45-minute sweep.
+    const response=await this.request('run',{input,policy:{executionTimeout:1200000,ttl:2520000}});
     if(!/^[a-zA-Z0-9_-]{1,100}$/.test(response.id||''))throw Error('H3_SERVERLESS_INVALID_ID');
     return `rp:${this.endpointId}:${response.id}`;
   }
@@ -40,7 +42,7 @@ export class H3ServerlessAdapter {
   // Runpod cannot recover an unknown job ID by our metadata. Fail closed.
   async findSubmission(){return null;}
   async cancel(id){await this.request(`cancel/${this.jobId(id)}`,{});}
-  async wait(id,assertLease,{timeoutMs=1500000,pollMs=4000}={}) {
+  async wait(id,assertLease,{timeoutMs=2580000,pollMs=4000}={}) {
     const jobId=this.jobId(id),start=Date.now();let lastSuccess=start;
     while(Date.now()-start<timeoutMs){
       assertLease();let status;

@@ -19,7 +19,7 @@ test('a failed GPU deployment does not advertise availability',async()=>{
 test('serverless stores provider ID and uploads directly without CPU video transfer',async()=>{
  const calls=[];let submitted=0;
  const a=make(async(url,opts)=>{
-  if(url.endsWith('/run')){submitted++;const body=JSON.parse(opts.body);assert.equal(body.input.job.id,job.id);assert.equal(body.input.uploadUrl,uploadUrl);assert.equal(body.policy.executionTimeout,1200000);return Response.json({id:'abc-u1'});}
+  if(url.endsWith('/run')){submitted++;const body=JSON.parse(opts.body);assert.equal(body.input.job.id,job.id);assert.equal(body.input.uploadUrl,uploadUrl);assert.equal(body.policy.executionTimeout,1200000);assert.equal(body.policy.ttl,2520000);return Response.json({id:'abc-u1'});}
   assert.ok(url.endsWith('/status/abc-u1'));return Response.json({status:'COMPLETED',output:result,executionTime:1234,delayTime:200});
  });
  const api=async(action,body)=>{calls.push({action,body});return action==='upload'?{uploadUrl}:{};};
