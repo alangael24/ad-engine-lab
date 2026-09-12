@@ -31,6 +31,11 @@ test('real API flow: auth, private reference, enqueue, worker, upload, download 
   assert.equal((await item.onRequestGet(context('/api/generations/'+job.id,'bob','GET',null,{id:job.id}))).status,404);
   const claimed=(await (await runWorker({action:'claim'})).json()).job;assert.equal(claimed.id,job.id);assert.ok(claimed.referenceUrl);
   const identity={jobId:job.id,leaseToken:claimed.leaseToken};
+  const queueId='rp:exampleendpoint:'+crypto.randomUUID()+'-u1';
+  assert.equal((await runWorker({action:'heartbeat',...identity,submissionStarted:true,providerPromptId:queueId})).status,200);
+  assert.equal((await runWorker({action:'heartbeat',...identity,providerPromptId:queueId})).status,200);
+  assert.equal((await runWorker({action:'heartbeat',...identity,providerPromptId:'https://untrusted.test/id'})).status,400);
+  assert.equal((await db.query('select provider_prompt_id from generation_jobs where id=$1',[job.id])).rows[0].provider_prompt_id,queueId);
   assert.equal((await runWorker({action:'complete',...identity})).status,409,'cannot complete a missing video');
   const upload=(await (await runWorker({action:'upload',...identity})).json()).uploadUrl;
   await stub.fetch(upload,{method:'PUT',headers:{'content-type':'video/mp4'},body:new Blob(['test-video'])});

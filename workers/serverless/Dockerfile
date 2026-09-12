@@ -1,6 +1,8 @@
 FROM pytorch/pytorch:2.10.0-cuda13.0-cudnn9-runtime@sha256:1f57418aedd9a4d0d3a59646619e1d4f82cacc33817247cead4f749e1f452d4b
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
-RUN apt-get update && apt-get install -y --no-install-recommends git curl xz-utils ca-certificates ffmpeg libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git curl xz-utils ca-certificates ffmpeg libgl1 libglib2.0-0 python3-venv && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv --system-site-packages /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
 RUN curl -fsSL https://nodejs.org/dist/v22.18.0/node-v22.18.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
 RUN git init /opt/ComfyUI && cd /opt/ComfyUI && git remote add origin https://github.com/Comfy-Org/ComfyUI.git && git fetch --depth 1 origin 15eb748b3ec5f8a0a2d470b7fb280e2d7579f916 && git checkout FETCH_HEAD && rm -rf .git
 RUN printf 'torch==2.10.0\ntorchvision==0.25.0\ntorchaudio==2.10.0\ntransformers<5\nhuggingface-hub<1\n' > /tmp/constraints.txt && pip install -c /tmp/constraints.txt -r /opt/ComfyUI/requirements.txt runpod==1.12.0

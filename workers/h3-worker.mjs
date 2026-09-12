@@ -1,4 +1,5 @@
 import { H3Adapter } from './h3-adapter.mjs';
+import { H3ServerlessAdapter } from './h3-serverless-adapter.mjs';
 import { pathToFileURL } from 'node:url';
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -18,7 +19,7 @@ export function createApi({ appUrl, token, workerId, fetchImpl = fetch }) {
 }
 export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbeatMs = 20000 } = {}) {
   const identity = { jobId:job.id, leaseToken:job.leaseToken };
-  let leaseLost = false, beating = false, lastHeartbeat = Date.now();
+  let leaseLost = false, beating = false, lastHeartbeat = Date.now(), promptId = job.providerPromptId;
   const beat = async () => {
     if (beating) return; beating = true;
     try { await api('heartbeat', identity); lastHeartbeat = Date.now(); }
@@ -29,28 +30,34 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
   await api('heartbeat', identity);
   const interval = setInterval(beat, heartbeatMs);
   try {
-    let promptId = job.providerPromptId;
     if (!promptId && job.submissionStarted) {
       promptId = await adapter.findSubmission(job.id);
       // A crash around submission is ambiguous. Never silently re-generate/bill twice.
       if (!promptId) throw new Error('AMBIGUOUS_SUBMISSION');
     }
     if (!promptId) {
-      const workflow = await adapter.build(job); assertLease();
+      const target = adapter.directUpload ? await api('upload', identity) : {};
+      const workflow = await adapter.build(job, target); assertLease();
       await api('heartbeat', { ...identity, submissionStarted:true });
       try { promptId = await adapter.submit(workflow, job.id); }
       catch { promptId = await adapter.findSubmission(job.id); if (!promptId) throw new Error('AMBIGUOUS_SUBMISSION'); }
     }
     await api('heartbeat', { ...identity, providerPromptId:promptId });
     const video = await adapter.wait(promptId, assertLease); assertLease();
+    if (adapter.directUpload) {
+      if (video.jobId !== job.id) throw new Error('H3_RESULT_JOB_MISMATCH');
+      console.log(JSON.stringify({event:'h3_serverless_result',jobId:job.id,executionMs:video.executionMs,queueMs:video.queueMs,bytes:video.bytes}));
+    } else {
     const { uploadUrl } = await api('upload', identity);
     const uploaded = await fetchImpl(uploadUrl, { method:'PUT', headers:{ 'content-type':'video/mp4','x-upsert':'false' },
       body:video, signal:AbortSignal.timeout(120000) });
     // An upload may have succeeded before an ack was lost. Completion verifies private storage.
     if (!uploaded.ok && ![400,409].includes(uploaded.status)) throw new Error('UPLOAD_FAILED');
+    }
     await api('complete', identity);
     console.log(`completed ${job.id}`);
   } catch (error) {
+    if(promptId && adapter.cancel) await adapter.cancel(promptId).catch(()=>{});
     // If completion succeeded but the response was lost, this is idempotent and does not refund it.
     if (!leaseLost && error.code !== 'SUBMISSION_ALREADY_STARTED') await api('fail', identity).catch(() => {});
     console.error(`job_failed ${job.id} ${error.code === 'LEASE_LOST' ? 'LEASE_LOST' : 'see_backend_status'}`);
@@ -59,7 +66,9 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
 export async function main() {
   const api = createApi({ appUrl:process.env.CREATIVE_RUSH_URL, token:process.env.GENERATION_WORKER_TOKEN,
     workerId:process.env.H3_WORKER_ID });
-  const adapter = new H3Adapter(process.env.COMFY_URL || 'http://127.0.0.1:8188');
+  const adapter = process.env.H3_SERVERLESS_ENDPOINT_ID
+    ? new H3ServerlessAdapter({endpointId:process.env.H3_SERVERLESS_ENDPOINT_ID,apiKey:process.env.RUNPOD_SERVERLESS_API_KEY})
+    : new H3Adapter(process.env.COMFY_URL || 'http://127.0.0.1:8188');
   let stopping = false;
   for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => { stopping = true; });
   while (!stopping) {

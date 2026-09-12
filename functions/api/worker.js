@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, json, getBearerToken } from '../../src/backend.js';
 import { ApiError, apiError, readJson, rpc, UUID, REFERENCE_BUCKET, RESULT_BUCKET } from '../../src/generations.js';
+export const PROVIDER_ID = /^(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|rp:[a-zA-Z0-9]{8,40}:[a-zA-Z0-9_-]{1,100})$/i;
 
 export async function verifyWorker(request, secret) {
   const token = getBearerToken(request);
@@ -33,7 +34,7 @@ export async function onRequestPost(context) {
       if (job.reference_id) {
         const ref = await db.from('generation_references').select('storage_path').eq('id', job.reference_id).eq('user_id', job.user_id).single();
         if (ref.error) throw ref.error;
-        const signed = await db.storage.from(REFERENCE_BUCKET).createSignedUrl(ref.data.storage_path, 900);
+        const signed = await db.storage.from(REFERENCE_BUCKET).createSignedUrl(ref.data.storage_path, 3600);
         if (signed.error) throw signed.error;
         referenceUrl = signed.data.signedUrl;
       }
@@ -44,7 +45,7 @@ export async function onRequestPost(context) {
     const job = await assignedJob(db, body);
     const args = { p_job_id: job.id, p_worker_id: body.workerId, p_lease_token: body.leaseToken };
     if (body.action === 'heartbeat') {
-      if (body.providerPromptId != null && !UUID.test(body.providerPromptId)) throw new ApiError('INVALID_GENERATION');
+      if (body.providerPromptId != null && !PROVIDER_ID.test(body.providerPromptId)) throw new ApiError('INVALID_GENERATION');
       await rpc(db, 'heartbeat_generation', { ...args, p_submission_started: body.submissionStarted === true,
         p_provider_prompt_id: body.providerPromptId || null });
       return json({ ok: true });

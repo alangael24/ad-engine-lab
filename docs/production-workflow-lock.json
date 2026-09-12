@@ -97,7 +97,7 @@
     "workers/production-quality.mjs": "079a2b8314d28c1e73ada44b8edbd8a16d8376f15438d83a6ed13ce86e7368d2",
     "workers/production-worker.mjs": "a673dac877b21f616864f1bc907751b8182a0d2df989dd35fc5617dd78462d2b",
     "workers/runtime-server.mjs": "8dfca646b33912b2325fd3c798053387a88d73ef4d445df07be98d7e56593f61",
-    "workers/serverless/Dockerfile": "47dfa53a0ff45d7116697601409eed9f233d86214cb0af8145586aca17713f04",
+    "workers/serverless/Dockerfile": "cb6f10fb2c9cf5774a5b8584ea5b919f68a498cd803e259a14d978f70a481e9f",
     "workers/serverless/handler.py": "b46b820b42f1661e65889a3a28b4b67faa19ff04a869ad11d3186975598e6203",
     "workers/serverless/run-job.mjs": "d50fe969141f03b44eccfe222e90ea266031eb6bd091c07090ae8af4a75ef5b7",
     "workers/simple-ad-renderer.mjs": "9c80fba0e99859d9e52724b38f5a23bb945971cea240d576dcd612bbd0c93eeb",
