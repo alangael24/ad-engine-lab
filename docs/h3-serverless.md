@@ -44,7 +44,18 @@ Run `node --test tests/h3-recovery*.test.mjs` for the virtual-clock and PGlite/A
 
 Recorded results: **33 new recovery tests passed**. The final targeted H3 run (including the existing worker/adapter tests) passed **47/47**. The broader repository suite before the final two concurrency checks passed **247 tests, 0 failed, 8 skipped**; those skipped tests are not evidence of working media generation. Static build and Pages Functions compilation both passed. The final concurrency changes were rechecked in the targeted H3 run. No live/CUDA tests were invoked.
 
-This change has only been validated locally. No GPU was started and no media/model API was used for these simulations. Deployment of the migration/API/worker, control-key configuration and a controlled real cold-start/second-clip/shutdown run remain required before claiming production autonomy or a measured cost per delivered ad.
+No GPU was started and no media/model API was used for these simulations. A controlled real cold-start/second-clip/shutdown run remains required before claiming production autonomy or a measured cost per delivered ad.
+
+### Release status (2026-09-13)
+
+- Recovery implementation `d56d5a4` is on `main`. The targeted release check passed **47/47** again.
+- The production database migration was applied as `20260913154839_h3_serverless_recovery` (the migration service assigned this timestamp; the source filename remains `20260913151441_h3_serverless_recovery.sql`). No generation jobs were queued or running at verification.
+- Pages deployment `350bb581-ace4-4fb5-b14c-bac6736924e3` serves the recovery API from `d56d5a4`. `GENERATION_ENABLED=false` was saved before this deployment to keep admission paused.
+- Render still serves `2b7240c`. Its automatic deploy is off. Do not deploy the new CPU bridge until `RUNPOD_CONTROL_API_KEY` has been configured: the startup check intentionally rejects a missing control credential.
+- The existing inference key successfully reads endpoint health, but the v2 endpoint control read returns **403 Forbidden**. That key is not sufficient for verified shutdown. A control credential for the same endpoint is still required; do not substitute another account or create another endpoint.
+- The dedicated endpoint remains at min/max zero, with no workers and no queued/running provider jobs. No live generation was started during this release attempt.
+
+After configuring the control credential, deploy the CPU bridge, verify its heartbeat and the deployed commit, and run the controlled production-queue smoke checks above. Record both artifact metadata and final endpoint/worker/job state. These deployment checks do not yet establish autonomous video delivery.
 
 ### Recorded smoke test (2026-09-11, America/Denver)
 
