@@ -19,7 +19,7 @@ test('a failed GPU deployment does not advertise availability',async()=>{
 test('serverless stores provider ID and uploads directly without CPU video transfer',async()=>{
  const calls=[];let submitted=0;
  const a=make(async(url,opts)=>{
-  if(url.endsWith('/run')){submitted++;const body=JSON.parse(opts.body);assert.equal(body.input.job.id,job.id);assert.equal(body.input.uploadUrl,uploadUrl);assert.equal(body.policy.executionTimeout,1200000);assert.equal(body.policy.ttl,2520000);return Response.json({id:'abc-u1'});}
+  if(url.endsWith('/run')){submitted++;const body=JSON.parse(opts.body);assert.equal(body.input.job.id,job.id);assert.equal(body.input.uploadUrl,uploadUrl);assert.equal(body.policy.executionTimeout,1200000);assert.equal(body.policy.ttl,4200000);return Response.json({id:'abc-u1'});}
   assert.ok(url.endsWith('/status/abc-u1'));return Response.json({status:'COMPLETED',output:result,executionTime:1234,delayTime:200});
  });
  const api=async(action,body)=>{calls.push({action,body});return action==='upload'?{uploadUrl}:{};};
@@ -35,12 +35,12 @@ test('restarted bridge resumes known Runpod job without another run',async()=>{
 test('lost submit response is not retried or completed',async()=>{
  let submitted=0;const actions=[];const a=make(async()=>{submitted++;throw Error('network interrupted');});
  await processJob(job,async action=>{actions.push(action);return {uploadUrl};},a);
- assert.equal(submitted,1);assert.equal(actions.at(-1),'fail');assert.ok(!actions.includes('complete'));
+ assert.equal(submitted,1);assert.equal(actions.at(-1),'recover');assert.ok(!actions.includes('complete'));
 });
 test('timed out or wrong-job output is cancelled and never completed',async()=>{
  for(const status of [{status:'TIMED_OUT'},{status:'COMPLETED',output:{...result,jobId:crypto.randomUUID()}}]){
-  const urls=[],actions=[];const a=make(async url=>{urls.push(url);return Response.json(status);});
-  await processJob({...job,providerPromptId:`rp:${endpointId}:abc-u1`},async action=>{actions.push(action);return{};},a);
+  const urls=[],actions=[];let cancelled=false;const a=make(async url=>{urls.push(url);if(url.includes('/cancel/'))cancelled=true;return Response.json(cancelled?{status:'CANCELLED'}:status);});
+  await processJob({...job,providerPromptId:`rp:${endpointId}:abc-u1`,providerStartedAt:new Date().toISOString()},async action=>{actions.push(action);return{};},a);
   assert.ok(urls.some(url=>url.includes('/cancel/')));assert.equal(actions.at(-1),'fail');assert.ok(!actions.includes('complete'));
  }
 });

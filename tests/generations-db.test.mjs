@@ -69,7 +69,7 @@ test('expired leases and stale queued jobs are refunded without resubmission',as
   await db.query("update generation_jobs set lease_expires_at=now()-interval '1 minute' where id=$1",[j.id]);
   await assert.rejects(call(db,'heartbeat_generation',[j.id,'gpu',j.lease_token,false,null]),/LEASE_LOST/);
   const queued=await reserve(db,u);
-  await db.query("update generation_jobs set created_at=now()-interval '31 minutes' where id=$1",[queued.id]);
+  await db.query("update generation_jobs set created_at=now()-interval '121 minutes' where id=$1",[queued.id]);
   assert.equal(await call(db,'sweep_generations'),2); assert.equal(await call(db,'sweep_generations'),0);
   assert.equal(await balance(db,u),12);
   assert.equal((await call(db,'finish_generation',[j.id,'gpu',j.lease_token,true])).status,'failed');
