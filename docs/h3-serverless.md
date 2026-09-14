@@ -7,7 +7,7 @@ CreativeRush's CPU host runs `h3-worker.mjs` when `H3_SERVERLESS_ENDPOINT_ID` is
 - Image: build `.github/workflows/h3-serverless.yml`; deploy its immutable commit tag/digest from `ghcr.io/alangael24/creativerush-h3`.
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
 - Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled. New lifecycle limits: pending application queue **120 minutes**, provider preparation **45 minutes**, execution **20 minutes**, provider TTL **70 minutes**, reconciliation grace **2 minutes**. Preparation and execution are distinct. Restarting the coordinator does not reset these clocks. These are ceilings, not expected durations or a price guarantee.
-- Cached model: `Comfy-Org/MiniMax-H3` by default. The compact-cache handler checks the four files in `workers/serverless/model-manifest.json` and links one complete snapshot from Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time. The previously deployed container still requires eight files.
+- Cached model: `Comfy-Org/MiniMax-H3` by default. The compact-cache handler checks the four files in `workers/serverless/model-manifest.json` and links one complete snapshot from Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time. Containers from before the compact-cache change require eight files.
 - Container disk 30 GB; no persistent network volume needed. The current upstream repository includes multiple quantizations (~477 GB total). The production graph only requires four weights (~43.82 GB); the former eight-file startup requirement was ~69 GB. Runpod currently caches the whole selected repository, so removing files from our startup checks alone does not reduce the upstream download. Configure a separate compact model cache as described below. Do not substitute a paid, in-container download as a workaround.
 - Endpoint environment: `H3_STORAGE_ORIGIN=https://<project>.supabase.co`. Do not expose the app worker token, Runpod key, or Supabase service role to GPU jobs.
 - Temporary test-only `H3_ALLOW_SMOKE_OUTPUT=true` permits a small base64 MP4 without signed storage. Remove after validation.
@@ -63,7 +63,23 @@ The published upstream metadata reports **477,493,273,893 bytes**. The unchanged
 
 The handler now supports `H3_MODEL_REPO=owner/compact-repository` and optional immutable `H3_MODEL_REVISION`. The selected repository must also be set as the endpoint's cached model. Stage the exact four files in the same relative paths, verify their hashes during packaging and preserve the upstream license/attribution. Use the compact repository's own snapshot commit for `H3_MODEL_REVISION`, not the upstream source commit. The worker follows the cached `refs/main` when no explicit revision is set; it never combines incomplete snapshots. Changing models, quantization, steps or resolution is not part of this optimization.
 
-The compact repository has **not been uploaded or selected on Runpod**, and the updated container has **not been built/deployed**. Local tests verify cache loading with only these weights and compare the manifest with both actual T2V/I2V production graphs. The combined H3 test run passed **54/54**. This does not measure cold-start latency or prove a CUDA run.
+The compact repository has **not been uploaded or selected on Runpod**. The updated container was built successfully from `f709eeb03d1493abdd0af805b1b3535d9df062e8` in [build 34810863201](https://github.com/alangael24/ad-engine-lab/actions/runs/34810863201), published as `ghcr.io/alangael24/creativerush-h3@sha256:f8e3d5c64fded6d75a8b477525cbd67007823bb79a962f9e97df457f7ac53a6c`, and configured on `0kkj6hcrybk9xi`. The fresh endpoint read confirmed the digest, 5090 pool/CUDA settings and min/max zero. No worker was started to execute this image. Local tests verify cache loading with only these weights and compare the manifest with both actual T2V/I2V production graphs. Together with the publisher tests, the combined H3 run passed **60/60**. This does not measure cold-start latency or prove a CUDA run.
+
+`scripts/publish-h3-cache.py` prepares a private repository using Hugging Face's server-side LFS copy operation, so the 44 GB do not pass through the Mac or a GPU. It audits pinned source hashes, requires the destination to belong to the authenticated account, refuses to overwrite unrelated files and verifies the committed destination. It preserves MiniMax and Qwen licenses and attribution. The account's rights under those licenses remain a separate requirement from successful technical copying.
+
+```sh
+python3 -m venv .venv-h3-cache
+.venv-h3-cache/bin/python -m pip install -r scripts/h3-cache-requirements.txt
+# Read-only: source metadata verification, no login/weights/GPU needed.
+.venv-h3-cache/bin/python scripts/publish-h3-cache.py --report /tmp/h3-cache-audit.json
+# After authenticating with an existing write token; never paste tokens into logs.
+.venv-h3-cache/bin/hf auth login
+.venv-h3-cache/bin/python scripts/publish-h3-cache.py --apply --report /tmp/h3-cache-published.json
+```
+
+The publication command has not been run: no Hugging Face token, authenticated browser session or saved login was available. The read-only source audit passed. Twelve public mirror candidates were also inspected; none contained all four exact hashes. Do not replace weights with a similarly named quantization to bypass authentication.
+
+After publication, select the returned private repository in Runpod's cached-model field using a repository-scoped read credential, and merge the returned `H3_MODEL_REPO`/`H3_MODEL_REVISION` into the endpoint environment. The current MCP endpoint-update schema does not expose the cached-model field; use the authenticated console/configuration path rather than claiming an env change alone selected it. Keep the endpoint at min/max zero until an authorized preparation run with a verified shutdown path. Selecting a repository alone is not proof that Runpod has cached its weights on an available host.
 
 Recommended next orchestration change: after a paid generation is approved, prepare H3 concurrently with image/narration creation, with a per-job warmup deadline and cost reservation. Do not start GPUs just because someone visits the page. Preparation still needs authenticated control access and the existing circuit breaker/shutdown checks. Early preparation only hides the portion overlapping useful work; it cannot guarantee zero wait when capacity or cache is unavailable. This prewarm controller is **not implemented** yet.
 
