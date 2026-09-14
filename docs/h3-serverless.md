@@ -7,8 +7,8 @@ CreativeRush's CPU host runs `h3-worker.mjs` when `H3_SERVERLESS_ENDPOINT_ID` is
 - Image: build `.github/workflows/h3-serverless.yml`; deploy its immutable commit tag/digest from `ghcr.io/alangael24/creativerush-h3`.
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
 - Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled. New lifecycle limits: pending application queue **120 minutes**, provider preparation **45 minutes**, execution **20 minutes**, provider TTL **70 minutes**, reconciliation grace **2 minutes**. Preparation and execution are distinct. Restarting the coordinator does not reset these clocks. These are ceilings, not expected durations or a price guarantee.
-- Cached model: `Comfy-Org/MiniMax-H3`. The handler checks all eight known files and links Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time.
-- Container disk 30 GB; no persistent network volume needed. The current upstream repository includes multiple quantizations (~477 GB total), although this worker links only the eight required files (~69 GB). Runpod currently caches the whole repository; the first uncached provisioning can therefore be slow. Do not substitute a paid, in-container download as a workaround.
+- Cached model: `Comfy-Org/MiniMax-H3` by default. The compact-cache handler checks the four files in `workers/serverless/model-manifest.json` and links one complete snapshot from Runpod's host cache into Comfy. It fails fast if missing instead of downloading weights on paid GPU time. The previously deployed container still requires eight files.
+- Container disk 30 GB; no persistent network volume needed. The current upstream repository includes multiple quantizations (~477 GB total). The production graph only requires four weights (~43.82 GB); the former eight-file startup requirement was ~69 GB. Runpod currently caches the whole selected repository, so removing files from our startup checks alone does not reduce the upstream download. Configure a separate compact model cache as described below. Do not substitute a paid, in-container download as a workaround.
 - Endpoint environment: `H3_STORAGE_ORIGIN=https://<project>.supabase.co`. Do not expose the app worker token, Runpod key, or Supabase service role to GPU jobs.
 - Temporary test-only `H3_ALLOW_SMOKE_OUTPUT=true` permits a small base64 MP4 without signed storage. Remove after validation.
 
@@ -56,6 +56,22 @@ No GPU was started and no media/model API was used for these simulations. A cont
 - The dedicated endpoint remains at min/max zero, with no workers and no queued/running provider jobs. No live generation was started during this release attempt.
 
 After configuring the control credential, deploy the CPU bridge, verify its heartbeat and the deployed commit, and run the controlled production-queue smoke checks above. Record both artifact metadata and final endpoint/worker/job state. These deployment checks do not yet establish autonomous video delivery.
+
+### Reducing customer startup delay (prepared locally, 2026-09-13)
+
+The published upstream metadata reports **477,493,273,893 bytes**. The unchanged production graph uses only **43,821,523,663 bytes** across FL2V int8, the Qwen text encoder, video VAE and turbo8 LoRA. It does not use REF2V, turbo4 or the audio VAE: MiniMax narration is assembled separately. `model-manifest.json` records the four paths, sizes, SHA-256 hashes and source commit `a98869194787969724c7425d95d0ed73ce9202af`.
+
+The handler now supports `H3_MODEL_REPO=owner/compact-repository` and optional immutable `H3_MODEL_REVISION`. The selected repository must also be set as the endpoint's cached model. Stage the exact four files in the same relative paths, verify their hashes during packaging and preserve the upstream license/attribution. Use the compact repository's own snapshot commit for `H3_MODEL_REVISION`, not the upstream source commit. The worker follows the cached `refs/main` when no explicit revision is set; it never combines incomplete snapshots. Changing models, quantization, steps or resolution is not part of this optimization.
+
+The compact repository has **not been uploaded or selected on Runpod**, and the updated container has **not been built/deployed**. Local tests verify cache loading with only these weights and compare the manifest with both actual T2V/I2V production graphs. The combined H3 test run passed **54/54**. This does not measure cold-start latency or prove a CUDA run.
+
+Recommended next orchestration change: after a paid generation is approved, prepare H3 concurrently with image/narration creation, with a per-job warmup deadline and cost reservation. Do not start GPUs just because someone visits the page. Preparation still needs authenticated control access and the existing circuit breaker/shutdown checks. Early preparation only hides the portion overlapping useful work; it cannot guarantee zero wait when capacity or cache is unavailable. This prewarm controller is **not implemented** yet.
+
+A continuously ready worker removes cold start for available baseline capacity but is billed while idle. Extra requests can still queue. At the consulted $1.58/hour rate, 24 hours cost $37.92, or $1,137.60 for 30 days of compute, before storage or any separately negotiated active-worker discount. This is a capacity expense shared across videos, not an extra charge to add to already counted busy GPU time. No always-on worker was enabled.
+
+Measure approval-to-first-preview, approval-to-final-download, cache preparation, container/model initialization, queue delay and inference separately. Until measured on the deployed compact cache, do not promise instant video delivery or infer a tenfold speedup from the reduction in model bytes.
+
+Sources: [Runpod cached-model limitations](https://docs.runpod.io/serverless/endpoints/model-caching), [active workers and FlashBoot](https://docs.runpod.io/serverless/endpoints/endpoint-configurations), [billing](https://docs.runpod.io/serverless/pricing), [upstream model metadata](https://huggingface.co/api/models/Comfy-Org/MiniMax-H3?blobs=true).
 
 ### Recorded smoke test (2026-09-11, America/Denver)
 

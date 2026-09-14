@@ -2,29 +2,37 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 import urllib.request
 
-MODEL_SIZES = {
-    'diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors': 20970379616,
-    'diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors': 20970379616,
-    'text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors': 15687142551,
-    'vae/minimax_h3_video_vae_fp16.safetensors': 5207808496,
-    'vae/minimax_h3_audio_vae_fp32.safetensors': 605254808,
-    'loras/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors': 1956192992,
-    'loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors': 1956193000,
-    'loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors': 1956193000,
-}
+MODEL_MANIFEST = json.loads(Path(__file__).with_name('model-manifest.json').read_text())
+# The server-owned graph always uses FL2V turbo8, with narration added by the
+# editor. REF2V, turbo4 and the audio decoder are not dependencies of this worker.
+MODEL_SIZES = {name: spec['bytes'] for name, spec in MODEL_MANIFEST['files'].items()}
 
 
-def link_models(root, cache):
-    snapshots = sorted((cache / 'models--Comfy-Org--MiniMax-H3' / 'snapshots').glob('*'))
-    for relative, size in MODEL_SIZES.items():
-        source = next((s / relative for s in snapshots if (s / relative).is_file()
-                       and (s / relative).stat().st_size == size), None)
-        if source is None:
-            raise RuntimeError('H3_CACHE_MISSING: ' + relative)
+def link_models(root, cache, repo=None, revision=None):
+    repo = repo or os.environ.get('H3_MODEL_REPO') or MODEL_MANIFEST['sourceRepo']
+    revision = revision or os.environ.get('H3_MODEL_REVISION') or None
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*', repo):
+        raise RuntimeError('H3_CACHE_INVALID_REPO')
+    model_cache = cache / ('models--' + repo.replace('/', '--'))
+    main_ref = model_cache / 'refs' / 'main'
+    if revision is None and main_ref.is_file():
+        revision = main_ref.read_text().strip()
+    if revision is not None and not re.fullmatch(r'[a-f0-9]{40,64}', revision):
+        raise RuntimeError('H3_CACHE_INVALID_REVISION')
+    snapshots = [model_cache / 'snapshots' / revision] if revision else sorted((model_cache / 'snapshots').glob('*'))
+    # Require one complete snapshot. Mixing files from different revisions can
+    # silently change the model even when individual file sizes look correct.
+    complete = [s for s in snapshots if all((s / name).is_file()
+                and (s / name).stat().st_size == size for name, size in MODEL_SIZES.items())]
+    if len(complete) != 1:
+        raise RuntimeError('H3_CACHE_MISSING' if not complete else 'H3_CACHE_AMBIGUOUS_REVISION')
+    for relative in MODEL_SIZES:
+        source = complete[0] / relative
         target = root / 'models' / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.is_symlink():
