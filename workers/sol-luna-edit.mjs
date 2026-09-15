@@ -1,3 +1,4 @@
+import {checkpointedCall,checkpointedRender} from './editorial-checkpoints.mjs';
 import {CAPTION_EVIDENCE_RULES} from './caption-review.mjs';
 import {productionWorkflow} from '../assets/production-workflow.js';
 import {verifyCaptionFindings} from './caption-review.mjs';
@@ -26,14 +27,16 @@ export function validateEditorialReview(raw,scenes){
  if(!Array.isArray(raw?.coverage)||raw.coverage.length!==scenes.length||raw.coverage.some((id,i)=>id!==scenes[i].id))throw Error('EDITORIAL_REVIEW_COVERAGE');
  return {...validateEditReview(raw,scenes),coverage:raw.coverage};
 }
-export async function finishSolLunaProject({root,project,shots,narration,words,base=null,cacheDirectory,cacheNamespace,strategy='',env=process.env,signal,fetchImpl=fetch,call=editorialCall,prepare=prepareSimpleSources,boards=sourceBoards,render=renderSimpleAd,evidence=buildReviewEvidence,auditCaptions=verifyCaptionFindings,onUsage}){
+export async function finishSolLunaProject({root,project,shots,narration,words,base=null,cacheDirectory,cacheNamespace,strategy='',checkpoints,checkpointScope='',env=process.env,signal,fetchImpl=fetch,call=editorialCall,prepare=prepareSimpleSources,boards=sourceBoards,render=renderSimpleAd,evidence=buildReviewEvidence,auditCaptions=verifyCaptionFindings,onUsage}){
  const profile=productionWorkflow(env);
  root=resolve(root);await mkdir(root,{recursive:true});
  const usage={version:EDITORIAL_VERSION,workflowProfile:profile.version,total:0,calls:[],unknown:false,basis:'API equivalent from reported usage; media and infrastructure excluded'};
  try{
+  const renderCheckpoint=checkpointedRender(render,checkpoints,{scope:checkpointScope});
   const input=await prepare({root,project,shots,narration,words,signal});
   const persist=async()=>{await writeFile(resolve(root,'usage.json'),JSON.stringify(usage,null,2));if(onUsage)await onUsage(structuredClone(usage));};
-  const invokeModel=a=>call({...a,onUsage:persist});
+  const durableCall=checkpointedCall(call,checkpoints,{scope:checkpointScope});
+  const invokeModel=a=>durableCall({...a,onUsage:persist});
   const scenes=input.scenes,context={script:project.data.scriptDraft,strategy,memory:creativeContext(project),aspectRatio:project.data.aspectRatio,duration:input.duration,scenes:scenes.map(({path,...s})=>s),words:input.words};
   // Strip provider URLs / arbitrary asset metadata out of the model packet.
   context.scenes=scenes.map(s=>({id:s.id,source:s.source,number:s.number,text:s.text,visual:s.visual,motion:s.motion,shotContract:s.shotContract||null,start:s.start,end:s.end,sourceDuration:s.sourceDuration??s.end-s.start,outputFrames:s.frames}));
@@ -54,7 +57,7 @@ export async function finishSolLunaProject({root,project,shots,narration,words,b
      }catch(e){validationError=e.message;if(attempt===1)throw e;}
     }
    }
-   const result=await render({...input,edl,cacheDirectory,cacheNamespace,root:resolve(root,'revision'),aspectRatio:project.data.aspectRatio,signal});
+   const result=await renderCheckpoint({...input,edl,cacheDirectory,cacheNamespace,root:resolve(root,'revision'),aspectRatio:project.data.aspectRatio,signal});
    const ev=await evidence(result.path,scenes,resolve(root,'revision-review'),{signal});
    const images=await Promise.all(ev.sheets.map(async p=>'data:image/jpeg;base64,'+(await readFile(p)).toString('base64')));
    const raw=await invokeModel({role:'director',name:'review_edit',schema:finalSchema,system:rules+' Review this LOCAL revision of an approved montage. Verify the requested change and its neighboring cuts; preserve all other approved creative decisions. Review full scene coverage for regressions. Do not suggest unrelated restyling or new copy. Only observable material defects block. Do not expand regeneration beyond the requested scenes. Never claim continuous audiovisual inspection from samples.',context:{...context,edit:edl,changedScenes:project.data.editing.changedSceneIds,neighborScenes:reviewNeighbors(scenes,project.data.editing.changedSceneIds),requestedLayers:project.data.editing.settings,sampleTimes:ev.sampleTimes},images,usage,env,signal,fetchImpl});
@@ -82,7 +85,7 @@ export async function finishSolLunaProject({root,project,shots,narration,words,b
    }
    if(round>0&&prior&&JSON.stringify(edl)===JSON.stringify(prior))throw Error('EDITORIAL_REPAIR_NO_CHANGE');
    await writeFile(resolve(root,`edit-${round}.json`),JSON.stringify(edl,null,2));
-   const result=await render({...input,edl,cacheDirectory,cacheNamespace,root:resolve(root,`render-${round}`),aspectRatio:project.data.aspectRatio,signal});
+   const result=await renderCheckpoint({...input,edl,cacheDirectory,cacheNamespace,root:resolve(root,`render-${round}`),aspectRatio:project.data.aspectRatio,signal});
    const ev=await evidence(result.path,scenes,resolve(root,`review-${round}`),{signal});
    const renderedImages=await Promise.all(ev.sheets.map(async p=>'data:image/jpeg;base64,'+(await readFile(p)).toString('base64')));
    const raw=await invokeModel({role:'director',name:'review_edit',schema:finalSchema,system:rules+' Review the ACTUAL RENDERED panels against script, scene context and your direction. List every scene ID in coverage exactly in supplied order. Inspect the opening, progression, captions and ending. Repeated similar subject matter is not repeated footage; valid before/after actions may revisit the same setting. Only block on observable material defects with concrete timestamps and viewer impact. For caption/cut/retiming defects use kind caption or timing and action none: The editor can repair the edit. For an image/motion defect needing new assets use the schema’s replace_image/replace_clip and concrete prompts. You see sampled frames, not continuous video/audio; never claim to hear speech or verify lipsync. Give a concise Spanish summary. Pass only when no material issues are observed.',context:{...context,plan,edit:edl,previousFeedback:feedback,sampleTimes:ev.sampleTimes,duplicates:ev.duplicates},images:renderedImages,usage,env,signal,fetchImpl});

@@ -1,3 +1,5 @@
+import {remoteCheckpoints,checkpointKey,CHECKPOINT_VERSION} from './editorial-checkpoints.mjs';
+import {productionWorkflow} from '../assets/production-workflow.js';
 import {createHash} from 'node:crypto';
 import {finishCreativeProject} from './creative-edit.mjs';
 import {finishProductionAd} from './sol-luna-edit.mjs';
@@ -23,19 +25,43 @@ export async function processRender(job,api,{fetchImpl=fetch,render=renderTimeli
  let stage='download',preserve=false,uploaded=false,beating=false,last=Date.now();const timer=setInterval(async()=>{if(beating)return;beating=true;try{await api('heartbeat',identity);last=Date.now();}catch(e){if(e.code==='LEASE_LOST'||Date.now()-last>110000)abort.abort();}finally{beating=false;}},20000);
  const deadline=setTimeout(()=>abort.abort(),40*60*1000);
  try{
-  await api('heartbeat',identity);const m=structuredClone(job.manifest);m.narration.path=join(dir,'narration');await download(m.narration.url,m.narration.path,fetchImpl);
-  for(const [i,s] of m.scenes.entries()){s.path=join(dir,`source-${i}.mp4`);await download(s.url,s.path,fetchImpl);}
-  const upload=async path=>{stage='upload';const {uploadUrl}=await api('upload',identity),r=await fetchImpl(uploadUrl,{method:'PUT',headers:{'content-type':'video/mp4','x-upsert':'false'},body:await readFile(path),signal:AbortSignal.timeout(120000)});if(!r.ok&&![400,409].includes(r.status))throw Error('UPLOAD_FAILED');uploaded=true;};
+  await api('heartbeat',identity);const m=structuredClone(job.manifest);
+  const checkpoints=job.recovery&&env.STUDIO_EDITORIAL_ENGINE!=='legacy'?remoteCheckpoints(api,identity,{fetchImpl}):null;
+  const deliveryKey=checkpoints?checkpointKey([CHECKPOINT_VERSION,'delivery',job.recovery,productionWorkflow(env)]):null;
+  const cached=checkpoints?await checkpoints.get(deliveryKey):null;
+  let recovered;
+  if(cached?.state==='done'){
+   recovered=structuredClone(cached.value.result);
+   recovered.path=await checkpoints.getMedia(cached.value.media,join(dir,'recovered.mp4'));
+   if(recovered.review?.sha256!==cached.value.media)throw Error('EDITORIAL_CHECKPOINT_HASH');
+   if(cached.value.jobId!==job.id)recovered.usage={...recovered.usage,total:0,calls:[],unknown:false,reusedCalls:[...(recovered.usage.reusedCalls||[]),...(recovered.usage.calls||[])]};
+  }else{
+   m.narration.path=join(dir,'narration');await download(m.narration.url,m.narration.path,fetchImpl);
+   for(const [i,s] of m.scenes.entries()){s.path=join(dir,`source-${i}.mp4`);await download(s.url,s.path,fetchImpl);}
+  }
+  const upload=async path=>{stage='upload';const {uploadUrl}=await api('upload',identity),r=await fetchImpl(uploadUrl,{method:'PUT',headers:{'content-type':'video/mp4','x-upsert':'false'},body:await readFile(path),signal:AbortSignal.timeout(120000)});if(!r.ok){
+    if(![400,409].includes(r.status))throw Error('UPLOAD_FAILED');
+    const {downloadUrl}=await api('uploaded_result',identity);const existing=join(dir,'uploaded-check.mp4');await download(downloadUrl,existing,fetchImpl);
+    if(createHash('sha256').update(await readFile(existing)).digest('hex')!==createHash('sha256').update(await readFile(path)).digest('hex'))throw Error('UPLOAD_CONFLICT');
+   }uploaded=true;};
   let result;
   if(job.editorial){
-   stage='edit';await api('begin_editorial',identity);
+   stage='edit';await api('begin_editorial',{...identity,...(checkpoints?{recoverable:true}:{})});
    const auditDir=env.PRODUCTION_AUDIT_DIR||join(tmpdir(),'creativerush-cost-audit');await mkdir(auditDir,{recursive:true});
    const onUsage=async usage=>writeFile(join(auditDir,`${job.id}-${job.leaseToken}.json`),JSON.stringify({jobId:job.id,leaseToken:job.leaseToken,usage},null,2));
    const {project,words,base}=job.editorial;
    project.data={...project.data,scenes:m.scenes.map((s,i)=>({...project.data.scenes.find(x=>x.id===s.id),...s})),scriptDraft:m.scenes.map(s=>s.text).join(' ')};
-   result=await edit({root:join(dir,'creative'),onUsage,project,shots:m.scenes.map(s=>({sceneId:s.id,path:s.path})),narration:m.narration.path,words,base,cacheDirectory:env.STUDIO_EDIT_CACHE_DIR||join(tmpdir(),'creativerush-edit-cache'),cacheNamespace:createHash('sha256').update(String(project.user_id)+':'+project.id).digest('hex'),strategy:`Finish the approved ad with clear pacing. Use readable word-synchronized captions by default; the latest customer request overrides defaults, including removing captions. Follow this approved direction and applied customer requests: ${JSON.stringify(project.data.creativeMemory||{})}. Keep every scene and spoken word in order; Keep the narration continuous; adjust picture timing without removing spoken audio. Match the reference.`,env,fetchImpl,signal:abort.signal,sandboxOptions:{python:env.VIDEO_USE_PYTHON}});
+   result=recovered||await edit({root:join(dir,'creative'),onUsage,checkpoints,checkpointScope:job.recovery,project,shots:m.scenes.map(s=>({sceneId:s.id,path:s.path})),narration:m.narration.path,words,base,cacheDirectory:env.STUDIO_EDIT_CACHE_DIR||join(tmpdir(),'creativerush-edit-cache'),cacheNamespace:createHash('sha256').update(String(project.user_id)+':'+project.id).digest('hex'),strategy:`Finish the approved ad with clear pacing. Use readable word-synchronized captions by default; the latest customer request overrides defaults, including removing captions. Follow this approved direction and applied customer requests: ${JSON.stringify(project.data.creativeMemory||{})}. Keep every scene and spoken word in order; Keep the narration continuous; adjust picture timing without removing spoken audio. Match the reference.`,env,fetchImpl,signal:abort.signal,sandboxOptions:{python:env.VIDEO_USE_PYTHON}});
+   if(recovered)await onUsage(result.usage);
    if(result.status!=='succeeded'||!result.path)throw Error('EDITORIAL_REVIEW_BLOCKED');
    stage='save_editorial';const sha256=createHash('sha256').update(await readFile(result.path)).digest('hex');
+   if(checkpoints&&!recovered){
+    if(result.review?.sha256!==sha256)throw Error('EDITORIAL_CHECKPOINT_HASH');
+    const media=await checkpoints.putMedia(result.path),claim=await checkpoints.claim(deliveryKey,{artifact:true});
+    if(!claim.claimed)throw Error('EDITORIAL_CHECKPOINT_BUSY');
+    const {path,...saved}=result;
+    await checkpoints.save(deliveryKey,'done',{jobId:job.id,media,result:saved});
+   }
    const editorialPayload={...identity,ranges:result.edl.ranges,segments:result.edl.segments,version:result.edl.version,review:result.review,edit:result.edl.version?{captions:result.edl.captions,captionGroups:result.edl.captionGroups,captionColor:result.edl.captionColor,captionSize:result.edl.captionSize,hook:result.edl.hook,sourceCaptionScenes:result.edl.sourceCaptionScenes,captionFadeMs:result.edl.captionFadeMs,captionHighlight:result.edl.captionHighlight}:undefined,words:result.edl.words,sha256,usage:result.usage,message:result.message};
    await writeFile(join(dir,'delivery.json'),JSON.stringify(editorialPayload,null,2));
    preserve=true;await upload(result.path);stage='save_editorial';

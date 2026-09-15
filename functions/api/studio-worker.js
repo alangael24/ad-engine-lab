@@ -1,3 +1,4 @@
+import {editorialRecoveryProject} from '../../assets/editorial-recovery.js';
 import {editorialReviewModelMatches} from '../../assets/production-workflow.js';
 import {editorialRevisionContext,approvedBase,projectFingerprint} from '../../src/partial-edit.js';
 import {editorialTimeline,alignmentWords} from '../../assets/editorial-timeline.js';
@@ -34,7 +35,9 @@ export async function onRequestPost(context){try{
     if(project.data.referenceAnalysisId){const a=await own(db,'studio_reference_analyses',r.user_id,project.data.referenceAnalysisId);if(a.project_id!==r.project_id||a.status!=='succeeded')throw Error('EDITORIAL_INVALID');project.referenceEvidence=a.result?.visualEvidence||[];}
   }
   }catch(error){await rpc(db,'studio_render_worker',{p_worker:b.workerId,p_action:'complete',p_id:r.id,p_lease:r.lease_token,p_success:false});throw error;}
-  return json({job:{id:r.id,leaseToken:r.lease_token,manifest,editorial}});
+  if(editorial)editorial.project=editorialRecoveryProject(editorial.project);
+  const recovery=editorial?await projectFingerprint({scenes:r.manifest.originalScenes||r.manifest.scenes,narration:r.manifest.narration,data:editorial.project.data,brand:editorial.project.brand_snapshot,words:editorial.words,base:editorial.base}):null;
+  return json({job:{id:r.id,leaseToken:r.lease_token,manifest,editorial,recovery}});
  }
  if(!UUID.test(b.jobId||'')||!UUID.test(b.leaseToken||''))throw new ApiError('LEASE_LOST');
  const q=await db.from('studio_renders').select('*').eq('id',b.jobId).eq('worker_id',b.workerId).eq('lease_token',b.leaseToken).maybeSingle();
@@ -43,10 +46,19 @@ export async function onRequestPost(context){try{
  if(r.status!=='running'||Date.parse(r.lease_expires_at)<=Date.now())throw new ApiError('LEASE_LOST');
  if(r.production_id){const parent=await own(db,'studio_productions',r.user_id,r.production_id);if(parent.status!=='running'||parent.expected_revision!==r.project_revision){await rpc(db,'studio_render_worker',{...args,p_action:'complete',p_success:false});throw new ApiError('LEASE_LOST');}}
  if(b.action==='heartbeat')return json(await rpc(db,'studio_render_worker',args));
+ if(b.action==='checkpoint')return json({checkpoint:await rpc(db,'studio_editorial_checkpoint',{p_worker:b.workerId,p_id:r.id,p_lease:b.leaseToken,p_action:b.op,p_key:b.key,p_value:b.value||{}})});
+ if(b.action==='checkpoint_media'){
+  if(!/^[a-f0-9]{64}$/.test(b.key||''))throw Error('EDITORIAL_CHECKPOINT_INVALID');
+  const checkpointPath=`${r.user_id}/editorial-checkpoints/${r.project_id}/${b.key}.mp4`;
+  const s=await db.storage.from('studio-media').createSignedUploadUrl(checkpointPath);if(s.error)throw s.error;
+  return json({uploadUrl:s.data.signedUrl,downloadUrl:await signed(db,'studio-media',checkpointPath)});
+ }
  const path=`${r.user_id}/renders/${r.id}.mp4`;
  if(b.action==='upload'){
   const s=await db.storage.from('studio-media').createSignedUploadUrl(path);if(s.error)throw s.error;return json({uploadUrl:s.data.signedUrl});
  }
+ if(b.action==='uploaded_result')return json({downloadUrl:await signed(db,'studio-media',path)});
+ if(b.action==='begin_editorial'&&b.recoverable===true)return json(await rpc(db,'studio_editorial_checkpoint',{p_worker:b.workerId,p_id:r.id,p_lease:b.leaseToken,p_action:'begin',p_key:null,p_value:{}}));
  if(b.action==='begin_editorial')return json(await rpc(db,'studio_editorial_begin',{p_worker:b.workerId,p_id:r.id,p_lease:b.leaseToken}));
  if(b.action==='editorial'){
   const original=r.manifest.originalScenes||r.manifest.scenes;
