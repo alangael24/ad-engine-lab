@@ -31,3 +31,15 @@ test('motion and global continuity survive saves; a chat direction change clears
  const d=projectData({title:'Test',referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',videoContinuity:'Same bathroom',scenes:[{...scene,start:0,end:6}]});assert.equal(d.scenes[0].motion,scene.motion);assert.equal(d.videoContinuity,'Same bathroom');
  const changed=applyEdit({data:d},{operation:'edit_scene',sceneId:scene.id,value:'Still water, static product',message:'Updated'});assert.equal(changed.scenes[0].motion,undefined);
 });
+test('a metered invalid H3 description gets one format repair and accounts for both calls',async()=>{
+ const context=sceneVideoContext(project,scene.id);let count=0,lastUsage;
+ const env={PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'test',PRODUCTION_ON_USAGE:async u=>{lastUsage=u;}};
+ const fetchImpl=async(_url,opts)=>{
+  count++;const request=JSON.parse(opts.body);
+  if(count===2)assert.match(request.input[1].content[0].text,/formatCorrection/);
+  const raw={integrated_multimodal_description:count===1?'[Shot 1] '+ 'x'.repeat(1150):description};
+  return new Response('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',model:'gpt-6-astra',usage:{input_tokens:100,output_tokens:100},output:[{type:'function_call',name:'write_h3_prompt',arguments:JSON.stringify(raw)}]}})+'\n\n');
+ };
+ const prompt=await writeH3Prompt(context,env,{referenceUrl:'https://owned.test/frame.png',fetchImpl});
+ assert.equal(count,2);assert.match(prompt,/Fine water streams/);assert.equal(lastUsage.total,.012);assert.equal(lastUsage.calls.length,2);assert.equal(lastUsage.unknown,false);
+});

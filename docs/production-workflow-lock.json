@@ -72,7 +72,7 @@
     "src/course-catalog.js": "dcf38e1ebe2c9a53ab66763be01460256604c100c565277df6644aa1c4f73f17",
     "src/generations.js": "6c46b2ba58ad64ae610c587748ebe08af5c32fb1a12264b0c9eba4b9bc89d407",
     "src/h3-lifecycle.js": "954c1b77c4515318928fd24481d55e8e76112c45e9eca8a0438716c8abb29020",
-    "src/h3-prompts.js": "6ef143ee835aece3a0a38090ee87034ea3324bdd249dccc1bc47c1fe21066976",
+    "src/h3-prompts.js": "3fd8fa85f8d21517c574c6b8b325b889c5c3805b614c572a5cdd0e890ad0072a",
     "src/media-cost.js": "153f6585e696de72aa07e00c75cb993b6940f58b7eda756126ccbe5b9b0e00df",
     "src/model-provider.js": "ee07414b0dd9c4e6bf1523dd0f28a498a818b4b383c7960411a360eecc763cbb",
     "src/partial-edit.js": "140872d37d223ca86d018ffa245397abf8d0fcdbd39a0ab3654b7a0308ea067a",
