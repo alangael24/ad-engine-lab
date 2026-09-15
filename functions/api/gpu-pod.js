@@ -4,6 +4,11 @@ import {verifyWorker} from './worker.js';
 export async function onRequestPost({request,env}){
  try{
   const body=await readJson(request);
+  if(body.action==='boot_progress'){
+   await verifyWorker(request,env.GENERATION_WORKER_TOKEN);
+   await rpc(getSupabaseAdmin(env),'h3_pod_boot_progress',{p_run:body.runId,p_worker:body.workerId,p_stage:body.stage,p_error:body.error||null});
+   return json({ok:true});
+  }
   if(body.action==='ready'){
    await verifyWorker(request,env.GENERATION_WORKER_TOKEN);
    await rpc(getSupabaseAdmin(env),'h3_pod_ready',{p_run:body.runId,p_worker:body.workerId});

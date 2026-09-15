@@ -52,7 +52,7 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   if(pod.gpu?.id!==GPU||pod.gpu?.count!==1||pod.cloud!=='COMMUNITY'||!Number.isFinite(pod.cost)||pod.cost>0.71)reason='unexpected_gpu_or_price';
   if(run.phase==='blocked'||!s.enabled)reason=reason||'disabled';
   if(now()>=Date.parse(run.deadline_at)||age*730000/3600000+30000>=run.reserved_microusd)reason='budget_deadline';
-  if(!run.ready_at&&age>600000)reason='startup_failed';
+  if(!run.ready_at&&(run.boot_error||age>600000))reason='startup_failed';
   if(run.phase==='running'&&!s.pending&&!s.running&&run.idle_since&&now()-Date.parse(run.idle_since)>=90000)reason='idle';
   if(pod.status==='EXITED')reason=reason||'worker_exited';
   if(!reason)return {status:run.phase,podId:pod.id};

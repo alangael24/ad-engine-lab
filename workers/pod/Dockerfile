@@ -3,4 +3,5 @@ COPY workers/h3-worker.mjs workers/h3-adapter.mjs workers/h3-serverless-adapter.
 COPY src/h3-lifecycle.js /opt/creativerush/src/h3-lifecycle.js
 COPY workers/workflows/h3.json /opt/creativerush/workers/workflows/h3.json
 COPY workers/pod/entry.py /opt/creativerush/workers/pod/entry.py
-CMD ["python", "workers/pod/entry.py"]
+ENTRYPOINT ["/opt/venv/bin/python", "/opt/creativerush/workers/pod/entry.py"]
+CMD []
