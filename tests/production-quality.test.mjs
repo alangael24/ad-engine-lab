@@ -1,6 +1,6 @@
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
-import {validateReview,repairScenes,repeatedSources} from '../assets/quality-model.js';
+import {validateReview,repairScenes,repeatedSources,QUALITY_VERSION} from '../assets/quality-model.js';
 import {CHAT_MODEL} from '../assets/chat-model.js';
 import {askReview,visualCandidates} from '../workers/production-quality.mjs';
 import {processProduction} from '../workers/production-worker.mjs';
@@ -10,7 +10,7 @@ import {getStudio} from '../src/studio.js';
 import {onRequestPost as workerRoute} from '../functions/api/studio-production-worker.js';
 const scene=(id,start=0)=>({id,text:`Phrase ${id}`,start,end:start+2,visual:'A distinct view of the product',motion:'Slow continuous motion',imageAssetId:crypto.randomUUID(),selectedVersionId:crypto.randomUUID()});
 const issue=s=>({sceneId:s.id,relatedSceneId:null,at:s.start,kind:'repetition',evidence:'Same comb action restarts in this shot.',action:'replace_image',visual:'A distinct close-up of the clean comb resting on the counter.',motion:'Slow continuous push toward the comb.'});
-const review=(scenes,verdict='pass',renderId='r')=>({version:1,renderId,sha256:'a'.repeat(64),sampleTimes:scenes.map(s=>({sceneId:s.id,times:[s.start+.1,s.start+1,s.end-.1]})),verdict,summary:'Revisión del montaje.',issues:verdict==='pass'?[]:[issue(scenes[0])]});
+const review=(scenes,verdict='pass',renderId='r')=>({version:QUALITY_VERSION,renderId,sha256:'a'.repeat(64),sampleTimes:scenes.map(s=>({sceneId:s.id,times:[s.start+.1,s.start+1,s.end-.1]})),verdict,summary:'Revisión del montaje.',issues:verdict==='pass'?[]:[issue(scenes[0])]});
 test('source audit finds same asset reuse through different version IDs, but accepts disjoint ranges',()=>{
  const a={...scene('a'),media:{bucket:'private',path:'same.mp4'}},b={...scene('b',2),media:a.media};
  assert.equal(repeatedSources([a,b]).length,1);
@@ -122,6 +122,7 @@ test('database refuses unreviewed completion; only an exact current render can p
  await f.work('begin_step',{key:'quality-0',stage:'quality'});
  await assert.rejects(f.work('finish_step',{key:'quality-0',stage:'quality',result:review(f.scenes,'pass',crypto.randomUUID())}),/QUALITY_INVALID/);
  await assert.rejects(f.work('finish_step',{key:'quality-0',stage:'quality',result:{...review(f.scenes,'pass',f.r),issues:[issue(f.scenes[0])]} }),/QUALITY_INVALID/);
+ await assert.rejects(f.work('finish_step',{key:'quality-0',stage:'quality',result:{...review(f.scenes,'pass',f.r),version:1}}),/QUALITY_INVALID/);
  await f.work('finish_step',{key:'quality-0',stage:'quality',result:review(f.scenes,'pass',f.r)});
  assert.equal((await f.work('complete',{key:'completed',renderId:f.r})).status,'succeeded');
 });
