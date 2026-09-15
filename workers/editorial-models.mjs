@@ -48,7 +48,9 @@ async function attemptCall({role,name,schema,system,context,images=[],usage,env,
    if(d.error||['response.failed','response.incomplete','error'].includes(d.type))providerError=true;
    if(deepseek){actual=d.model||actual;for(const c of d.choices||[]){finish=c.finish_reason||finish;textOut+=c.delta?.content||'';}}
    else if(d.type==='response.completed')response=d.response;
-  },2000000);
+  // Reasoning arrives in many small SSE envelopes. Transport bytes can exceed
+  // 2 MB well within the token cap; keep reading through the final usage event.
+  },32*1024*1024);
   call.returnedModel=deepseek?actual:response?.model;
   if(!call.usage)throw Error('EDITORIAL_USAGE_UNKNOWN');
   if(providerError||deepseek&&finish!=='stop'||!deepseek&&response?.status!=='completed')throw Error('EDITORIAL_RESPONSE_INCOMPLETE');

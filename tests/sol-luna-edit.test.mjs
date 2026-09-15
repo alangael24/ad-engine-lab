@@ -15,6 +15,17 @@ const edl={segments:[{source:'S01',in:0,out:2,frames:48,crop:1}],captions:true,c
 const plan={direction:'Clear movement, readable words.',scenes:[{source:'S01',direction:'Keep the moving pattern.'}],captions:true,captionColor:'white',hook:''};
 const pass={verdict:'pass',summary:'Revisado.',issues:[],coverage:['one']};
 const env={PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',OPENAI_API_KEY:'fixture-sol',REFERENCE_FLASH_KEY:'fixture-luna'};
+test('verbose DeepSeek transport reaches final usage without truncating a valid token-bounded response',async()=>{
+ const encoder=new TextEncoder(),reasoning=encoder.encode('data: '+JSON.stringify({model:'deepseek-flash',choices:[{delta:{reasoning_content:'thinking '.repeat(64)}}]})+'\n\n');
+ let n=0;const stream=new ReadableStream({pull(controller){
+  if(n++<5000)controller.enqueue(reasoning);
+  else{controller.enqueue(encoder.encode('data: '+JSON.stringify({model:'deepseek-flash',choices:[{delta:{content:'{"ok":true}'},finish_reason:'stop'}],usage:{prompt_tokens:100,completion_tokens:6000}})+'\n\ndata: [DONE]\n\n'));controller.close();}
+ }});
+ const usage={total:0,calls:[],unknown:false};
+ assert.ok(reasoning.length*5000>2000000);
+ const result=await editorialCall({role:'editor',name:'test',schema:{},system:'',context:{},usage,env:{OPENCODE_API_KEY:'fixture'},fetchImpl:async()=>new Response(stream)});
+ assert.deepEqual(result,{ok:true});assert.equal(usage.unknown,false);assert.equal(usage.calls[0].output,6000);assert.ok(usage.total>0);
+});
 test('picture EDL preserves exact scene duration and excludes overlapping footage',()=>{
  assert.deepEqual(validateSimpleEdit(edl,[scene],words),edl);
  assert.equal(simpleEditTimeline([scene],edl.segments)[0].end,2);

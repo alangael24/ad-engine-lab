@@ -11,6 +11,8 @@ import {fileURLToPath} from 'node:url';
 import {createProductionProviders} from './production-providers.mjs';
 import {productionApi} from './production-worker.mjs';
 import {studioApi} from './studio-worker.mjs';
+import {runtimeWorkerEnvironment} from './runtime-identity.mjs';
+Object.assign(process.env,runtimeWorkerEnvironment(process.env));
 await createProductionProviders(process.env).ready();
 productionApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.PRODUCTION_WORKER_TOKEN,workerId:process.env.PRODUCTION_WORKER_ID});
 studioApi({appUrl:process.env.CREATIVE_RUSH_URL,token:process.env.STUDIO_WORKER_TOKEN,workerId:process.env.STUDIO_WORKER_ID});
