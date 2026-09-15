@@ -40,6 +40,22 @@ After one successful clip, a second start after verified shutdown is needed to
 claim repeatability. A T2V inline-result smoke test does not validate I2V or the
 production signed-upload path.
 
+Do not submit a standalone smoke job to the production endpoint while its CPU
+idle controller owns lifecycle management: that controller only sees the
+application queue and can scale down an otherwise valid external probe. Prefer
+the normal application generation path. An operator-only release probe needs an
+exclusive, expiring maintenance lease under the existing dispatch lock, with no
+active application jobs, and must release it only after verified shutdown. Do
+not disable the idle controller globally. Record this intervention separately
+from an autonomous customer run.
+
+The 2026-09-15 isolated-release probe passed private HF range access and native
+image build, but did not reach inference. Runpod's Workers panel reported
+"There's no free GPU capacity for your current selection" in EU-RO-1 with only
+RTX 5090 allowed. A successful local preflight cannot establish host readiness
+or guarantee GPU capacity. No successful cold-start repeatability claim follows
+from that probe.
+
 - Image: build `.github/workflows/h3-serverless.yml`; deploy its immutable commit tag/digest from `ghcr.io/alangael24/creativerush-h3`.
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
 - Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled. New lifecycle limits: pending application queue **120 minutes**, provider preparation **45 minutes**, execution **20 minutes**, provider TTL **70 minutes**, reconciliation grace **2 minutes**. Preparation and execution are distinct. Restarting the coordinator does not reset these clocks. These are ceilings, not expected durations or a price guarantee.
