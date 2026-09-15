@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {recoveredStillApprovals} from '../src/recovered-still-approvals.js';
 import {measuredEditorialCost} from '../src/production-spend.js';
+test('server-held clip selections preserve approvals, while creative changes and unproven writes do not',()=>{
+ const {project,prior}=fixture(),current=structuredClone(project);
+ current.revision=9;current.data.scenes[0].selectedVersionId='clip';
+ const retry={id:'selected',user_id:'u',project_id:'p',status:'failed',expected_revision:9,snapshot:project,
+  steps:{prepare:{status:'done',result:{...project,revision:8}},'select-0':{status:'done',result:structuredClone(current)},
+   plan:{result:{scenes:[{id:'s'}]}},timing:{result:[{id:'s',planSceneId:'s'}]}}};
+ assert.equal(recoveredStillApprovals(current,[retry,prior]).s.productionId,'old');
+ for(const change of [p=>p.data.scenes[0].imageAssetId='new',p=>p.data.scenes[0].visual='new',p=>p.data.scriptDraft='new',p=>p.data.creativeMemory={preferences:['new']}]){
+  const changed=structuredClone(current);change(changed);
+  const attempt=structuredClone(retry);attempt.steps['select-0'].result=changed;
+  assert.deepEqual(recoveredStillApprovals(changed,[attempt,prior]),{});
+ }
+ const client=structuredClone(current);client.data.scenes[0].selectedVersionId='unproven';
+ assert.deepEqual(recoveredStillApprovals(client,[retry,prior]),{});
+ for(const key of ['random-write','select-foo']){
+  const attempt=structuredClone(retry);attempt.steps[key]=attempt.steps['select-0'];delete attempt.steps['select-0'];
+  assert.deepEqual(recoveredStillApprovals(current,[attempt,prior]),{});
+ }
+ const incomplete=structuredClone(retry);incomplete.steps['select-0'].status='started';
+ assert.deepEqual(recoveredStillApprovals(current,[incomplete,prior]),{});
+});
 function fixture(){
  const project={id:'p',user_id:'u',revision:7,brand_snapshot:{product:'shower'},data:{scriptDraft:'Hello',scenes:[{id:'s',imageAssetId:'corrected'}]}};
  const prior={id:'old',user_id:'u',project_id:'p',status:'failed',expected_revision:7,steps:{prepare:{status:'done',result:structuredClone(project)},plan:{result:{scenes:[{id:'plan-s'}]}},timing:{result:[{id:'s',planSceneId:'plan-s'}]},'still-check-0-0':{status:'done',result:{verdict:'repair',issues:[{}],assetIds:['wrong']}},'still-check-0-1':{status:'done',result:{verdict:'pass',issues:[],assetIds:['corrected']}}}};

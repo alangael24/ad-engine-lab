@@ -2,8 +2,9 @@
 // client creative-memory assertion as proof that a still passed review.
 const canonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const approvalDecision='Product, character and scene images approved before animation.';
-function retryData(data,ignoreObserved=false){
+function retryData(data,ignoreObserved=false,ignoreSelection=false){
  const copy=structuredClone(data);
+ if(ignoreSelection)for(const scene of copy?.scenes||[])delete scene.selectedVersionId;
  if(ignoreObserved&&copy?.creativeMemory)delete copy.creativeMemory.observedStates;
  if(copy?.creativeMemory?.decisions){let found=false;copy.creativeMemory.decisions=copy.creativeMemory.decisions.filter(d=>{if(d!==approvalDecision)return true;if(found)return false;found=true;return true;});}
  return canonical(copy);
@@ -12,8 +13,13 @@ export function recoveredStillApprovals(project,productions,visited=new Set()){
  for(const p of productions){
   if(visited.has(p.id))continue;
   if(p.user_id!==project.user_id||p.project_id!==project.id||p.status!=='failed'||p.expected_revision!==project.revision)continue;
-  const saved=p.steps?.prepare?.result;
-  if(p.steps?.prepare?.status!=='done'||saved?.revision!==project.revision||canonical(saved.data)!==canonical(project.data)||canonical(saved.brand_snapshot)!==canonical(project.brand_snapshot))continue;
+  // Selecting completed clips advances revision without changing the approved
+  // stills. Only an exact server-held prepare/select write can prove that state.
+  const write=Object.entries(p.steps||{}).find(([key,step])=>(key==='prepare'||/^select-\d+$/.test(key))
+   &&step.status==='done'&&step.result?.revision===project.revision
+   &&canonical(step.result.data)===canonical(project.data)&&canonical(step.result.brand_snapshot)===canonical(project.brand_snapshot));
+  if(!write)continue;
+  const saved=write[1].result,selected=write[0].startsWith('select-');
   const plan=p.steps?.plan?.result?.scenes,timing=p.steps?.timing?.result;
   if(!Array.isArray(plan)||!Array.isArray(timing))continue;
   const approvals={};
@@ -32,12 +38,12 @@ export function recoveredStillApprovals(project,productions,visited=new Set()){
   // approval note and report-backed observations, never changed creative input.
   const snapshot=p.snapshot;
   if(snapshot?.id===project.id&&snapshot.user_id===project.user_id&&snapshot.revision<project.revision
-   &&retryData(snapshot.data,true)===retryData(saved.data,true)&&canonical(snapshot.brand_snapshot)===canonical(saved.brand_snapshot)){
+   &&retryData(snapshot.data,true,selected)===retryData(saved.data,true,selected)&&canonical(snapshot.brand_snapshot)===canonical(saved.brand_snapshot)){
    const inherited=recoveredStillApprovals(snapshot,productions,new Set([...visited,p.id]));
    // Recovery rehydrates observations from immutable passing reports. Accept
    // that derived change only when every saved observation is report-backed.
    const observed=saved.data?.creativeMemory?.observedStates;
-   const backed=retryData(snapshot.data)===retryData(saved.data)||(Array.isArray(observed)&&observed.length>0
+   const backed=retryData(snapshot.data,false,selected)===retryData(saved.data,false,selected)||(Array.isArray(observed)&&observed.length>0
     &&observed.length===project.data.scenes.length&&new Set(observed.map(o=>o.sceneId)).size===observed.length
     &&observed.every(o=>inherited[o.sceneId]?.assetId===o.assetId
      &&inherited[o.sceneId].report.observedStates?.some(v=>canonical(v)===canonical(o))));

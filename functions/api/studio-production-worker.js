@@ -46,7 +46,7 @@ export async function onRequestPost(context){try{
    referenceEvidence=a.result?.visualEvidence||[];
    if(!referenceEvidence.length)throw Error('PRODUCTION_REFERENCE_REQUIRED');
   }
-  const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps,snapshot').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(10);
+  const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps,snapshot').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(100);
   if(prior.error)throw prior.error;
   // The worker replays the immutable input snapshot, not today's project.
   // Its own prepare/select writes advance the current revision; using that
