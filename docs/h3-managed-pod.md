@@ -35,3 +35,19 @@ The credentials and minute cron were connected and a five-second, 480p reference
 At the preparation deadline, the scheduled controller stopped and terminated the pod, verified absence, closed the durable run and disabled further rentals. The unstarted job was failed and its one credit refunded exactly once. The conservative ledger estimate was $0.122279, not a provider invoice. No pods or active queue jobs remained. This validates automatic rental and failed-start cleanup, **not successful automatic video delivery**.
 
 Compatibility fixes were required before rental: manual redirect handling on Cloudflare, explicit service User-Agent, synchronization of the generation credential, and handling a PostgreSQL empty composite as an absent run. Failed-start credit compensation was added during the attempt before closure; this was not a frozen-code acceptance run. The focused lifecycle suite now has ten passing tests.
+
+
+## Successful automatic queue acceptance — 2026-09-15
+
+Code `7f13173` and image `ghcr.io/alangael24/creativerush-h3-pod@sha256:0a75c7db66cd1d1877a135932b237b90e6defbc3ff0bd67131f1198927d0092b` completed a frozen one-clip run. The container now has an explicit Python ENTRYPOINT and authenticated stage telemetry; reported bootstrap errors trigger cleanup on the next controller tick. The previous failure had insufficient logs to establish its exact cause; this success establishes the corrected configuration, not a definitive root-cause diagnosis of that host.
+
+- Internal queue job: `5d581e63-be00-4b01-b1c3-3b9a550709dd`; managed run: `e798eaf6-3a66-41a4-bcc6-8718258d2a1d`.
+- Automatic 5090 allocation at $0.69/hour; startup and four-file preparation reached readiness in 172.638 seconds.
+- Queue claim through private upload/completion: 44.005 seconds. Order reservation through stored result: 257.140 seconds.
+- Downloaded through authenticated Supabase storage after completion: 531,878 bytes, H.264, 480x832, 24fps, 124 frames, 5.166667 seconds. Full FFmpeg decode passed.
+- No manual SSH, downloads, generation, process restart, job completion or GPU shutdown during the frozen run.
+- Independent cron stopped and terminated pod `1zzj06hzxftcsy`, verified absence and closed the run with reason `idle`. RunPod then returned zero pods.
+- Conservative lifecycle ledger estimate: $0.085614, including setup and idle time. Including the earlier failed attempt: $0.207893. These are estimates, not settled invoices. The successful job consumed one credit with no refund.
+- Paid admission was disabled after automatic closure to prevent unrequested subsequent rentals. No active GPU or stopped volume remains.
+
+The focused lifecycle suite has 11 passing tests. This validates automatic **clip** delivery through the production queue, not the full customer-browser ad workflow, visual quality across products, or reliability over consecutive cold starts. Artifact and deployment receipts are saved locally under `outputs/h3-pod-lifecycle-0915/automatic-acceptance.json`.
