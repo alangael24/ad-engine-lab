@@ -48,7 +48,11 @@ export async function onRequestPost(context){try{
   }
   const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps,snapshot').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(10);
   if(prior.error)throw prior.error;
-  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(project,prior.data||[])}});
+  // The worker replays the immutable input snapshot, not today's project.
+  // Its own prepare/select writes advance the current revision; using that
+  // revision here loses inherited approvals after a coordinator restart.
+  // The heartbeat above still fences user edits and obsolete leases.
+  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(j.snapshot,prior.data||[])}});
  }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);

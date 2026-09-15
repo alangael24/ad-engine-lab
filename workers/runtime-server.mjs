@@ -26,7 +26,8 @@ const server=createServer((req,res)=>{if(req.url!=='/health'||req.method!=='GET'
 function shutdown(code){if(stopping)return;stopping=true;server.close();for(const child of children)child.kill('SIGTERM');const deadline=setTimeout(()=>process.exit(code),25000);deadline.unref();if(!children.size)process.exit(code);}
 for(const file of processes){
  const child=spawn(process.execPath,['--max-old-space-size=512',fileURLToPath(new URL(file,import.meta.url))],{stdio:'inherit'});children.add(child);
- child.on('error',()=>shutdown(1));child.on('exit',()=>{children.delete(child);if(stopping){if(!children.size)process.exit(0);}else shutdown(1);});
+ child.on('error',error=>{console.error(JSON.stringify({event:'runtime_child_error',file,code:error.code||'UNKNOWN'}));shutdown(1);});
+ child.on('exit',(code,signal)=>{console.log(JSON.stringify({event:'runtime_child_exit',file,code,signal,stopping}));children.delete(child);if(stopping){if(!children.size)process.exit(0);}else shutdown(1);});
 }
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>shutdown(0));
 server.listen(Number(process.env.PORT||10000),'0.0.0.0');

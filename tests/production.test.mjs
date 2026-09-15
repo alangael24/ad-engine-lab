@@ -127,6 +127,31 @@ test('production preflight blocks disabled or stale clip coordinators before pai
  }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
 });
 
+test('resumed coordinator retains inherited still approvals after its own prepare write',async()=>{
+ const f=await fixture();await ready(db);
+ const claim=async(id)=>{let j;do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==id);return j;};
+ const old=await claim((await start(f)).id),scene={id:crypto.randomUUID(),text:'Hola mundo. Conoce el producto.',visual:'Full filter',motion:'Flowing water',start:0,end:5,imageAssetId:f.p.brand_snapshot.productAssetId};
+ const saved=await work(old,'write',{key:'prepare',stage:'images',action:'save_project',data:{...f.p.data,scenes:[scene]}});
+ const steps={plan:{status:'done',result:{scenes:[scene]}},timing:{status:'done',result:[{id:scene.id,planSceneId:scene.id}]},'still-check-0-0':{status:'done',result:{verdict:'pass',issues:[],assetIds:[scene.imageAssetId]}}};
+ await db.query('update studio_productions set steps=steps||$2::jsonb where id=$1',[old.id,JSON.stringify(steps)]);
+ await work(old,'fail',{code:'TEST_RESTART'});
+ f.p=(await db.query('select * from studio_projects where id=$1',[f.p.id])).rows[0];
+ const j=await claim((await start(f)).id),stub=mockSupabase(db),network=globalThis.fetch;
+ globalThis.fetch=stub.fetch;
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true'};
+ const context=()=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'creative_context'})})});
+ try{
+  for(let n=0;n<2;n++){
+   const r=await context();assert.equal(r.status,200,await r.clone().text());
+   assert.equal((await r.json()).value.recoveredStillApprovals[scene.id]?.assetId,scene.imageAssetId);
+   if(!n)await work(j,'write',{key:'prepare',stage:'images',action:'save_project',data:f.p.data});
+  }
+  const current=(await db.query('select * from studio_projects where id=$1',[f.p.id])).rows[0];
+  await f.write('save_project',f.p.id,{...current.data,scriptDraft:'Changed by customer'},current.revision);
+  assert.notEqual((await context()).status,200);
+ }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
+});
+
 test('chat approval creates one production atomically and duplicate completion reuses it',async()=>{
  const f=await fixture(),id=crypto.randomUUID(),payload={expected:f.p.revision,message:'Me gusta, haz el video',enabled:true};
  await call(db,'studio_chat_write',[f.u.id,'reserve',id,f.p.id,JSON.stringify(payload)]);
