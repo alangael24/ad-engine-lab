@@ -4,6 +4,42 @@ CreativeRush's CPU host runs `h3-worker.mjs` when `H3_SERVERLESS_ENDPOINT_ID` is
 
 ## Deployment settings
 
+### Separate CPU and GPU releases (2026-09-15)
+
+The native Runpod GitHub builder for endpoint `21qymzqesukalm` now follows
+`h3-runtime-release`, not `main`. This branch starts at the validated GPU source
+`903a066e689a2e9dbd7b808b5bb67f5a51c92644`. CPU/web changes on `main` must not advance
+this branch. Advance the GPU branch deliberately only after reviewing the H3
+changes, while workers min/max are both zero. Wait for the native build to finish
+and verify its release/image before submitting a job. Changing the branch itself
+also starts a build. The existing GitHub Actions workflow remains manual.
+
+Read-only model access preflight (no GPU or full weight download):
+
+```sh
+python scripts/preflight-h3-cache.py \
+  --repo alan2410/creativerush-h3-fl2v-turbo8 \
+  --revision aa560098737677b0862278c8c99f75edf218288c \
+  --report /tmp/h3-cache-preflight.json
+```
+
+Provide the scoped read token through `HF_TOKEN` or the local macOS
+`--keychain-service` option. This checks pinned metadata, all four published
+hashes/sizes and authenticated one-byte range access. It does **not** recompute
+the full file hashes or establish Runpod-host connectivity/cache readiness.
+No raw credentials, signed URLs or provider exception bodies appear in reports.
+
+A release validation must distinguish image download, host model assignment,
+GPU allocation, handler startup and actual inference. `THROTTLED` or the last
+line "initializing model files" alone does not prove a broken model or three
+billable GPUs. Use host model-assignment diagnostics when available and retain
+unknown states explicitly. The watchdog must read actual workers and provider
+queue, cancel the known job at its absolute deadline, scale min/max to zero and
+verify shutdown before finishing. Never reset the deadline after region changes.
+After one successful clip, a second start after verified shutdown is needed to
+claim repeatability. A T2V inline-result smoke test does not validate I2V or the
+production signed-upload path.
+
 - Image: build `.github/workflows/h3-serverless.yml`; deploy its immutable commit tag/digest from `ghcr.io/alangael24/creativerush-h3`.
 - Queue endpoint; one RTX 5090 (`ADA_32_PRO`), CUDA 13.0 or newer.
 - Minimum workers **0**, maximum **1**, idle timeout **60 seconds**, execution timeout **1200 seconds**, queue-delay scaling 4 seconds, FlashBoot enabled. New lifecycle limits: pending application queue **120 minutes**, provider preparation **45 minutes**, execution **20 minutes**, provider TTL **70 minutes**, reconciliation grace **2 minutes**. Preparation and execution are distinct. Restarting the coordinator does not reset these clocks. These are ceilings, not expected durations or a price guarantee.
