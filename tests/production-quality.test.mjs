@@ -81,6 +81,10 @@ test('retry with server-verified still approvals generates clips without repeati
  f.job.snapshot.data.videoContinuity='Approved direction. '.repeat(95);
  f.job.snapshot.data.referenceNotes='Reference context. '.repeat(60);
  for(const s of f.job.snapshot.data.scenes)s.selectedVersionId=null;
+ const api=f.api;
+ f.api=(action,body)=>action==='begin_step'&&body.data.key==='plan'
+  ? {value:{status:'done',result:{continuity:'Old duplicated direction. '.repeat(100),scenes:structuredClone(f.job.snapshot.data.scenes)}}}
+  : api(action,body);
  f.providers.context=async()=>({recoveredStillApprovals:Object.fromEntries(f.job.snapshot.data.scenes.map(s=>[s.id,{assetId:s.imageAssetId,report:{verdict:'pass',issues:[],observedStates:[]}}]))});
  f.providers.reviewImage=async()=>{throw Error('Unexpected paid still review');};
  f.providers.reviewImages=async()=>{throw Error('Unexpected paid batch review');};

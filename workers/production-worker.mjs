@@ -32,6 +32,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    continuity:project.data.videoContinuity||'Preserve the existing product, characters, setting and visual style.',
    scenes:existing.map(s=>({...s,motion:s.motion||'Follow the approved scene direction; preserve continuity.'}))
   }:await (async()=>{const raw=await providers.plan(project,invoke);return {...validatePlan(raw,project.data.scriptDraft),providerUsage:raw.providerUsage||null};})());
+  // A retry may replay an older cached plan created before this normalization.
+  if(revision)plan.continuity=project.data.videoContinuity||'Preserve the existing product, characters, setting and visual style.';
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:project.data.narrationRevision?await patchNarration(project,plan,providers,invoke,once,job.id):await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
   const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):narration.timeline||alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));

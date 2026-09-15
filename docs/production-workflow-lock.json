@@ -97,7 +97,7 @@
     "workers/narration-revision.mjs": "dc48cc7518fba393ef34f8f971c55a28a8f28b90ca463857ba8232a144ffc786",
     "workers/production-providers.mjs": "529b2f54a6126f045add049a1bc22ade63561d7d904628fdabc2bd146ad82f78",
     "workers/production-quality.mjs": "079a2b8314d28c1e73ada44b8edbd8a16d8376f15438d83a6ed13ce86e7368d2",
-    "workers/production-worker.mjs": "5850e896a7b8b22e6fecfb2523a497c8c8af491cdcf4fb2cbcdde09dfad6aaa7",
+    "workers/production-worker.mjs": "6e527321bc517a5740d66f035478d7bdb681fcdfb66c9a8da00da2aee92ecd48",
     "workers/recoverable-speech.mjs": "5b1bd90cc069114dc80baa397b87d6d872e343182fbec004ab89f2a66a4e21ad",
     "workers/runtime-server.mjs": "8dfca646b33912b2325fd3c798053387a88d73ef4d445df07be98d7e56593f61",
     "workers/serverless/Dockerfile": "cb6f10fb2c9cf5774a5b8584ea5b919f68a498cd803e259a14d978f70a481e9f",
