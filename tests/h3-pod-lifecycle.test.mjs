@@ -94,3 +94,25 @@ test('redirect responses fail closed without forwarding credentials',async()=>{
  }}),/POD_STATE_UNAVAILABLE/);
  assert.equal(calls,1);
 });
+test('failed startup refunds unsubmitted credits only after verified closure',async()=>{
+ const fresh=await database();
+ try{
+  for(const file of ['20260915073916_managed_h3_pod_lifecycle.sql','20260915081955_managed_pod_failed_start_refunds.sql'])
+   await fresh.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+  const u=await user(fresh);await ready(fresh);const job=await reserve(fresh,u);
+  const balance=async()=>Number((await fresh.query('select video_credits from credit_balances where user_id=$1',[u.id])).rows[0].video_credits);
+  const charged=await balance();
+  await fresh.exec('update h3_pod_control set enabled=true,total_limit_microusd=500000');
+  const s=await call(fresh,'h3_pod_work',['refund-test','acquire']);
+  await call(fresh,'h3_pod_work',['refund-test','begin',s.token]);
+  await call(fresh,'h3_pod_work',['refund-test','attach',s.token,{podId:'abcdefgh'}]);
+  await call(fresh,'h3_pod_work',['refund-test','drain',s.token,{reason:'startup_failed'}]);
+  assert.equal(await balance(),charged);
+  await call(fresh,'h3_pod_work',['refund-test','close',s.token]);
+  assert.equal(await balance(),charged+job.credit_cost);
+  const row=(await fresh.query('select status,error_code from generation_jobs where id=$1',[job.id])).rows[0];
+  assert.deepEqual(row,{status:'failed',error_code:'H3_STARTUP_FAILED'});
+  await assert.rejects(call(fresh,'h3_pod_work',['refund-test','close',s.token]),/POD_SHUTDOWN_UNCONFIRMED/);
+  assert.equal(await balance(),charged+job.credit_cost);
+ }finally{await fresh.close();}
+});
