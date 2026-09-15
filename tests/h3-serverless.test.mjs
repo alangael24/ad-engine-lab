@@ -37,6 +37,38 @@ test('lost submit response is not retried or completed',async()=>{
  await processJob(job,async action=>{actions.push(action);return {uploadUrl};},a);
  assert.equal(submitted,1);assert.equal(actions.at(-1),'recover');assert.ok(!actions.includes('complete'));
 });
+test('runtime activation propagation retries only explicit non-acceptance',async()=>{
+ let calls=0;const sleeps=[],bodies=[];
+ const a=new H3ServerlessAdapter({endpointId,apiKey:'test-only',clock:{sleep:async ms=>sleeps.push(ms)},fetchImpl:async(url,opts)=>{
+  bodies.push(opts.body);assert.ok(url.endsWith('/run'));
+  if(++calls<3)return Response.json({code:'ENDPOINT_PAUSED'},{status:409});
+  return Response.json({id:'after-activation-u1'});
+ }});
+ assert.equal(await a.submit({job,uploadUrl}),`rp:${endpointId}:after-activation-u1`);
+ assert.equal(calls,3);assert.deepEqual(sleeps,[5000,5000]);assert.equal(new Set(bodies).size,1);
+});
+test('paused-endpoint retry is bounded and does not enable compute',async()=>{
+ let calls=0;const sleeps=[];
+ const a=new H3ServerlessAdapter({endpointId,apiKey:'test-only',clock:{sleep:async ms=>sleeps.push(ms)},fetchImpl:async url=>{
+  assert.ok(url.endsWith('/run'));calls++;return Response.json({code:'ENDPOINT_PAUSED'},{status:409});
+ }});
+ await assert.rejects(()=>a.submit({job,uploadUrl}),/UNAVAILABLE/);
+ assert.equal(calls,4);assert.deepEqual(sleeps,[5000,5000,5000]);
+});
+test('activation retries stop when the submitting worker loses its lease',async()=>{
+ let calls=0,leaseLost=false;
+ const a=new H3ServerlessAdapter({endpointId,apiKey:'test-only',clock:{sleep:async()=>{leaseLost=true;}},fetchImpl:async()=>{
+  calls++;return Response.json({code:'ENDPOINT_PAUSED'},{status:409});
+ }});
+ await assert.rejects(()=>a.submit({job,uploadUrl},job.id,{assertLease:()=>{if(leaseLost)throw Error('LEASE_LOST');}}),/LEASE_LOST/);
+ assert.equal(calls,1);
+});
+test('ambiguous, unauthorized and malformed submit rejections are never retried',async()=>{
+ for(const [status,body] of [[409,{code:'CONFLICT'}],[409,null],[500,{code:'ENDPOINT_PAUSED'}],[401,{code:'ENDPOINT_PAUSED'}]]){
+  let calls=0;const a=make(async()=>{calls++;return body===null?new Response('not JSON',{status}):Response.json(body,{status});});
+  await assert.rejects(()=>a.submit({job,uploadUrl}),/UNAVAILABLE/);assert.equal(calls,1);
+ }
+});
 test('timed out or wrong-job output is cancelled and never completed',async()=>{
  for(const status of [{status:'TIMED_OUT'},{status:'COMPLETED',output:{...result,jobId:crypto.randomUUID()}}]){
   const urls=[],actions=[];let cancelled=false;const a=make(async url=>{urls.push(url);if(url.includes('/cancel/'))cancelled=true;return Response.json(cancelled?{status:'CANCELLED'}:status);});

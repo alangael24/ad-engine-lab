@@ -12,7 +12,11 @@ export class H3ServerlessAdapter {
       headers:{authorization:`Bearer ${this.key}`,'content-type':'application/json'},
       redirect:'error',signal:AbortSignal.timeout(25000),
     });
-    if(!response.ok)throw Object.assign(Error('H3_SERVERLESS_UNAVAILABLE'),{httpStatus:response.status,retryable:response.status!==404});
+    if(!response.ok){
+      const detail=await response.json().catch(()=>null);
+      throw Object.assign(Error('H3_SERVERLESS_UNAVAILABLE'),{httpStatus:response.status,
+        providerCode:detail?.code,retryable:response.status!==404});
+    }
     return response.json();
   }
   async ready(){
@@ -26,9 +30,21 @@ export class H3ServerlessAdapter {
     return {job:{id:job.id,prompt:job.prompt,durationSeconds:job.durationSeconds,
       resolution:job.resolution,aspectRatio:job.aspectRatio,referenceUrl:job.referenceUrl||null},uploadUrl};
   }
-  async submit(input) {
-    // Never retry POST /run: a lost acknowledgement is not proof of rejection.
-    const response=await this.request('run',{input,policy:{executionTimeout:H3_LIMITS.executionMs,ttl:H3_LIMITS.providerTtlMs}});
+  async submit(input,_jobId,{assertLease=()=>{}}={}) {
+    // Only an explicit paused-endpoint rejection proves no job was accepted.
+    // Control-plane activation can precede runtime propagation by a few seconds.
+    // Never retry a lost acknowledgement, generic 409, timeout or 5xx response.
+    let response;
+    for(let attempt=0;attempt<4;attempt++){
+      assertLease();
+      try{
+        response=await this.request('run',{input,policy:{executionTimeout:H3_LIMITS.executionMs,ttl:H3_LIMITS.providerTtlMs}});
+        break;
+      }catch(error){
+        if(error.httpStatus!==409||error.providerCode!=='ENDPOINT_PAUSED'||attempt===3)throw error;
+        await this.clock.sleep(5000);
+      }
+    }
     if(!/^[a-zA-Z0-9_-]{1,100}$/.test(response.id||''))throw Error('H3_SERVERLESS_INVALID_ID');
     return `rp:${this.endpointId}:${response.id}`;
   }

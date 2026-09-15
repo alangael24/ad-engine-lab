@@ -63,7 +63,7 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
       const target = adapter.directUpload ? await api('upload', identity) : {};
       const workflow = await adapter.build(job, target); assertLease();
       await api('heartbeat', { ...identity, submissionStarted:true });
-      try { promptId = await adapter.submit(workflow, job.id); }
+      try { promptId = await adapter.submit(workflow, job.id, {assertLease}); }
       catch { promptId = await adapter.findSubmission(job.id); if (!promptId) throw Object.assign(new Error('AMBIGUOUS_SUBMISSION'),{retryable:serverless}); }
     }
     await checkpoint({ ...identity, providerPromptId:promptId });

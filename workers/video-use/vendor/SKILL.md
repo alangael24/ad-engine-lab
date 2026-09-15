@@ -320,3 +320,7 @@ Things that consistently fail regardless of style:
 - **Editing before confirming the strategy.** Never.
 - **Re-transcribing cached sources.** Immutable outputs of immutable inputs.
 - **Assuming what kind of video it is.** Look first, ask second, edit last.
+
+## Reusable speech procedures
+
+For dynamic subtitles or removing pauses/repeated takes, read `SPEECH-PROCEDURES.md` and use `helpers/speech_edit.py`. These procedures add measured caption layout, word highlighting, safe cut planning and explicit repetition candidates; do not invent word timings or silently remove intentional repetition. The production adapter exposes a dedicated cleanup tool and measures encoded segment durations before caption generation.

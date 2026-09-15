@@ -1,0 +1,14 @@
+import {readFile,writeFile,copyFile,access,realpath} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const target=process.argv[2];
+if(!target)throw Error('Usage: node scripts/sync-video-use-speech.mjs /path/to/video-use');
+const root=await realpath(target),vendor=fileURLToPath(new URL('../workers/video-use/vendor/',import.meta.url));
+await access(resolve(root,'helpers/grade.py'));
+const skillPath=resolve(root,'SKILL.md'),skill=await readFile(skillPath,'utf8');
+if(!skill.includes('name: video-use'))throw Error('Target is not the video-use skill');
+await copyFile(resolve(vendor,'helpers/speech_edit.py'),resolve(root,'helpers/speech_edit.py'));
+await copyFile(resolve(vendor,'helpers/render.py'),resolve(root,'helpers/speech_render.py'));
+await copyFile(resolve(vendor,'SPEECH-PROCEDURES.md'),resolve(root,'SPEECH-PROCEDURES.md'));
+if(!skill.includes('## Reusable speech procedures'))await writeFile(skillPath,skill+'\n## Reusable speech procedures\n\nFor dynamic subtitles or removing pauses/repeated takes, read `SPEECH-PROCEDURES.md`. Use `helpers/speech_edit.py` for planning and `helpers/speech_render.py` for measured rendering. Preserve intentional repetition and inspect actual output.\n');
+console.log('Installed speech procedures and measured renderer; legacy render.py unchanged.');

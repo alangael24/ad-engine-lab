@@ -602,8 +602,11 @@ def build_final_composite(
     # Subtitles LAST — Rule 1
     if has_subs:
         subs_abs = str(subtitles_path.resolve()).replace(":", r"\:").replace("'", r"\'")
+        # ASS carries measured canvas geometry and per-word colors. Do not replace
+        # these with the legacy SRT style (which uses different script coordinates).
+        style = "" if subtitles_path.suffix.lower() == '.ass' else f":force_style='{subtitle_style or SUB_FORCE_STYLE}'"
         filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{subtitle_style or SUB_FORCE_STYLE}'[outv]"
+            f"{current}subtitles='{subs_abs}'{style}[outv]"
         )
         out_label = "[outv]"
     else:
@@ -697,8 +700,13 @@ def main() -> None:
     subs_path: Path | None = None
     if not args.no_subtitles:
         if args.build_subtitles:
-            subs_path = edit_dir / "master.srt"
-            build_master_srt(edl, edit_dir, subs_path)
+            if edl.get('dynamic_captions') is not None:
+                from speech_edit import build_dynamic_ass
+                subs_path = edit_dir / 'master.ass'
+                build_dynamic_ass(edl, edit_dir, subs_path)
+            else:
+                subs_path = edit_dir / "master.srt"
+                build_master_srt(edl, edit_dir, subs_path)
         elif edl.get("subtitles"):
             subs_path = resolve_path(edl["subtitles"], edit_dir)
             if not subs_path.exists():
