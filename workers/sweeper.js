@@ -5,7 +5,7 @@ export default {
     context.waitUntil((async () => {
       if (!env.CREATIVE_RUSH_URL?.startsWith('https://') || !env.GENERATION_WORKER_TOKEN) throw new Error('Missing sweeper configuration');
       const response = await fetch(`${env.CREATIVE_RUSH_URL.replace(/\/$/,'')}/api/worker`, {
-        method:'POST', headers:{ 'content-type':'application/json', authorization:`Bearer ${env.GENERATION_WORKER_TOKEN}` },
+        method:'POST', headers:{ 'content-type':'application/json', authorization:`Bearer ${env.GENERATION_WORKER_TOKEN}`, 'user-agent':'CreativeRush-Worker/1.0' },
         body:JSON.stringify({ action:'sweep' }), signal:AbortSignal.timeout(25000),
       }).catch(()=>({ok:false}));
       if (!response.ok) console.error('Generation reconciliation failed');

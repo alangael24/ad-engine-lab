@@ -7,7 +7,7 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   ||!/^ghcr\.io\/alangael24\/creativerush-h3-pod@sha256:[a-f0-9]{64}$/.test(env.H3_POD_IMAGE||''))throw Error('POD_CONFIG');
  const owner='podctl_'+crypto.randomUUID();let token;
  const state=async(action,data={})=>{
-   const r=await fetchImpl(origin.origin+'/api/gpu-pod',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({owner,action,token,data}),redirect:'manual',signal:AbortSignal.timeout(20000)});
+   const r=await fetchImpl(origin.origin+'/api/gpu-pod',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json','user-agent':'CreativeRush-Worker/1.0'},body:JSON.stringify({owner,action,token,data}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(!r.ok)throw Error('POD_STATE_UNAVAILABLE');return r.json();
  };
  const control=async(path,method='GET',body)=>{

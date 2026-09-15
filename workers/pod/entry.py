@@ -23,7 +23,7 @@ try:
             urllib.request.urlopen('http://127.0.0.1:8188/system_stats',timeout=2).close();break
         except OSError:time.sleep(2)
     else:raise RuntimeError('COMFY_NOT_READY')
-    req=urllib.request.Request(os.environ['CREATIVE_RUSH_URL']+'/api/gpu-pod',data=json.dumps({'action':'ready','runId':os.environ['H3_POD_RUN_ID'],'workerId':os.environ['H3_WORKER_ID']}).encode(),headers={'Authorization':'Bearer '+os.environ['GENERATION_WORKER_TOKEN'],'Content-Type':'application/json'})
+    req=urllib.request.Request(os.environ['CREATIVE_RUSH_URL']+'/api/gpu-pod',data=json.dumps({'action':'ready','runId':os.environ['H3_POD_RUN_ID'],'workerId':os.environ['H3_WORKER_ID']}).encode(),headers={'Authorization':'Bearer '+os.environ['GENERATION_WORKER_TOKEN'],'Content-Type':'application/json','User-Agent':'CreativeRush-Worker/1.0'})
     urllib.request.urlopen(req,timeout=25).close()
     worker=subprocess.Popen(['node','workers/h3-worker.mjs'],cwd='/opt/creativerush')
     while comfy.poll() is None and worker.poll() is None:time.sleep(2)
