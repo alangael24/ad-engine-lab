@@ -2,8 +2,9 @@
 // client creative-memory assertion as proof that a still passed review.
 const canonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const approvalDecision='Product, character and scene images approved before animation.';
-function retryData(data){
+function retryData(data,ignoreObserved=false){
  const copy=structuredClone(data);
+ if(ignoreObserved&&copy?.creativeMemory)delete copy.creativeMemory.observedStates;
  if(copy?.creativeMemory?.decisions){let found=false;copy.creativeMemory.decisions=copy.creativeMemory.decisions.filter(d=>{if(d!==approvalDecision)return true;if(found)return false;found=true;return true;});}
  return canonical(copy);
 }
@@ -27,13 +28,20 @@ export function recoveredStillApprovals(project,productions,visited=new Set()){
    }
   }
   // A failed retry may have saved the unchanged project after restoring these
-  // approvals. Follow only its server-held, older snapshot; ignore solely a
-  // duplicate system approval note, never changed preferences or scene content.
+  // approvals. Follow only its server-held, older snapshot; allow a duplicate
+  // approval note and report-backed observations, never changed creative input.
   const snapshot=p.snapshot;
   if(snapshot?.id===project.id&&snapshot.user_id===project.user_id&&snapshot.revision<project.revision
-   &&retryData(snapshot.data)===retryData(saved.data)&&canonical(snapshot.brand_snapshot)===canonical(saved.brand_snapshot)){
+   &&retryData(snapshot.data,true)===retryData(saved.data,true)&&canonical(snapshot.brand_snapshot)===canonical(saved.brand_snapshot)){
    const inherited=recoveredStillApprovals(snapshot,productions,new Set([...visited,p.id]));
-   for(const scene of project.data.scenes||[])if(!approvals[scene.id]&&inherited[scene.id]?.assetId===scene.imageAssetId)approvals[scene.id]=inherited[scene.id];
+   // Recovery rehydrates observations from immutable passing reports. Accept
+   // that derived change only when every saved observation is report-backed.
+   const observed=saved.data?.creativeMemory?.observedStates;
+   const backed=retryData(snapshot.data)===retryData(saved.data)||(Array.isArray(observed)&&observed.length>0
+    &&observed.length===project.data.scenes.length&&new Set(observed.map(o=>o.sceneId)).size===observed.length
+    &&observed.every(o=>inherited[o.sceneId]?.assetId===o.assetId
+     &&inherited[o.sceneId].report.observedStates?.some(v=>canonical(v)===canonical(o))));
+   if(backed)for(const scene of project.data.scenes||[])if(!approvals[scene.id]&&inherited[scene.id]?.assetId===scene.imageAssetId)approvals[scene.id]=inherited[scene.id];
   }
   if(Object.keys(approvals).length)return approvals;
  }

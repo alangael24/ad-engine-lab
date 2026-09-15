@@ -11,6 +11,23 @@ test('exact unchanged retry reuses the approved repaired image, never the reject
  const {project,prior}=fixture();assert.equal(recoveredStillApprovals(project,[prior]).s.assetId,'corrected');
  assert.equal(recoveredStillApprovals(project,[prior]).s.productionId,'old');
 });
+test('rehydrated observations must exactly match inherited passing reports',()=>{
+ const {project,prior}=fixture();
+ const observed={sceneId:'s',assetId:'corrected',summary:'Right hand lowered.'};
+ prior.steps['still-check-0-1'].result.observedStates=[observed];
+ const current=structuredClone(project);current.revision=8;
+ current.data.creativeMemory={observedStates:[observed]};
+ project.data.creativeMemory={observedStates:[{...observed,summary:'Older approved wording.'}]};
+ prior.steps.prepare.result=structuredClone(project);
+ const retry={id:'retry',user_id:'u',project_id:'p',status:'failed',expected_revision:8,snapshot:project,
+  steps:{prepare:{status:'done',result:current},plan:{result:{scenes:[{id:'s'}]}},timing:{result:[{id:'s',planSceneId:'s'}]}}};
+ assert.equal(recoveredStillApprovals(current,[retry,prior]).s.productionId,'old');
+ for(const observations of [[{...observed,summary:'Unverified new state.'}],[{...observed,assetId:'other'}],[],[observed,observed]]){
+  const changed=structuredClone(current);changed.data.creativeMemory.observedStates=observations;
+  const attempt=structuredClone(retry);attempt.steps.prepare.result=changed;
+  assert.deepEqual(recoveredStillApprovals(changed,[attempt,prior]),{});
+ }
+});
 test('editing settles only a reconciled complete usage record; unknown or inconsistent calls retain their reservation',()=>{
  const usage={unknown:false,total:.25,calls:[{status:'completed',cost:.1},{status:'failed',cost:.15}]};
  assert.equal(measuredEditorialCost(usage),.25);
