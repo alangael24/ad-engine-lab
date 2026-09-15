@@ -27,3 +27,11 @@ The controller persists after deploy/restart and does not depend on an LLM. The 
 ## Validation
 
 `node --test tests/h3-pod-lifecycle.test.mjs` exercises PostgreSQL locking/admission, budget reservations, permission boundaries, lost-create recovery, tariff refusal, startup failure, busy-budget cutoff and verified cleanup with simulated RunPod responses. The previous live two-clip lifecycle run validated the base GPU image and four weights; the new production entrypoint needs its own live queued-clip acceptance test. Keep these distinct from full-ad autonomy or aesthetic QA.
+
+## Live production queue attempt — 2026-09-15
+
+The credentials and minute cron were connected and a five-second, 480p reference-image job was reserved through the existing queue RPC using an internal test account. Cloudflare automatically created pod `4p610upqwt1vt0` at $0.69/hour. H3 never reached readiness; RunPod returned null runtime and the log service failed, so this does not establish whether image pulling or bootstrap was responsible. No clip was produced.
+
+At the preparation deadline, the scheduled controller stopped and terminated the pod, verified absence, closed the durable run and disabled further rentals. The unstarted job was failed and its one credit refunded exactly once. The conservative ledger estimate was $0.122279, not a provider invoice. No pods or active queue jobs remained. This validates automatic rental and failed-start cleanup, **not successful automatic video delivery**.
+
+Compatibility fixes were required before rental: manual redirect handling on Cloudflare, explicit service User-Agent, synchronization of the generation credential, and handling a PostgreSQL empty composite as an absent run. Failed-start credit compensation was added during the attempt before closure; this was not a frozen-code acceptance run. The focused lifecycle suite now has ten passing tests.
