@@ -31,7 +31,9 @@ export async function onRequestPost(context) {
     }
     if (body.action === 'claim') {
       await rpc(db, 'sweep_generations');
-      const serverless=body.backend==='serverless',enabled=context.env.GENERATION_ENABLED==='true';
+      const serverless=body.backend==='serverless';
+      if(context.env.H3_BACKEND==='pod'&&serverless)return json({job:null,paused:true});
+      const enabled=context.env.GENERATION_ENABLED==='true';
       if (!enabled && !serverless) return json({ job: null, paused: true });
       const job = await rpc(db, serverless?'claim_serverless_generation':'claim_generation',
         {p_worker_id:body.workerId,...(serverless?{p_allow_new:enabled&&body.recoverOnly!==true}:{})});
