@@ -76,6 +76,16 @@ test('blocked first still prevents generating the second and submitting H3',asyn
  const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
  assert.equal(result.code,'PRODUCTION_IMAGES_BLOCKED');assert.equal(f.counts.images,1);assert.equal(f.counts.clips,0);assert.equal(f.counts.complete,0);
 });
+test('retry with server-verified still approvals generates clips without repeating image calls or reviews',async()=>{
+ const f=pipelineFixture();
+ for(const s of f.job.snapshot.data.scenes)s.selectedVersionId=null;
+ f.providers.context=async()=>({recoveredStillApprovals:Object.fromEntries(f.job.snapshot.data.scenes.map(s=>[s.id,{assetId:s.imageAssetId,report:{verdict:'pass',issues:[],observedStates:[]}}]))});
+ f.providers.reviewImage=async()=>{throw Error('Unexpected paid still review');};
+ f.providers.reviewImages=async()=>{throw Error('Unexpected paid batch review');};
+ f.providers.review=async({renderId})=>review(f.state.project.data.scenes,'pass',renderId);
+ const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(r.ok,true);assert.equal(f.counts.images,0);assert.equal(f.counts.clips,2);assert.equal(f.counts.complete,1);
+});
 test('production repairs one scene, rerenders and only completes after the new render passes',async()=>{
  const f=pipelineFixture(),result=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(result.ok,true);assert.equal(f.counts.complete,1);assert.equal(f.counts.reviews,2);assert.equal(f.counts.images,1);assert.equal(f.counts.clips,1);assert.equal(f.state.renders.length,2);assert.equal(result.renderId,f.state.renders[1].id);
  assert.deepEqual(Object.fromEntries(Object.entries(f.state.project.data.scenes[1]).filter(([k])=>k!=='planSceneId')),f.job.snapshot.data.scenes[1]);assert.equal(f.state.project.data.narrationAssetId,'voice');

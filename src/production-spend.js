@@ -12,3 +12,10 @@ export function measuredStepCost(result){
  const cost=result?.providerUsage?.cost??result?.usage?.costUsd??result?.costUsd;
  return Number.isFinite(cost)&&cost>=0?cost:null;
 }
+
+export function measuredEditorialCost(usage){
+ if(usage?.unknown!==false||!Array.isArray(usage.calls)||!Number.isFinite(usage.total)||usage.total<0)return null;
+ if(usage.calls.some(c=>!Number.isFinite(c.cost)||c.cost<0||c.status==='started'))return null;
+ const sum=usage.calls.reduce((n,c)=>n+c.cost,0);
+ return Math.abs(sum-usage.total)<0.000001?sum:null;
+}

@@ -1,4 +1,5 @@
 import {paidStep,measuredStepCost} from '../../src/production-spend.js';
+import {recoveredStillApprovals} from '../../src/recovered-still-approvals.js';
 import {narrationAlignment,approvedBase} from '../../src/partial-edit.js';
 import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
@@ -45,7 +46,9 @@ export async function onRequestPost(context){try{
    referenceEvidence=a.result?.visualEvidence||[];
    if(!referenceEvidence.length)throw Error('PRODUCTION_REFERENCE_REQUIRED');
   }
-  return json({value:{referenceEvidence}});
+  const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(10);
+  if(prior.error)throw prior.error;
+  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(project,prior.data||[])}});
  }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);

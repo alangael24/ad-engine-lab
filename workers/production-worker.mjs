@@ -1,4 +1,5 @@
 import {repairOnOriginalTimeline} from '../assets/editorial-timeline.js';
+import {measuredEditorialCost} from '../src/production-spend.js';
 import {patchNarration} from './narration-revision.mjs';
 import {remember} from '../assets/creative-context.js';
 import {repairScenes,validateReview} from '../assets/quality-model.js';
@@ -38,6 +39,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   const reusable=s=>s.selectedVersionId&&(reuseNarration||timeline.filter(t=>t.planSceneId===s.id).every(t=>t.id===s.id&&t.end-t.start<=s.end-s.start));
   for(const [i,s] of plan.scenes.entries()){
    images.push(s.imageAssetId||reusable(s)?{assetId:s.imageAssetId||null}:await once(`image-${i}`,'images',()=>providers.image({project,plan,index:i,previous:images.at(-1),anchor:existingAnchor?{assetId:existingAnchor.imageAssetId}:images[0],invoke,jobId:job.id})));
+   const recovered=project.recoveredStillApprovals?.[s.id];
+   if(recovered?.assetId&&recovered.assetId===images[i].assetId){imageApprovals.set(s.id,recovered);continue;}
    // Production providers review each still before the next one may inherit it.
    if(providers.reviewImage&&!(reuseApprovedStills&&s.imageAssetId))for(let attempt=0;attempt<=2;attempt++){
     const key=1000+i*3+attempt;
@@ -105,6 +108,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    const render=await write(renderKey,'assembly','render',{requestId:await stableId(job.id,renderKey)});
    await wait(c=>{const r=c.renders.find(x=>x.id===render.id);if(r?.status==='failed')throw Error('PRODUCTION_RENDER_FAILED');return r?.status==='succeeded';});
    const current=await invoke('inspect');
+   const editingCost=measuredEditorialCost(current.renders.find(r=>r.id===render.id)?.manifest?.editorial?.usage);
+   if(editingCost!==null)await invoke('record_cost',{key:renderKey+'-editor',costUsd:editingCost});
    const reviewedScenes=current.renders.find(r=>r.id===render.id)?.manifest?.scenes||current.project.data.scenes;
    const review=await once(`quality-${round}`,'quality',async()=>{
     const report=await providers.review({renderId:render.id,invoke});validateReview(report,reviewedScenes);
