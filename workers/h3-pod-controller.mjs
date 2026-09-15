@@ -7,11 +7,11 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   ||!/^ghcr\.io\/alangael24\/creativerush-h3-pod@sha256:[a-f0-9]{64}$/.test(env.H3_POD_IMAGE||''))throw Error('POD_CONFIG');
  const owner='podctl_'+crypto.randomUUID();let token;
  const state=async(action,data={})=>{
-  const r=await fetchImpl(origin.origin+'/api/gpu-pod',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({owner,action,token,data}),redirect:'error',signal:AbortSignal.timeout(20000)});
+   const r=await fetchImpl(origin.origin+'/api/gpu-pod',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({owner,action,token,data}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(!r.ok)throw Error('POD_STATE_UNAVAILABLE');return r.json();
  };
  const control=async(path,method='GET',body)=>{
-  const r=await fetchImpl('https://api.runpod.io/v2'+path,{method,headers:{authorization:`Bearer ${env.RUNPOD_CONTROL_API_KEY}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
+   const r=await fetchImpl('https://api.runpod.io/v2'+path,{method,headers:{authorization:`Bearer ${env.RUNPOD_CONTROL_API_KEY}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(r.status===404)return null;
   if(!r.ok)throw Error('POD_CONTROL_UNCONFIRMED');
   return r.status===204?{}:r.json();

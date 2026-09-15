@@ -33,6 +33,7 @@ const run={id:'run',name:'cr-h3-run',phase:'creating',created_at:new Date(1000).
 function mock({state={token:'lease',enabled:true,pending:true,running:false,run:null},pods=[],createThrows=false,cost=.69,clock=1000}={}){
  const calls=[];let deleted=false,exited=false;
  const fetchImpl=async(url,opts={})=>{
+  assert.equal(opts.redirect,'manual','edge requests must not follow redirects or use unsupported redirect:error');
   const body=opts.body?JSON.parse(opts.body):null;calls.push({url,body,method:opts.method});
   if(url.endsWith('/api/gpu-pod')){
    if(body.action==='begin')state.run={...run};
@@ -76,4 +77,12 @@ test('budget cutoff stops a busy pod and unknown disappearance cannot permit ano
 test('disabled controller still cleans up an existing attributed GPU',async()=>{
  const m=mock({state:{token:'t',enabled:false,pending:false,running:false,run:{...run,pod_id:'abcdefgh',phase:'running',ready_at:'yes'}}});
  assert.equal((await tickManagedPod(env,m)).status,'deleted');
+});
+test('redirect responses fail closed without forwarding credentials',async()=>{
+ let calls=0;
+ await assert.rejects(tickManagedPod(env,{fetchImpl:async(_url,opts)=>{
+  calls++;assert.equal(opts.redirect,'manual');
+  return new Response(null,{status:302,headers:{location:'https://other.test'}});
+ }}),/POD_STATE_UNAVAILABLE/);
+ assert.equal(calls,1);
 });
