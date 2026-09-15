@@ -10,8 +10,26 @@ export function editorialTimeline(scenes,ranges){
  if(groups.some(g=>!g.length))throw Error('EDITORIAL_INVALID');
  return scenes.map((s,i)=>{const duration=groups[i].reduce((n,r)=>n+r.end-r.start,0);if(duration<.5)throw Error('EDITORIAL_INVALID');const start=offset;offset+=duration;return {...s,start,end:offset,sourceRanges:groups[i]};});
 }
-export function alignmentWords(a){
+export function alignmentWords(a,script){
  if(!a||!Array.isArray(a.characters)||a.characters.length!==a.character_start_times_seconds?.length||a.characters.length!==a.character_end_times_seconds?.length)throw Error('EDITORIAL_ALIGNMENT_REQUIRED');
+ if(script!=null){
+  // Providers can omit spaces between sentence chunks. Restore only whitespace
+  // proven by the approved script, using existing chunk timestamps, never
+  // interpolating a split inside an unaligned provider chunk.
+  const expected=String(script).match(/\S+/gu)||[],compact=s=>s.replace(/\s/gu,'');
+  if(a.characters.some(c=>typeof c!=='string')||compact(a.characters.join(''))!==expected.join(''))throw Error('EDITORIAL_SCRIPT_COVERAGE');
+  const words=[];let index=0,part='',start,end;
+  for(let i=0;i<a.characters.length;i++){
+   const chunk=compact(a.characters[i]),from=a.character_start_times_seconds[i],to=a.character_end_times_seconds[i];
+   if(!Number.isFinite(from)||!Number.isFinite(to)||from<0||to<from)throw Error('EDITORIAL_ALIGNMENT_REQUIRED');
+   if(!chunk)continue;
+   if(!part)start=from;part+=chunk;end=to;
+   if(!expected[index]?.startsWith(part))throw Error('EDITORIAL_ALIGNMENT_BOUNDARY');
+   if(part===expected[index]){words.push({type:'word',text:part,start,end});part='';index++;}
+  }
+  if(part||index!==expected.length||!words.length)throw Error('EDITORIAL_ALIGNMENT_REQUIRED');
+  return words;
+ }
  const words=[];let text='',start,end;
  for(let i=0;i<a.characters.length;i++){
   const c=a.characters[i],from=a.character_start_times_seconds[i],to=a.character_end_times_seconds[i];

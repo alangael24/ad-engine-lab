@@ -1,7 +1,7 @@
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {command} from './studio-renderer.mjs';
-import {reviewSchema,validateReview,MATERIAL_REVIEW_RULES} from '../assets/quality-model.js';
+import {reviewSchema,validateEditReview,MATERIAL_REVIEW_RULES} from '../assets/quality-model.js';
 export const CAPTION_EVIDENCE_RULES='Caption timing is measured against exact 24fps output frames and the supplied word intervals. A filmstrip sample outside a caption interval is not evidence of a missing subtitle. Tiny fades or sub-frame endpoint rounding are not material defects. Check legibility, wording, duplicate layers and occlusion at interior frames before requesting edits.';
 export function captionAuditSamples(edl,words,scenes,sceneIds){
  const groups=edl.captionGroups.filter(([a,b])=>scenes.some(s=>sceneIds.includes(s.id)&&words[a].start<s.end&&words[b].end>s.start));
@@ -21,7 +21,7 @@ export async function verifyCaptionFindings({review,path,edl,scenes,words,root,c
  const selected=scenes.filter(s=>targets.includes(s.id));
  const schema={...reviewSchema,properties:{...reviewSchema.properties,coverage:{type:'array',items:{type:'string'}}},required:[...reviewSchema.required,'coverage']};
  const raw=await call({role:'director',name:'verify_captions',schema,system:MATERIAL_REVIEW_RULES+' '+CAPTION_EVIDENCE_RULES+' Independently confirm or dismiss the alleged caption defects using these exact interior frames. Sheets contain three columns in reading order; frameLayout identifies each unannotated cell. Inspect all supplied caption groups. Return coverage for exactly the supplied scenes in order. Report only caption issues with action none. Do not restyle the video or waive unrelated findings.',context:{scenes:selected.map(({path,...s})=>s),groups,frameLayout,allegations:review.issues.filter(i=>i.kind==='caption'),sourceCaptionScenes:edl.sourceCaptionScenes||[],captionFadeMs:edl.captionFadeMs||0},images,usage,env,signal,fetchImpl});
- const checked=validateReview(raw,selected);
+ const checked=validateEditReview(raw,selected);
  if(JSON.stringify(raw.coverage)!==JSON.stringify(selected.map(s=>s.id))||checked.issues.some(i=>i.kind!=='caption'||i.action!=='none'))throw Error('EDITORIAL_CAPTION_AUDIT_INVALID');
  const issues=[...review.issues.filter(i=>i.kind!=='caption'||!targets.includes(i.sceneId)),...checked.issues];
  const verdict=!issues.length?'pass':issues.some(i=>i.action==='none')?'blocked':'repair';

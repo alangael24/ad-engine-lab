@@ -7,6 +7,14 @@ import {writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 const scenes=[{id:crypto.randomUUID(),text:'Hello',start:0,end:3,media:{bucket:'private',path:'a'}},{id:crypto.randomUUID(),text:'World',start:3,end:6,media:{bucket:'private',path:'b'}}];
 const ranges=[{source:'S01',start:0,end:1},{source:'S01',start:2,end:3},{source:'S02',start:0,end:2}];
+test('approved script restores missing sentence spaces with exact existing chunk timestamps',()=>{
+ const a={characters:['Hello','.','Next',' ','word','.'],character_start_times_seconds:[0,.4,1,1.4,1.5,1.9],character_end_times_seconds:[.4,.5,1.4,1.5,1.9,2]};
+ assert.deepEqual(alignmentWords(a,'Hello. Next word.'),[{type:'word',text:'Hello.',start:0,end:.5},{type:'word',text:'Next',start:1,end:1.4},{type:'word',text:'word.',start:1.5,end:2}]);
+ assert.throws(()=>alignmentWords(a,'Changed. Next word.'),/SCRIPT_COVERAGE/);
+ assert.throws(()=>alignmentWords({characters:['Hello.Next'],character_start_times_seconds:[0],character_end_times_seconds:[1]},'Hello. Next'),/ALIGNMENT_BOUNDARY/);
+ const abbreviation={characters:['U','.','S','.','A','.'],character_start_times_seconds:[0,.1,.2,.3,.4,.5],character_end_times_seconds:[.1,.2,.3,.4,.5,.6]};
+ assert.equal(alignmentWords(abbreviation,'U.S.A.')[0].text,'U.S.A.');
+});
 test('trimmed output preserves scene identity and maps final review back to original shots',()=>{
  const edited=editorialTimeline(scenes,ranges);assert.equal(edited[1].start,2);assert.equal(edited[1].end,4);assert.equal(edited[1].id,scenes[1].id);
  assert.equal(repairOnOriginalTimeline({issues:[{sceneId:scenes[1].id,at:2.3}]},scenes,edited).issues[0].at,3.3);

@@ -25,7 +25,7 @@ export async function narrationAlignment(db,user,project,assetId){
  throw Error('EDITORIAL_ALIGNMENT_REQUIRED');
 }
 export async function editorialRevisionContext(db,user,project){
- const alignment=await narrationAlignment(db,user,project.id,project.data.narrationAssetId),words=alignmentWords(alignment);
+ const alignment=await narrationAlignment(db,user,project.id,project.data.narrationAssetId),words=alignmentWords(alignment,project.data.scenes.map(s=>s.text).join(' '));
  const r=await approvedBase(db,user,project);
  return {project,words,base:r?{id:r.id,scenes:r.manifest.originalScenes||r.manifest.scenes,edl:r.manifest.editorial.edit,words:r.manifest.editorial.words||[]}:null};
 }

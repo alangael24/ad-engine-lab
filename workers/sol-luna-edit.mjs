@@ -4,7 +4,7 @@ import {verifyCaptionFindings} from './caption-review.mjs';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {creativeContext} from '../assets/creative-context.js';
-import {MATERIAL_REVIEW_RULES,QUALITY_VERSION,reviewSchema,validateReview} from '../assets/quality-model.js';
+import {MATERIAL_REVIEW_RULES,QUALITY_VERSION,reviewSchema,validateReview,validateEditReview} from '../assets/quality-model.js';
 import {validateSimpleEdit,SIMPLE_EDIT_VERSION} from '../assets/simple-edit.js';
 import {buildReviewEvidence} from './production-quality.mjs';
 import {editorialCall,EDITORIAL_VERSION} from './editorial-models.mjs';
@@ -24,7 +24,7 @@ function validatePlan(p,scenes){
 }
 export function validateEditorialReview(raw,scenes){
  if(!Array.isArray(raw?.coverage)||raw.coverage.length!==scenes.length||raw.coverage.some((id,i)=>id!==scenes[i].id))throw Error('EDITORIAL_REVIEW_COVERAGE');
- return {...validateReview(raw,scenes),coverage:raw.coverage};
+ return {...validateEditReview(raw,scenes),coverage:raw.coverage};
 }
 export async function finishSolLunaProject({root,project,shots,narration,words,base=null,cacheDirectory,cacheNamespace,strategy='',env=process.env,signal,fetchImpl=fetch,call=editorialCall,prepare=prepareSimpleSources,boards=sourceBoards,render=renderSimpleAd,evidence=buildReviewEvidence,auditCaptions=verifyCaptionFindings,onUsage}){
  const profile=productionWorkflow(env);

@@ -17,6 +17,13 @@ export function validateReview(raw,scenes){
  const actions=issues.filter(i=>i.action!=='none');if(new Set(actions.map(i=>i.sceneId)).size!==actions.length)fail('multiple_repairs_same_scene');
  return {verdict:raw.verdict,summary:text(raw.summary,1500),issues};
 }
+// A request to repair only captions/timing is a local editing block, not an
+// asset-regeneration request. Keep every finding and require a new review.
+export function validateEditReview(raw,scenes){
+ const local=raw?.verdict==='repair'&&Array.isArray(raw.issues)&&raw.issues.length>0
+  &&raw.issues.every(i=>['caption','timing'].includes(i.kind)&&i.action==='none');
+ return validateReview(local?{...raw,verdict:'blocked'}:raw,scenes);
+}
 export function repeatedSources(scenes){
  const issues=[];
  for(let i=0;i<scenes.length;i++)for(let j=0;j<i;j++){

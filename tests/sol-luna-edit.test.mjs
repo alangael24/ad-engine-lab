@@ -73,6 +73,13 @@ test('Sol directs, Luna edits, Sol reviews; one repair requires a changed EDL',a
   await assert.rejects(finishSolLunaProject(options),/NO_CHANGE/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+test('caption repair requests remain blocking and route to local editing without discarding evidence',()=>{
+ const issue={sceneId:'one',relatedSceneId:null,kind:'caption',at:1,evidence:'Sentence words are fused.',action:'none',visual:'Separate words.',motion:''};
+ const review=validateEditorialReview({coverage:['one'],verdict:'repair',summary:'Repair captions.',issues:[issue]},[scene]);
+ assert.equal(review.verdict,'blocked');assert.equal(review.issues[0].evidence,issue.evidence);
+ assert.equal(review.issues[0].action,'none');
+ assert.throws(()=>validateEditorialReview({coverage:['one'],verdict:'repair',summary:'Other issue.',issues:[{...issue,kind:'artifact'}]},[scene]),/QUALITY_INVALID/);
+});
 test('real FFmpeg render preserves continuous audio and cached Sol review binds exact file hash',{skip:!process.env.TEST_MEDIA},async()=>{
  const root=await mkdtemp(join(tmpdir(),'simple-media-test-'));try{
   const src=join(root,'source.mp4'),audio=join(root,'voice.wav');
