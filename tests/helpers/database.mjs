@@ -23,6 +23,7 @@ export async function database() {
   await db.exec(await readFile(new URL('../../supabase/migrations/20260907110000_editorial_render.sql', import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/20260910132024_partial_video_revisions.sql', import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/20260913151441_h3_serverless_recovery.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260915034454_serverless_autowake_and_editing_budget.sql', import.meta.url),'utf8'));
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

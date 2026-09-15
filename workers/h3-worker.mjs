@@ -62,6 +62,7 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
     if (!promptId) {
       const target = adapter.directUpload ? await api('upload', identity) : {};
       const workflow = await adapter.build(job, target); assertLease();
+      if(serverless&&adapter.ensureActive)await adapter.ensureActive(async()=>{assertLease();await api('heartbeat',identity);assertLease();});
       await api('heartbeat', { ...identity, submissionStarted:true });
       try { promptId = await adapter.submit(workflow, job.id, {assertLease}); }
       catch { promptId = await adapter.findSubmission(job.id); if (!promptId) throw Object.assign(new Error('AMBIGUOUS_SUBMISSION'),{retryable:serverless}); }
@@ -132,7 +133,7 @@ export async function main() {
   const api = createApi({ appUrl:process.env.CREATIVE_RUSH_URL, token:process.env.GENERATION_WORKER_TOKEN,
     workerId:workerInstanceId(process.env.H3_WORKER_ID) });
   const adapter = process.env.H3_SERVERLESS_ENDPOINT_ID
-    ? new H3ServerlessAdapter({endpointId:process.env.H3_SERVERLESS_ENDPOINT_ID,apiKey:process.env.RUNPOD_SERVERLESS_API_KEY,controlApiKey:process.env.RUNPOD_CONTROL_API_KEY})
+    ? new H3ServerlessAdapter({endpointId:process.env.H3_SERVERLESS_ENDPOINT_ID,apiKey:process.env.RUNPOD_SERVERLESS_API_KEY,controlApiKey:process.env.RUNPOD_CONTROL_API_KEY,autoWake:true})
     : new H3Adapter(process.env.COMFY_URL || 'http://127.0.0.1:8188');
   let stopping = false;
   for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => { stopping = true; });
@@ -143,9 +144,19 @@ export async function main() {
       if (job) {
         const outcome=await processJob(job, api, adapter);
         if(outcome?.status==='deferred')await delay(10000);
-      } else await delay(5000);
+      } else {if(adapter.directUpload)await shutdownIdleEndpoint(api,adapter);await delay(5000);}
     } catch { console.error('worker_not_ready_retrying'); await delay(10000); }
   }
+}
+export async function shutdownIdleEndpoint(api,adapter){
+  const claim=await api('idle_claim');
+  if(!claim.stop)return {status:'busy',reason:claim.reason};
+  const guard=()=>api('idle_heartbeat',{idleToken:claim.token});
+  // Keep the durable drain lock on failures or live workers. A later CPU
+  // process resumes shutdown; it cannot dispatch a new job through this lock.
+  if(!await adapter.shutdownAndVerify(guard))return {status:'pending'};
+  await guard();await api('idle_complete',{idleToken:claim.token});
+  return {status:'off'};
 }
 export function workerInstanceId(base){
   if(!/^[a-zA-Z0-9_-]{1,80}$/.test(base||''))throw Error('Worker configuration missing');

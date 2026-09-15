@@ -91,7 +91,7 @@ export async function onRequestPost(context){try{
     d.data={...request,prompt};
    }
   }
-  if(d.action==='render'&&j.steps?.[d.key]?.status!=='done'){await reserve(d.key,'assembly');await reserve(d.key+'-editor','planning',120);}
+  if(d.action==='render'&&j.steps?.[d.key]?.status!=='done'){await reserve(d.key,'assembly');await reserve(d.key+'-editor','editing');}
   return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});
  }
  throw Error('PRODUCTION_INVALID');

@@ -139,3 +139,22 @@ GPU request was necessary for the release preflight. Fresh control and runtime
 reads confirmed both endpoints at min/max zero, no workers and no queued or
 running jobs. Keep this validated GPU image pinned while releasing CPU changes;
 those changes do not modify `workers/serverless/`.
+
+## Automatic lifecycle (September 14)
+
+The CPU H3 worker enables the existing endpoint only after claiming and validating
+an authorized generation. It reads the endpoint, requires exactly one `ADA_32_PRO`
+GPU (RTX 5090), min=0, max=0 or 1, and patches only workers min=0/max=1. It never
+rents a replacement pod, changes GPU type or edits the deployed image/cache. It
+reads back the setting before marking inference submission as started. Lost control
+acknowledgements are reconciled by reading; unknown inference submissions are still
+never retried. Circuit-breaker recovery does not automatically clear a startup fault.
+
+When there are no pending GPU jobs or full productions, the worker takes a durable
+idle lease using the same database dispatch lock. Other CPU workers cannot claim
+new jobs until workers min/max=0, zero live workers and an empty provider queue are
+verified. Failed shutdowns retain this lock; after a CPU crash a new owner can
+resume cleanup, but cannot start inference through it. Incoming jobs can queue while
+cleanup finishes and then wake the endpoint again. This requires the CPU service
+and existing RUNPOD_CONTROL_API_KEY to remain available; it is not an independent
+watchdog for a simultaneous prolonged CPU/provider outage.

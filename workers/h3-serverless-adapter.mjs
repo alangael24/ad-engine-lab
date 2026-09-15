@@ -2,9 +2,9 @@ import {H3Adapter} from './h3-adapter.mjs';
 import {H3_LIMITS,realClock} from '../src/h3-lifecycle.js';
 // Runs on CPU. Endpoint health, not a warm GPU, controls queue availability.
 export class H3ServerlessAdapter {
-  constructor({endpointId,apiKey,controlApiKey,fetchImpl=fetch,clock=realClock}) {
+  constructor({endpointId,apiKey,controlApiKey,autoWake=false,fetchImpl=fetch,clock=realClock}) {
     if(!/^[a-zA-Z0-9]{8,40}$/.test(endpointId||'')||!apiKey)throw Error('H3_SERVERLESS_CONFIG');
-    this.endpointId=endpointId;this.key=apiKey;this.controlKey=controlApiKey;this.fetch=fetchImpl;this.directUpload=true;this.clock=clock;
+    this.endpointId=endpointId;this.key=apiKey;this.controlKey=controlApiKey;this.fetch=fetchImpl;this.directUpload=true;this.clock=clock;this.autoWake=autoWake;
   }
   async request(path,body) {
     const response=await this.fetch(`https://api.runpod.ai/v2/${this.endpointId}/${path}`,{
@@ -64,26 +64,45 @@ export class H3ServerlessAdapter {
       return ['CANCELLED','FAILED','TIMED_OUT'].includes(state.status);
     } catch(error) { if(error.httpStatus===404)return true;throw error; }
   }
-  async shutdownAndVerify(assertLease=()=>{}){
+  async control(path='',body,assertLease=()=>{}) {
     if(!this.controlKey)throw Error('H3_SHUTDOWN_CREDENTIAL_REQUIRED');
-    const control=async(path='',body)=>{
-      assertLease();
-      const response=await this.fetch(`https://api.runpod.io/v2/serverless/${this.endpointId}${path}`,{
-        ...(body?{method:'PATCH',body:JSON.stringify(body)}:{}),
-        headers:{authorization:`Bearer ${this.controlKey}`,'content-type':'application/json'},
-        redirect:'error',signal:AbortSignal.timeout(25000),
-      });
-      if(!response.ok)throw Error('H3_SHUTDOWN_UNCONFIRMED');
-      return response.json();
+    await assertLease();
+    const response=await this.fetch(`https://api.runpod.io/v2/serverless/${this.endpointId}${path}`,{
+      ...(body?{method:'PATCH',body:JSON.stringify(body)}:{}),
+      headers:{authorization:`Bearer ${this.controlKey}`,'content-type':'application/json'},
+      redirect:'error',signal:AbortSignal.timeout(25000),
+    });
+    if(!response.ok)throw Error('H3_CONTROL_UNCONFIRMED');
+    const result=await response.json();await assertLease();return result;
+  }
+  async ensureActive(assertLease=()=>{}) {
+    if(!this.autoWake)return;
+    const check=endpoint=>{
+      if(endpoint.id!==this.endpointId||endpoint.gpu?.count!==1
+        ||endpoint.gpu?.pools?.length!==1||endpoint.gpu.pools[0]!=='ADA_32_PRO'
+        ||endpoint.workers?.min!==0||![0,1].includes(endpoint.workers?.max))throw Error('H3_ACTIVATION_CONFIG');
     };
-    // This dedicated endpoint may only be scaled DOWN. Never change its GPU,
-    // image, environment or min/max upward. An acknowledgement is not proof.
-    const before=await control();
-    if(before.workers?.min!==0||before.workers?.max!==0){
-      try{await control('',{workers:{min:0,max:0}});}catch{/* A lost PATCH ack may still have applied. Read it back. */}
+    const before=await this.control('',undefined,assertLease);check(before);
+    if(before.workers.max===0){
+      // Enable exactly one 5090 on demand. min=0 means no warm idle worker.
+      // Never replace the endpoint, GPU type, container, model cache or secrets.
+      try{await this.control('',{workers:{min:0,max:1}},assertLease);}catch(error){
+        if(error.message==='LEASE_LOST'||error.code==='LEASE_LOST')throw error;
+        // A lost PATCH acknowledgement is reconciled with a read, not a second rental.
+      }
     }
-    const endpoint=await control(),workers=await control('/workers'),health=await this.request('health');
-    assertLease();
+    const after=await this.control('',undefined,assertLease);check(after);
+    if(after.workers.max!==1)throw Object.assign(Error('H3_ACTIVATION_UNCONFIRMED'),{retryable:true});
+  }
+  async shutdownAndVerify(assertLease=()=>{}){
+    const before=await this.control('',undefined,assertLease);
+    if(before.workers?.min!==0||before.workers?.max!==0){
+      try{await this.control('',{workers:{min:0,max:0}},assertLease);}catch(error){
+        if(error.message==='LEASE_LOST'||error.code==='LEASE_LOST')throw error;
+      }
+    }
+    const endpoint=await this.control('',undefined,assertLease),workers=await this.control('/workers',undefined,assertLease),health=await this.request('health');
+    await assertLease();
     return endpoint.workers?.min===0&&endpoint.workers?.max===0
       &&workers.summary?.total===0&&Array.isArray(workers.workers)&&workers.workers.length===0
       &&health.jobs?.inQueue===0&&health.jobs?.inProgress===0;

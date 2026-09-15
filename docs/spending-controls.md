@@ -47,3 +47,15 @@ With the CPU host suspended, its controller cannot run. This code is not an acti
 ## Validation
 
 Twenty targeted tests passed, including provider usage retention, route-level budget rejection, concurrent reservations, retry accounting, GPU draining and mocked RunPod failures. Pages Functions compiled successfully. The broad suite completed with 141 passes, one skip, and one unrelated existing onboarding failure because this isolated checkout lacks `ecom-index.html`; the subsequent added usage test also passed. No live provider calls were used for validation.
+
+## September 14 correction: separate editorial reservation
+
+The production render route now reserves one `editing` session, seeded at
+2,000,000 microusd ($2), separately from CPU `assembly`. It no longer reserves
+120 `planning` units ($6 under the previous production policy). $2 is a conservative
+session allowance matching the default model-session ceiling, **not a measured
+editing price**. The model usage audit remains the source of measured API-equivalent
+editing cost. Do not reduce the editing reservation below the executor's model
+budget. Unknown outcomes keep their reservation; old reservations are never rewritten.
+The schema migration does not enable spending. Operator funding must preserve the
+cumulative ledger and add only the explicitly authorized trial allowance.

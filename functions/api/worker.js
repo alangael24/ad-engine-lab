@@ -26,6 +26,9 @@ export async function onRequestPost(context) {
     const body = await readJson(context.request);
     if (body.action === 'sweep') return json({ expired: await rpc(db, 'sweep_generations') });
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(body.workerId || '')) throw new ApiError('UNAUTHORIZED');
+    if (['idle_claim','idle_heartbeat','idle_complete'].includes(body.action)) {
+      return json(await rpc(db,'serverless_idle_work',{p_worker:body.workerId,p_action:body.action.slice(5),p_token:body.idleToken||null}));
+    }
     if (body.action === 'claim') {
       await rpc(db, 'sweep_generations');
       const serverless=body.backend==='serverless',enabled=context.env.GENERATION_ENABLED==='true';

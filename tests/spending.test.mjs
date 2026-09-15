@@ -63,3 +63,24 @@ test('GPU is never started, rented or stopped without an affirmative idle decisi
  }
  await assert.rejects(checkGpuIdle(env,{fetchImpl:async()=>new Response(null,{status:500})}),/GPU_STATUS_UNAVAILABLE/);
 });
+
+test('editing is a separate $2 reservation, idempotent, with historical spend preserved',async()=>{
+ const db=await database();try{
+  const f=await fixture(db);await db.exec('update production_spend_policy set project_limit=6000000,total_limit=6000000');
+  await reserve(db,f,'plan','planning');
+  const edit=await reserve(db,f,'render-editor','editing');
+  assert.equal(edit.units,1);assert.equal(edit.estimated_microusd,2000000);
+  assert.deepEqual(await reserve(db,f,'render-editor','editing'),edit);
+  assert.equal((await db.query('select sum(estimated_microusd)::int total from production_spend_reservations')).rows[0].total,2010000);
+  await assert.rejects(reserve(db,f,'render-editor','planning'),/IDEMPOTENCY_CONFLICT/);
+ }finally{await db.close();}
+});
+
+test('funded trial allowance is limited to the nominated customer',async()=>{
+ const db=await database();try{
+  const f=await fixture(db),other=await fixture(db);
+  await db.query('update production_spend_policy set allowed_user_ids=array[(select user_id from studio_productions where id=$1)]',[f.job]);
+  await reserve(db,f);
+  await assert.rejects(reserve(db,other),/PRODUCTION_BUDGET_DISABLED/);
+ }finally{await db.close();}
+});
