@@ -41,6 +41,11 @@ const staticEntries = [
   "llms.txt",
 ];
 
+// Fail before publishing if the public landing styles are missing.
+await Promise.all(["assets/ecom-landing.css", "assets/seo-resources.css"].map(
+  (entry) => readFile(resolve(root, entry), "utf8"),
+));
+
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 
