@@ -52,7 +52,10 @@ export async function prepareSimpleSources({root,project,shots,narration,words,s
   const meta=await probe(shot.path,{signal});
   if(!meta.streams.some(x=>x.codec_type==='video')||Number(meta.format.duration)<duration-.025)throw Error('EDITORIAL_CLIP_SHORT');
   const sceneWords=sourceWords.filter(w=>w.start>=from-.015&&w.start<from+duration-.015).map(w=>({...w,start:w.start-from+s.start,end:w.end-from+s.start}));
-  mapped.push(...sceneWords);local.push({...s,sourceDuration:Number(meta.format.duration),path:resolve(shot.path),number:i+1,source:'S'+String(i+1).padStart(2,'0'),frames:Math.round(s.end*24)-Math.round(s.start*24)});end=s.end;
+  // H3 files can contain an extra final frame. The API still fences edits to
+  // the registered duration: do not offer the model a longer source window.
+  const sourceDuration=Math.min(Number(meta.format.duration),s.sourceDuration??s.media?.duration??Number(meta.format.duration));
+  mapped.push(...sceneWords);local.push({...s,sourceDuration,path:resolve(shot.path),number:i+1,source:'S'+String(i+1).padStart(2,'0'),frames:Math.round(s.end*24)-Math.round(s.start*24)});end=s.end;
  }
  const norm=s=>(s.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).join(' ');
  if(norm(mapped.map(x=>x.text).join(' '))!==norm(project.data.scriptDraft)||mapped.some(w=>w.end>end+.05))throw Error('EDITORIAL_SCRIPT_COVERAGE');

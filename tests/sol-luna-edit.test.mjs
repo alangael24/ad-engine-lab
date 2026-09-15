@@ -83,10 +83,10 @@ test('caption repair requests remain blocking and route to local editing without
 test('real FFmpeg render preserves continuous audio and cached Sol review binds exact file hash',{skip:!process.env.TEST_MEDIA},async()=>{
  const root=await mkdtemp(join(tmpdir(),'simple-media-test-'));try{
   const src=join(root,'source.mp4'),audio=join(root,'voice.wav');
-  await command('ffmpeg',['-v','error','-y','-f','lavfi','-i','testsrc2=size=320x180:rate=24:duration=2','-an','-c:v','libx264',src]);
+  await command('ffmpeg',['-v','error','-y','-f','lavfi','-i','testsrc2=size=320x180:rate=24:duration=2.084','-an','-c:v','libx264',src]);
   await command('ffmpeg',['-v','error','-y','-f','lavfi','-i','sine=frequency=440:duration=2','-c:a','pcm_s16le',audio]);
-  const project={data:{scenes:[scene],scriptDraft:scene.text,aspectRatio:'16:9'}};
-  const r=await finishSolLunaProject({root:join(root,'job'),project,shots:[{sceneId:scene.id,path:src}],narration:audio,words,env,call:async a=>a.name==='direct_edit'?plan:a.name==='edit_ad'?edl:pass});
+  const project={data:{scenes:[{...scene,sourceDuration:2}],scriptDraft:scene.text,aspectRatio:'16:9'}};
+  const r=await finishSolLunaProject({root:join(root,'job'),project,shots:[{sceneId:scene.id,path:src}],narration:audio,words,env,call:async a=>{if(a.name==='direct_edit')assert.equal(a.context.scenes[0].sourceDuration,2);return a.name==='direct_edit'?plan:a.name==='edit_ad'?edl:pass;}});
   assert.equal(r.status,'succeeded');assert.equal(r.review.model,'gpt-5.6-sol');assert.equal(Number((await probe(r.path)).format.duration),2);
   const bytes=await readFile(r.path),manifest={scenes:[scene],editorial:{version:'sol-luna-v1',sha256:r.review.sha256,review:r.review,usage:r.usage}};
   const fetchImpl=async url=>{assert.equal(url,'https://fixture/media');return new Response(bytes);};

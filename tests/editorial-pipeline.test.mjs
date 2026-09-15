@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {editorialTimeline,alignmentWords,repairOnOriginalTimeline} from '../assets/editorial-timeline.js';
 import {processRender} from '../workers/studio-worker.mjs';
 import {database,user,call} from './helpers/database.mjs';
-import {writeFile} from 'node:fs/promises';
+import {writeFile,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 const scenes=[{id:crypto.randomUUID(),text:'Hello',start:0,end:3,media:{bucket:'private',path:'a'}},{id:crypto.randomUUID(),text:'World',start:3,end:6,media:{bucket:'private',path:'b'}}];
 const ranges=[{source:'S01',start:0,end:1},{source:'S01',start:2,end:3},{source:'S02',start:0,end:2}];
@@ -25,7 +25,7 @@ test('production render calls the flexible editor, saves its real timings, uploa
  const actions=[],job={id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),manifest:{narration:{url:'https://test/audio'},scenes:scenes.map(s=>({...s,url:'https://test/video'}))},editorial:{project:{data:{scenes}},words:[]}};
  const api=async(action,data)=>{actions.push({action,data});return action==='upload'?{uploadUrl:'https://test/upload'}:{};};
  const result=await processRender(job,api,{fetchImpl:async()=>new Response(Buffer.from('fixture')),render:()=>assert.fail('must use flexible editor'),edit:async input=>{assert.equal(input.project.data.scenes.length,2);assert.match(input.strategy,/word-synchronized/);const path=join(input.root,'../edited.mp4');await writeFile(path,'verified fixture render');return {status:'succeeded',path,edl:{ranges},usage:{calls:2},message:'Reviewed'};}});
- assert.equal(result,true);assert.deepEqual(actions.map(x=>x.action),['heartbeat','begin_editorial','editorial','upload','complete']);assert.equal(actions.at(-1).data.success,true);assert.match(actions[2].data.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(result,true);assert.deepEqual(actions.map(x=>x.action),['heartbeat','begin_editorial','upload','editorial','complete']);assert.equal(actions.at(-1).data.success,true);assert.match(actions[3].data.sha256,/^[a-f0-9]{64}$/);
 });
 test('failed editorial review never uploads or completes successfully',async()=>{
  const actions=[];const ok=await processRender({id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),manifest:{narration:{url:'https://test/audio'},scenes:[]},editorial:{project:{data:{scenes:[]}},words:[]}},async(a,d)=>{actions.push({a,d});return {};},{fetchImpl:async()=>new Response('fixture'),edit:async()=>({status:'needs_review',path:null})});
@@ -85,4 +85,15 @@ test('queued production executes actual flexible rendering and submits the short
  const ok=await processRender({id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),manifest:{narration:{url:'https://fixture/voice'},scenes:[scene]},editorial:{project:{brand_snapshot:{product:'Fixture'},data:{scriptDraft:scene.text,scenes:[scene],creativeMemory:{approvedAssets:[still]}}},words:[{type:'word',text:'Hello',start:.3,end:.6},{type:'word',text:'world.',start:1,end:1.4}]}},api,{fetchImpl:request,env:{REFERENCE_FLASH_KEY:'fixture',VIDEO_USE_PYTHON:process.env.VIDEO_USE_PYTHON}});
  assert.equal(ok,true);assert.ok(uploaded.length>1000);assert.equal(n,4);assert.deepEqual(actions.find(x=>x.action==='editorial').data.ranges,edl.ranges);assert.equal(editorialTimeline([scene],edl.ranges)[0].end,1.4000000000000001);
  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('delivery rejection preserves private output and exact submitted decisions without another model call',async()=>{
+ let root,edits=0,uploaded;const actions=[];
+ const job={id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),manifest:{narration:{url:'https://test/audio'},scenes:[]},editorial:{project:{data:{scenes:[]}},words:[]}};
+ const api=async(a,d)=>{actions.push(a);if(a==='upload')return {uploadUrl:'https://test/upload'};if(a==='editorial')throw Object.assign(Error('EDITORIAL_INVALID'),{code:'EDITORIAL_INVALID'});return {};};
+ try{
+ const ok=await processRender(job,api,{fetchImpl:async(url,o)=>{if(o?.method==='PUT')uploaded=o.body;return new Response('fixture');},edit:async input=>{edits++;root=join(input.root,'..');const path=join(root,'final.mp4');await writeFile(path,'approved fixture video');return {status:'succeeded',path,edl:{ranges:[]},review:{verdict:'pass'},usage:{total:.1}};}});
+ assert.equal(ok,false);assert.equal(edits,1);assert.equal(uploaded.toString(),'approved fixture video');assert.ok(actions.indexOf('upload')<actions.indexOf('editorial'));
+ const payload=JSON.parse(await readFile(join(root,'delivery.json'),'utf8'));assert.equal(payload.review.verdict,'pass');assert.equal(payload.usage.total,.1);assert.equal(await readFile(join(root,'final.mp4'),'utf8'),'approved fixture video');
+ }finally{if(root)await rm(root,{recursive:true,force:true});}
 });
