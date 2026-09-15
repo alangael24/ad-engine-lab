@@ -75,5 +75,5 @@ export async function onRequestPost(context){try{
   return json(await rpc(db,'studio_render_worker',args));
  }
  throw new ApiError('INVALID_GENERATION');
-}catch(error){return studioError(error);}}
+}catch(error){const code=[error.code,error.message].find(v=>typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(v))||'STUDIO_BACKEND';console.error('studio_worker_error',code);return studioError(error);}}
 export function onRequest(){return new Response(null,{status:405});}

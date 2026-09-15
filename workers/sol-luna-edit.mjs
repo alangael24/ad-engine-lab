@@ -58,6 +58,10 @@ export async function finishSolLunaProject({root,project,shots,narration,words,b
    const ev=await evidence(result.path,scenes,resolve(root,'revision-review'),{signal});
    const images=await Promise.all(ev.sheets.map(async p=>'data:image/jpeg;base64,'+(await readFile(p)).toString('base64')));
    const raw=await invokeModel({role:'director',name:'review_edit',schema:finalSchema,system:rules+' Review this LOCAL revision of an approved montage. Verify the requested change and its neighboring cuts; preserve all other approved creative decisions. Review full scene coverage for regressions. Do not suggest unrelated restyling or new copy. Only observable material defects block. Do not expand regeneration beyond the requested scenes. Never claim continuous audiovisual inspection from samples.',context:{...context,edit:edl,changedScenes:project.data.editing.changedSceneIds,neighborScenes:reviewNeighbors(scenes,project.data.editing.changedSceneIds),requestedLayers:project.data.editing.settings,sampleTimes:ev.sampleTimes},images,usage,env,signal,fetchImpl});
+   // Keep the model's verdict before validation so a malformed report remains
+   // diagnosable without another paid review. No media or signed URLs are logged.
+   await writeFile(resolve(root,'review-local-raw.json'),JSON.stringify(raw,null,2));
+   console.log(JSON.stringify({event:'editorial_review',verdict:raw.verdict,coverage:raw.coverage,issues:raw.issues,summary:raw.summary}));
    let verified=validateEditorialReview(raw,scenes);
    verified=await auditCaptions({review:verified,path:result.path,edl,scenes,words:input.words,root:resolve(root,'caption-audit-revision'),call:invokeModel,usage,env,signal,fetchImpl});
    if(ev.duplicates.length&&!verified.issues.some(i=>i.kind==='repetition'))throw Error('EDITORIAL_REUSE_WAIVED');
@@ -82,6 +86,8 @@ export async function finishSolLunaProject({root,project,shots,narration,words,b
    const ev=await evidence(result.path,scenes,resolve(root,`review-${round}`),{signal});
    const renderedImages=await Promise.all(ev.sheets.map(async p=>'data:image/jpeg;base64,'+(await readFile(p)).toString('base64')));
    const raw=await invokeModel({role:'director',name:'review_edit',schema:finalSchema,system:rules+' Review the ACTUAL RENDERED panels against script, scene context and your direction. List every scene ID in coverage exactly in supplied order. Inspect the opening, progression, captions and ending. Repeated similar subject matter is not repeated footage; valid before/after actions may revisit the same setting. Only block on observable material defects with concrete timestamps and viewer impact. For caption/cut/retiming defects use kind caption or timing and action none: The editor can repair the edit. For an image/motion defect needing new assets use the schema’s replace_image/replace_clip and concrete prompts. You see sampled frames, not continuous video/audio; never claim to hear speech or verify lipsync. Give a concise Spanish summary. Pass only when no material issues are observed.',context:{...context,plan,edit:edl,previousFeedback:feedback,sampleTimes:ev.sampleTimes,duplicates:ev.duplicates},images:renderedImages,usage,env,signal,fetchImpl});
+   await writeFile(resolve(root,`review-${round}-raw.json`),JSON.stringify(raw,null,2));
+   console.log(JSON.stringify({event:'editorial_review',verdict:raw.verdict,coverage:raw.coverage,issues:raw.issues,summary:raw.summary}));
    let verified=validateEditorialReview(raw,scenes);
    verified=await auditCaptions({review:verified,path:result.path,edl,scenes,words:input.words,root:resolve(root,'caption-audit-'+round),call:invokeModel,usage,env,signal,fetchImpl});
    if(ev.duplicates.length&&!verified.issues.some(i=>i.kind==='repetition'))throw Error('EDITORIAL_REUSE_WAIVED');
