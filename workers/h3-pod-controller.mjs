@@ -19,7 +19,7 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
  let s=await state('acquire');if(s.busy)return {status:'busy'};token=s.token;
  try{
   let run=s.run;
-  if(!run||run.phase==='closed'){
+  if(!run?.id||run.phase==='closed'){
    if(!s.enabled||!s.pending||s.running)return {status:'idle'};
    const catalog=await control('/catalog/gpus/'+encodeURIComponent(GPU)+'?include=AVAILABILITY&product=POD&cloud=COMMUNITY&minCudaVersion=13.0');
    const rate=catalog?.price?.community;

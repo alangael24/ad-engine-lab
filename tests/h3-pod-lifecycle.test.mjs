@@ -57,6 +57,14 @@ test('a lost create acknowledgement is never followed by a duplicate POST',async
  await tickManagedPod(env,next);assert.equal(next.calls.filter(c=>c.url.endsWith('/pods')&&c.method==='POST').length,0);
 });
 test('unapproved price cannot create a pod',async()=>{const m=mock({cost:.99});assert.equal((await tickManagedPod(env,m)).status,'no_approved_capacity');assert.ok(!m.calls.some(c=>c.body?.action==='begin'));});
+test('an empty PostgreSQL composite is no run, including before the first order',async()=>{
+ const empty={id:null,name:null,pod_id:null,phase:null,created_at:null};
+ const idle=mock({state:{token:'lease',enabled:true,pending:false,running:false,run:empty}});
+ assert.equal((await tickManagedPod(env,idle)).status,'idle');
+ const queued=mock({state:{token:'lease',enabled:true,pending:true,running:false,run:empty}});
+ assert.equal((await tickManagedPod(env,queued)).status,'preparing');
+ assert.equal(queued.calls.filter(c=>c.url.endsWith('/pods')&&c.method==='POST').length,1);
+});
 test('idle stop verifies shutdown before termination and closure',async()=>{
  const m=mock({state:{token:'t',enabled:true,pending:false,running:false,run:{...run,pod_id:'abcdefgh',phase:'running',ready_at:new Date(2000).toISOString(),idle_since:new Date(3000).toISOString()}},clock:150000});
  assert.equal((await tickManagedPod(env,m)).status,'deleted');

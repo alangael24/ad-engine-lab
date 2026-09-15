@@ -8,7 +8,7 @@ export default {
         method:'POST', headers:{ 'content-type':'application/json', authorization:`Bearer ${env.GENERATION_WORKER_TOKEN}`, 'user-agent':'CreativeRush-Worker/1.0' },
         body:JSON.stringify({ action:'sweep' }), signal:AbortSignal.timeout(25000),
       }).catch(()=>({ok:false}));
-      if (!response.ok) console.error('Generation reconciliation failed');
+      if (!response.ok) console.error('Generation reconciliation failed',response.status||'network');
       console.log(JSON.stringify({managedPod:await tickManagedPod(env)}));
     })());
   },
