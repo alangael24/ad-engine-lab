@@ -15,7 +15,7 @@ export async function patchNarration(project,plan,providers,invoke,once,jobId){
   const old=revision.scenes.find(x=>x.id===scene.id);if(!old)throw Error('PRODUCTION_NARRATION_BASE');
   if(scene.text===old.text)parts.push({sceneId:scene.id,assetId:revision.assetId,start:old.narrationStart,duration:old.end-old.start,reused:true});
   else{
-   const result=await once(`narration-scene-${scene.id}`,'narration',()=>providers.speech({...project,data:{...project.data,scriptDraft:scene.text}},{...plan,scenes:[scene]},invoke,jobId));
+   const result=await once(`narration-scene-${scene.id}`,'narration',()=>providers.speech({...project,data:{...project.data,scriptDraft:scene.text}},{...plan,scenes:[scene]},invoke,jobId,`narration-scene-${scene.id}`));
    if(!Number.isFinite(result.duration)||result.duration<.5||result.duration>15)throw Error('PRODUCTION_TIMING');
    parts.push({...result,sceneId:scene.id,start:0,reused:false});
   }

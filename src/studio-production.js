@@ -2,6 +2,13 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_VOICE_CONFIG:[503,'La voz no está configurada. Tu avance está guardado.'],
+ PRODUCTION_VOICE_HTTP:[503,'El servicio de voz no respondió correctamente. No repetimos la solicitud automáticamente.'],
+ PRODUCTION_VOICE_REJECTED:[503,'El proveedor rechazó la narración. Tu avance está guardado.'],
+ PRODUCTION_VOICE_UNCERTAIN:[409,'No pudimos confirmar la narración. No la generaremos otra vez automáticamente.'],
+ PRODUCTION_VOICE_AUDIO:[503,'La respuesta de voz no contenía un audio válido. Tu avance está guardado.'],
+ PRODUCTION_VOICE_SUBTITLES:[503,'La voz se generó, pero falta recuperar su sincronización. Conservamos el audio.'],
+ PRODUCTION_VOICE_ALIGNMENT:[422,'La voz está guardada, pero sus palabras no coinciden con el guion. Hay que revisar la sincronización.'],
  PRODUCTION_REPAIR_OUTSIDE_SCOPE:[409,'La revisión encontró otro cambio necesario fuera de lo solicitado. Conservamos el video anterior sin generar tomas adicionales.'],
  PRODUCTION_NARRATION_BASE:[409,'Falta la narración editable de esta versión. Conservamos el audio y no generamos una narración completa.'],
  PRODUCTION_NARRATION_BOUNDARY:[409,'La frase necesita un corte de audio más preciso. Conservamos la versión anterior.'],

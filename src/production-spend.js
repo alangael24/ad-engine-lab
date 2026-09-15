@@ -6,3 +6,9 @@ export function paidStep(key){
  if(/^(quality-\d+|still-check-\d+-[0-2]|image-review-\d+|repair-still-review-\d+)$/.test(key))return 'quality';
  return null;
 }
+
+export function measuredStepCost(result){
+ if(result?.reusedAudio)return 0;
+ const cost=result?.providerUsage?.cost??result?.usage?.costUsd??result?.costUsd;
+ return Number.isFinite(cost)&&cost>=0?cost:null;
+}

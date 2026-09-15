@@ -84,3 +84,20 @@ test('funded trial allowance is limited to the nominated customer',async()=>{
   await assert.rejects(reserve(db,other),/PRODUCTION_BUDGET_DISABLED/);
  }finally{await db.close();}
 });
+
+test('measured spend replaces estimate, unknown calls retain holds, overrun blocks later stages',async()=>{
+ const db=await database();try{
+  const f=await fixture(db);await db.exec('update production_spend_policy set project_limit=500000,total_limit=500000');
+  await reserve(db,f,'plan','planning');
+  const account=(action,amount)=>call(db,'account_production_spend',['budget-worker',f.job,f.lease,'plan',action,amount]);
+  await account('reserve',400000);
+  await assert.rejects(reserve(db,f,'image-0','image'),/PRODUCTION_BUDGET_EXCEEDED/);
+  await account('settle',150000);await account('settle',150000);
+  await reserve(db,f,'image-0','image');
+  await account('settle',264845);
+  await assert.rejects(reserve(db,f,'next','planning'),/PRODUCTION_BUDGET_EXCEEDED/);
+  await assert.rejects(account('settle',1),/IDEMPOTENCY_CONFLICT/);
+  await assert.rejects(call(db,'account_production_spend',['budget-worker',f.job,crypto.randomUUID(),'plan','settle',0]),/LEASE_LOST/);
+  await db.exec('set role authenticated');await assert.rejects(account('settle',999),/permission denied/);
+ }finally{await db.close();}
+});

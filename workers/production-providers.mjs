@@ -5,7 +5,7 @@ import {imagePacket,normalizeShotContract,shotContractSchema,DIRECTOR_CONTINUITY
 import {creativeContext} from '../assets/creative-context.js';
 import {askReview} from './production-quality.mjs';
 import {productionVisionFetch,productionVisionModel} from '../src/production-vision.js';
-import {synthesizeMiniMax} from './minimax-speech.mjs';
+import {recoverableSpeech} from './recoverable-speech.mjs';
 import {composeNarration} from './narration-revision.mjs';
 import {reviewProduction} from './production-quality.mjs';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
@@ -47,24 +47,33 @@ async function saveAsset(kind,bytes,invoke,fetchImpl,duration){
  const r=await fetchImpl(uploadUrl,{method:'PUT',headers:{'content-type':kind==='image'?'image/png':'audio/mpeg','x-upsert':'false'},body:bytes,signal:AbortSignal.timeout(120000)});
  if(!r.ok)await providerFailure(r,'asset_upload');const saved=await invoke('register',{assetId,kind,duration});return {assetId:saved.result.id};
 }
+// Aggregate all vision calls (including formatting retries) within this step.
+function meteredVisionEnv(env,invoke){
+ if(!invoke.costStep)return env;
+ const key=invoke.costStep,calls=new Map();
+ return {...env,PRODUCTION_ON_USAGE:async usage=>{
+  for(const call of usage.calls)calls.set(call.id,call);
+  const items=[...calls.values()],unknown=items.some(c=>!Number.isFinite(c.cost));
+  const costUsd=items.reduce((n,c)=>n+(Number.isFinite(c.cost)?c.cost:c.reserved),0);
+  await invoke(unknown?'reserve_cost':'record_cost',{key,costUsd});
+ }};
+}
 export function createProductionProviders(env,{fetchImpl=fetch}={}){
  return {
   context:(_project,invoke)=>invoke('creative_context'),
-  review:args=>reviewProduction({...args,env,fetchImpl}),
+  review:args=>reviewProduction({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
   async ready(){if(!(env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY)||!env.OPENAI_API_KEY||!(env.MINIMAX_API_KEY||(env.ELEVENLABS_API_KEY&&env.PRODUCTION_VOICE_ID)))fail('PRODUCTION_OFFLINE');},
-  plan:(project,invoke)=>callDirector(project,env,{fetchImpl,invoke}),
-  reviewImages:args=>reviewImages({...args,env,fetchImpl}),
-  reviewImage:args=>reviewImages({...args,targetIndex:args.index,env,fetchImpl}),
+  plan:(project,invoke)=>callDirector(project,meteredVisionEnv(env,invoke),{fetchImpl,invoke}),
+  reviewImages:args=>reviewImages({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
+  reviewImage:args=>reviewImages({...args,targetIndex:args.index,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
   composeSpeech:args=>composeNarration({...args,fetchImpl,save:(bytes,duration)=>saveAsset('narration',bytes,args.invoke,fetchImpl,duration)}),
-  async speech(project,plan,invoke){
-   if(env.MINIMAX_API_KEY){
-    const {bytes,alignment,usage}=await synthesizeMiniMax(project.data.scriptDraft,env,{fetchImpl});
-    console.log(JSON.stringify({event:'production_voice_usage',projectId:project.id,...usage}));
+  async speech(project,plan,invoke,_jobId,stepKey='narration'){
+   if(env.MINIMAX_API_KEY)return recoverableSpeech(project.data.scriptDraft,env,invoke,async bytes=>{
     const dir=await mkdtemp(join(tmpdir(),'production-minimax-'));let duration;
     try{const p=join(dir,'voice.mp3');await writeFile(p,bytes);duration=Number((await probe(p)).format.duration);}finally{await rm(dir,{recursive:true,force:true});}
-    if(!Number.isFinite(duration)||duration<=0||duration>120||alignment.character_end_times_seconds.some(t=>t>duration+.05))fail('PRODUCTION_TIMING');
-    return {...await saveAsset('narration',bytes,invoke,fetchImpl,duration),duration,alignment,usage};
-   }
+    if(!Number.isFinite(duration)||duration<=0||duration>120)fail('PRODUCTION_TIMING');
+    return {...await saveAsset('narration',bytes,invoke,fetchImpl,duration),duration};
+   },{fetchImpl,stepKey});
    const voice=encodeURIComponent(env.PRODUCTION_VOICE_ID);
    const r=await fetchImpl(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/with-timestamps?output_format=mp3_44100_128`,{method:'POST',headers:{'xi-api-key':env.ELEVENLABS_API_KEY,'content-type':'application/json'},body:JSON.stringify({text:project.data.scriptDraft,model_id:'eleven_multilingual_v2'}),signal:AbortSignal.timeout(120000)});
    if(!r.ok)fail('PRODUCTION_PROVIDER');const d=JSON.parse(new TextDecoder().decode(await readBounded(r,30000000)));

@@ -13,3 +13,10 @@ test('alignment tolerates punctuation segmentation while preserving every spoken
  const r=minimaxAlignment(data,'¡Hola, mundo!');assert.deepEqual(r.characters,['¡Hola,','mundo!']);assert.deepEqual(r.character_start_times_seconds,[0,.4]);assert.equal(r.character_end_times_seconds.at(-1),1);
  assert.throws(()=>minimaxAlignment(data,'¡Hola, otro mundo!'));
 });
+
+test('normalised number phonemes sharing one source range do not duplicate spoken words',()=>{
+ const parts=[{word:'30',word_begin:0,word_end:2,time_begin:0,time_end:100},{word:'30',word_begin:0,word_end:2,time_begin:100,time_end:200},{word:'30',word_begin:0,word_end:2,time_begin:200,time_end:350},{word:' noches',word_begin:2,word_end:9,time_begin:350,time_end:800}];
+ const r=minimaxAlignment([{timestamped_words:parts}],'30 noches');assert.deepEqual(r.characters,['30',' noches']);assert.equal(r.character_end_times_seconds[0],.35);
+ assert.throws(()=>minimaxAlignment([{timestamped_words:parts.map((w,i)=>({...w,word_begin:i*2,word_end:i*2+2}))}],'30 noches'));
+ assert.throws(()=>minimaxAlignment([{timestamped_words:parts.map(({word_begin,word_end,...w})=>w)}],'30 noches'));
+});

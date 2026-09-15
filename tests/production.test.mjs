@@ -154,3 +154,16 @@ test('temporary test allowance expires and preserves the normal daily attempt li
  await db.query("update production_attempt_allowances set expires_at=now()-interval '1 minute' where user_id=$1",[f.u.id]);
  await assert.rejects(start(f),/PRODUCTION_LIMIT/);
 });
+
+test('explicit retry preserves paid voice and fences an ambiguous synthesis checkpoint',async()=>{
+ const f=await fixture(),initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const key='voice-'+'a'.repeat(32),pending='voice-'+'b'.repeat(32),saved={assetId:crypto.randomUUID(),duration:3,subtitleUrl:'https://example.test/subtitle',usage:{costUsd:.01}};
+ await work(j,'begin_step',{key,stage:'narration'});await work(j,'finish_step',{key,result:saved});
+ await work(j,'begin_step',{key:pending,stage:'narration'});await work(j,'fail',{code:'PRODUCTION_VOICE_UNCERTAIN'});
+ const retry=await start(f);assert.deepEqual(retry.steps[key].result,saved);assert.equal(retry.steps[pending].status,'started');
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==retry.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==retry.id);
+ assert.deepEqual((await work(j,'begin_step',{key,stage:'narration'})).result,saved);
+ await assert.rejects(work(j,'begin_step',{key:pending,stage:'narration'}),/PRODUCTION_UNCERTAIN/);
+ await work(j,'fail',{code:'TEST_DONE'});
+});

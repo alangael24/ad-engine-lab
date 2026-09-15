@@ -17,7 +17,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
  const invoke=async(action,data={})=>{if(lost)throw Error('LEASE_LOST');const r=await api(action,{...identity,data});return r.value??r;};
  const timer=setInterval(async()=>{if(beating)return;beating=true;try{await invoke('heartbeat');last=Date.now();}catch(e){if(e.code==='LEASE_LOST'||e.code==='STUDIO_CONFLICT'||Date.now()-last>100000)lost=true;}finally{beating=false;}},20000);
  const check=()=>{if(lost)throw Error('LEASE_LOST');if(Date.now()-started>deadlineMs)throw Error('PRODUCTION_TIMEOUT');};
- const once=async(key,stage,fn)=>{check();const s=await invoke('begin_step',{key,stage});if(s.status==='done')return s.result;const result=await fn();check();await invoke('finish_step',{key,stage,result});return result;};
+ const once=async(key,stage,fn)=>{check();const s=await invoke('begin_step',{key,stage});if(s.status==='done')return s.result;invoke.costStep=key;const result=await fn();check();await invoke('finish_step',{key,stage,result});return result;};
  const write=async(key,stage,action,data)=>{check();return (await invoke('write',{key,stage,action,data})).result;};
  const wait=async(predicate)=>{while(true){check();const current=await invoke('inspect');const value=predicate(current);if(value)return value;await sleep(pollMs);}};
  try{

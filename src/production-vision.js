@@ -16,7 +16,7 @@ export async function productionVisionFetch(fetchImpl,url,init,env){
   }context.push({role:message.role,text:content.join('\n')});
  }
  const usage={total:0,calls:[],unknown:false};
- const raw=await editorialCall({role:'director',name:tool.name,schema:tool.parameters,system:messages.filter(x=>x.role==='system').map(x=>x.content).join('\n'),context,images,usage,env,signal:init.signal,fetchImpl,maxTokens:request.max_tokens});
+ const raw=await editorialCall({role:'director',name:tool.name,schema:tool.parameters,system:messages.filter(x=>x.role==='system').map(x=>x.content).join('\n'),context,images,usage,env,signal:init.signal,fetchImpl,maxTokens:request.max_tokens,onUsage:env.PRODUCTION_ON_USAGE});
  const last=usage.calls.at(-1),model=last.returnedModel;
  const normalized={prompt_tokens:usage.calls.reduce((n,x)=>n+x.input,0),completion_tokens:usage.calls.reduce((n,x)=>n+x.output,0),total_tokens:usage.calls.reduce((n,x)=>n+x.input+x.output,0),calls:usage.calls,cost:usage.total,unknown:usage.unknown};
  return new Response('data: '+JSON.stringify({model,usage:normalized,choices:[{delta:{tool_calls:[{index:0,function:{name:tool.name,arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});

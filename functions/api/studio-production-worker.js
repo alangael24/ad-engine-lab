@@ -1,4 +1,4 @@
-import {paidStep} from '../../src/production-spend.js';
+import {paidStep,measuredStepCost} from '../../src/production-spend.js';
 import {narrationAlignment,approvedBase} from '../../src/partial-edit.js';
 import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
@@ -21,6 +21,11 @@ export async function onRequestPost(context){try{
  if(['heartbeat','inspect','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
  const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
+ if(b.action==='record_cost'||b.action==='reserve_cost'){
+  const amount=b.data?.costUsd;
+  if(!Number.isFinite(amount)||amount<0||amount>100)throw Error('PRODUCTION_INVALID');
+  return json({value:await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:b.data.key,p_action:b.action==='record_cost'?'settle':'reserve',p_amount:Math.ceil(amount*1000000)})});
+ }
  if(b.action==='begin_step'){
   const key=b.data?.key,kind=paidStep(key);
   if(kind&&!(key==='narration'&&j.snapshot?.data?.narrationRevision)&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
@@ -44,6 +49,9 @@ export async function onRequestPost(context){try{
   return json({url:await signed(db,'studio-media',r.result_path),manifest:r.manifest,project:await own(db,'studio_projects',j.user_id,j.project_id)});
  }
  if(b.action==='finish_step'){
+  const cost=measuredStepCost(b.data?.result);
+  if(paidStep(b.data?.key)&&cost!=null)await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:b.data.key,p_action:'settle',p_amount:Math.ceil(cost*1000000)});
+
   if(b.data?.stage==='quality'){
    const r=await own(db,'studio_renders',j.user_id,b.data?.result?.renderId),report=b.data.result;
    if(r.production_id!==j.id||r.project_revision!==j.expected_revision||r.status!=='succeeded'||report.version!==QUALITY_VERSION||!/^[a-f0-9]{64}$/.test(report.sha256||''))throw Error('PRODUCTION_QUALITY_INVALID');
