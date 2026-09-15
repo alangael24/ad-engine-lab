@@ -102,6 +102,7 @@ export async function onRequestPost(context){try{
      if(!scene)throw Error('PRODUCTION_INVALID');
      await reserve(d.key,'clip',Math.ceil((scene.end-scene.start)/5));
     }
+    if(!request.assetId)await reserve(d.key+'-prompt','planning');
     const promptEnv={...context.env,PRODUCTION_ON_USAGE:async usage=>{
      const unknown=usage.calls.some(c=>!Number.isFinite(c.cost));
      const amount=usage.calls.reduce((n,c)=>n+(Number.isFinite(c.cost)?c.cost:c.reserved),0);
