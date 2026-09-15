@@ -46,7 +46,7 @@ export async function onRequestPost(context){try{
    referenceEvidence=a.result?.visualEvidence||[];
    if(!referenceEvidence.length)throw Error('PRODUCTION_REFERENCE_REQUIRED');
   }
-  const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(10);
+  const prior=await db.from('studio_productions').select('id,user_id,project_id,status,expected_revision,steps,snapshot').eq('user_id',j.user_id).eq('project_id',j.project_id).eq('status','failed').order('created_at',{ascending:false}).limit(10);
   if(prior.error)throw prior.error;
   return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(project,prior.data||[])}});
  }
@@ -102,7 +102,12 @@ export async function onRequestPost(context){try{
      if(!scene)throw Error('PRODUCTION_INVALID');
      await reserve(d.key,'clip',Math.ceil((scene.end-scene.start)/5));
     }
-    const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',context.env);
+    const promptEnv={...context.env,PRODUCTION_ON_USAGE:async usage=>{
+     const unknown=usage.calls.some(c=>!Number.isFinite(c.cost));
+     const amount=usage.calls.reduce((n,c)=>n+(Number.isFinite(c.cost)?c.cost:c.reserved),0);
+     await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:d.key+'-prompt',p_action:unknown?'reserve':'settle',p_amount:Math.ceil(amount*1000000)});
+    }};
+    const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',promptEnv);
     d.data={...request,prompt};
    }
   }

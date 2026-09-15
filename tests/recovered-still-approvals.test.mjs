@@ -25,3 +25,17 @@ test('changed product, script, image, revision, ownership or incomplete proof in
  for(const change of changes){const {project,prior}=fixture();change(project);assert.deepEqual(recoveredStillApprovals(project,[prior]),{});}
  for(const change of [p=>p.status='running',p=>p.steps.prepare.status='started',p=>p.steps['still-check-0-1'].result.verdict='repair',p=>p.steps['still-check-0-1'].result.assetIds=['wrong'],p=>p.steps['still-check-0-1'].result.issues=[{}]]){const {project,prior}=fixture();change(prior);assert.deepEqual(recoveredStillApprovals(project,[prior]),{});}
 });
+test('failed retry follows a verified unchanged snapshot chain, not changed creative content',()=>{
+ const {project,prior}=fixture(),snapshot=structuredClone(project);
+ const note='Product, character and scene images approved before animation.';
+ snapshot.data.creativeMemory={decisions:[note],preferences:['Dynamic']};
+ prior.steps.prepare.result=structuredClone(snapshot);
+ const current=structuredClone(snapshot);current.revision=8;current.data.creativeMemory.decisions.push(note);
+ const retry={id:'retry',user_id:'u',project_id:'p',status:'failed',expected_revision:8,snapshot,
+  steps:{prepare:{status:'done',result:structuredClone(current)},plan:{result:{scenes:[{id:'s'}]}},timing:{result:[{id:'s',planSceneId:'s'}]}}};
+ assert.equal(recoveredStillApprovals(current,[retry,prior]).s.productionId,'old');
+ for(const change of [p=>p.data.scenes[0].imageAssetId='changed',p=>p.data.scriptDraft='changed',p=>p.data.creativeMemory.preferences=['Other'],p=>p.data.creativeMemory.decisions.push('New direction')]){
+  const modified=structuredClone(current);change(modified);
+  assert.deepEqual(recoveredStillApprovals(modified,[{...retry,steps:{...retry.steps,prepare:{status:'done',result:modified}}},prior]),{});
+ }
+});

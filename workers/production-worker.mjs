@@ -155,7 +155,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    }
   }
 
- }catch(e){const code=e.code||e.message;await api('fail',{...identity,data:{code:/^[A-Z_]{1,80}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z_]{1,80}$/.test(code)?code:'PRODUCTION_PROVIDER'};}
+ }catch(e){const code=e.code||e.message;await api('fail',{...identity,data:{code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'};}
  finally{clearInterval(timer);}
 }
 export async function main(){

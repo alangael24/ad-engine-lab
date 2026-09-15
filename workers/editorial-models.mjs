@@ -36,7 +36,12 @@ async function attemptCall({role,name,schema,system,context,images=[],usage,env,
   const body=deepseek?{model,reasoning_effort:'low',thinking:{type:'enabled'},stream:true,stream_options:{include_usage:true},max_tokens:maxOutput,response_format:{type:'json_object'},messages:[{role:'system',content:system+'\nReturn exactly one JSON object satisfying this schema: '+JSON.stringify(schema)},{role:'user',content:text}]}:{model,store:false,stream:true,max_output_tokens:maxOutput,reasoning:{effort:cfg.reasoning},parallel_tool_calls:false,tool_choice:{type:'function',name},tools:[{type:'function',name,description:'Return the requested structured result.',parameters:schema,strict:false}],input:[{role:'system',content:system},{role:'user',content:[{type:'input_text',text},...images.map(url=>({type:'input_image',image_url:url}))]}]};
   const r=await fetchImpl(endpoint,{method:'POST',headers:{authorization:`Bearer ${key}`,'content-type':'application/json','x-opencode-session':'creativerush-editorial-'+call.id},signal:signal?AbortSignal.any([signal,AbortSignal.timeout(cfg.timeout)]):AbortSignal.timeout(cfg.timeout),body:JSON.stringify(body)});
   call.requestId=r.headers.get('x-request-id');call.httpStatus=r.status;
-  if(!r.ok)throw Error('EDITORIAL_PROVIDER_UNAVAILABLE');
+  if(!r.ok){
+   let failure;try{failure=await r.json();}catch{}
+   const safe=x=>typeof x==='string'&&/^[a-zA-Z0-9_.-]{1,100}$/.test(x)?x:undefined;
+   call.providerCode=safe(failure?.error?.code);call.providerType=safe(failure?.error?.type);call.providerParam=safe(failure?.error?.param);
+   throw Error('EDITORIAL_PROVIDER_UNAVAILABLE');
+  }
   let response,actual,finish,textOut='',providerError=false;
   await readEvents(r,d=>{
    if(d.usage||d.response?.usage)call.usage=d.usage||d.response.usage;
