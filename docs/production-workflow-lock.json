@@ -91,7 +91,7 @@
     "workers/gpu-idle-worker.mjs": "3772c197d900f3fd65ce42627a8e4dd5d8e3c6878e0e0d8a169e8451be408602",
     "workers/h3-adapter.mjs": "3666896b08cd86eef247f5e03196a9e368bc81669125296b3bf5e6b9500f2cb7",
     "workers/h3-serverless-adapter.mjs": "7a0319cb8f46768ac4ec31f6768b6cf3196d7d19ff0b4828931c15678e42f7b5",
-    "workers/h3-worker.mjs": "6553f01d9eec4707348254a6934853880c1d8c188c1e39f39e0130bf2bc3d1ef",
+    "workers/h3-worker.mjs": "51a5ede97e1dc5aa19f117660ca7af73c5a3ae1cde6de6cc46eb1b9461c304d7",
     "workers/minimax-speech.mjs": "3bfd0336c812599e23b66224120c4e2a72e3ac35dbc4bb2ed9c6a92072a3d20e",
     "workers/narration-revision.mjs": "1a5f78382a9f3f00974a1a5e456464d4e4dad91192ca1a6b319173a78ac5ab5b",
     "workers/production-providers.mjs": "89756df8f7a31fe7c13bfa7ec9a0c44d80f6e00f41b518933ae2fc2ec3ee7cf9",

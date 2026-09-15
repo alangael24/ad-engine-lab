@@ -140,11 +140,13 @@ export async function main() {
   while (!stopping) {
     try {
       await api('sweep');
+      // Cleanup must still run when an unhealthy endpoint fails ready().
+      if(adapter.directUpload)await shutdownIdleEndpoint(api,adapter);
       const {job}=await claimReadyJob(api,adapter);
       if (job) {
         const outcome=await processJob(job, api, adapter);
         if(outcome?.status==='deferred')await delay(10000);
-      } else {if(adapter.directUpload)await shutdownIdleEndpoint(api,adapter);await delay(5000);}
+      } else await delay(5000);
     } catch { console.error('worker_not_ready_retrying'); await delay(10000); }
   }
 }
