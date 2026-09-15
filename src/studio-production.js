@@ -2,6 +2,8 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_GENERATION_OFFLINE:[503,'La animación no está disponible ahora. Conservamos tu avance sin iniciar nuevas imágenes ni voces.'],
+ WORKER_OFFLINE:[503,'La animación se detuvo. Las imágenes y la voz están guardadas.'],
  PRODUCTION_VOICE_CONFIG:[503,'La voz no está configurada. Tu avance está guardado.'],
  PRODUCTION_VOICE_HTTP:[503,'El servicio de voz no respondió correctamente. No repetimos la solicitud automáticamente.'],
  PRODUCTION_VOICE_REJECTED:[503,'El proveedor rechazó la narración. Tu avance está guardado.'],

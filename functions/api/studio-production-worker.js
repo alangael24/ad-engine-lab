@@ -33,6 +33,10 @@ export async function onRequestPost(context){try{
  }
  if(b.action==='creative_context'){
   const project=await own(db,'studio_projects',j.user_id,j.project_id);
+  // Check the CPU coordinator before spending on planning, voice or images.
+  // A serverless endpoint may be scaled to zero; no warm GPU is required here.
+  const scenes=j.snapshot?.data?.scenes||[];
+  if((!scenes.length||scenes.some(s=>!s.selectedVersionId))&&!await generationAvailability(db,context.env))throw Error('PRODUCTION_GENERATION_OFFLINE');
   if(j.snapshot?.data?.editing?.baseRenderId)await approvedBase(db,j.user_id,j.snapshot);
   let referenceEvidence=[];
   if(project.data.referenceAnalysisId){

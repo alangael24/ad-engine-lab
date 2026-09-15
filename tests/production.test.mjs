@@ -111,6 +111,21 @@ test('unconfigured providers fail before any media generation',async()=>{
  let calls=0;const result=await processProduction({id:crypto.randomUUID(),lease_token:crypto.randomUUID()},async(action)=>{calls++;return {value:{}};},{ready(){throw Error('PRODUCTION_OFFLINE');},plan(){throw Error('should not generate');}});
  assert.equal(result.code,'PRODUCTION_OFFLINE');assert.equal(calls,2);
 });
+test('production preflight blocks disabled or stale clip coordinators before paid steps',async()=>{
+ const f=await fixture(),initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const stub=mockSupabase(db),network=globalThis.fetch;globalThis.fetch=stub.fetch;
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'false'};
+ const invoke=()=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'creative_context'})})});
+ try{
+  await ready(db);let r=await invoke();assert.equal(r.status,503);assert.equal((await r.json()).code,'PRODUCTION_GENERATION_OFFLINE');
+  env.GENERATION_ENABLED='true';await db.query("update generation_workers set last_seen_at=now()-interval '2 minutes'");
+  r=await invoke();assert.equal(r.status,503);
+  await ready(db);r=await invoke();assert.equal(r.status,200,await r.clone().text());
+  assert.equal((await db.query('select count(*)::int n from production_spend_reservations where job_id=$1',[j.id])).rows[0].n,0);
+  assert.deepEqual((await db.query('select steps from studio_productions where id=$1',[j.id])).rows[0].steps,{});
+ }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
+});
 
 test('chat approval creates one production atomically and duplicate completion reuses it',async()=>{
  const f=await fixture(),id=crypto.randomUUID(),payload={expected:f.p.revision,message:'Me gusta, haz el video',enabled:true};
