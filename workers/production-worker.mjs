@@ -27,7 +27,9 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   if(providers.context)project={...project,...await providers.context(project,invoke)};
   const existing=project.data.scenes||[],revision=existing.length>0,reuseApprovedStills=revision&&!!project.data.editing?.baseRenderId;
   const plan=await once('plan','planning',async()=>revision?{
-   continuity:`Preserve the existing product, characters, setting and visual style. ${project.data.videoContinuity||''} ${project.data.referenceNotes||''} ${JSON.stringify(project.data.creative||{})}`,
+   // Reference notes and format settings already travel in creativeContext.
+   // Re-appending them here grows the persisted direction on every retry.
+   continuity:project.data.videoContinuity||'Preserve the existing product, characters, setting and visual style.',
    scenes:existing.map(s=>({...s,motion:s.motion||'Follow the approved scene direction; preserve continuity.'}))
   }:await (async()=>{const raw=await providers.plan(project,invoke);return {...validatePlan(raw,project.data.scriptDraft),providerUsage:raw.providerUsage||null};})());
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;

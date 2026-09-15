@@ -78,6 +78,8 @@ test('blocked first still prevents generating the second and submitting H3',asyn
 });
 test('retry with server-verified still approvals generates clips without repeating image calls or reviews',async()=>{
  const f=pipelineFixture();
+ f.job.snapshot.data.videoContinuity='Approved direction. '.repeat(95);
+ f.job.snapshot.data.referenceNotes='Reference context. '.repeat(60);
  for(const s of f.job.snapshot.data.scenes)s.selectedVersionId=null;
  f.providers.context=async()=>({recoveredStillApprovals:Object.fromEntries(f.job.snapshot.data.scenes.map(s=>[s.id,{assetId:s.imageAssetId,report:{verdict:'pass',issues:[],observedStates:[]}}]))});
  f.providers.reviewImage=async()=>{throw Error('Unexpected paid still review');};
@@ -85,6 +87,8 @@ test('retry with server-verified still approvals generates clips without repeati
  f.providers.review=async({renderId})=>review(f.state.project.data.scenes,'pass',renderId);
  const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});
  assert.equal(r.ok,true);assert.equal(f.counts.images,0);assert.equal(f.counts.clips,2);assert.equal(f.counts.complete,1);
+ assert.equal(f.state.project.data.videoContinuity,f.job.snapshot.data.videoContinuity);
+ assert.ok(f.state.project.data.videoContinuity.length<=2000);
 });
 test('production repairs one scene, rerenders and only completes after the new render passes',async()=>{
  const f=pipelineFixture(),result=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(result.ok,true);assert.equal(f.counts.complete,1);assert.equal(f.counts.reviews,2);assert.equal(f.counts.images,1);assert.equal(f.counts.clips,1);assert.equal(f.state.renders.length,2);assert.equal(result.renderId,f.state.renders[1].id);
