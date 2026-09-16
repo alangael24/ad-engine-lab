@@ -1,6 +1,6 @@
 # Material image-review pilot
 
-Status: local opt-in orchestration module; **not connected to the production worker or deployed**. Existing production reviewers and final-video review are unchanged.
+Status: production integration in `workers/material-image-review.mjs`, enabled by default for `astra-deepseek-v1`. Set `PRODUCTION_IMAGE_REVIEW_MODE=legacy` to roll back. Final-video Astra review is unchanged. Deployment status is recorded separately; this document is not deployment evidence.
 
 The goal is to conserve usable stills and stop material defects before paying for animation. This is not a search for aesthetic improvements.
 
@@ -25,10 +25,12 @@ Product controls require special attention only when their physical arrangement 
 1. DeepSeek inspects every criterion with actual references and target still.
 2. Astra independently checks proposed blocking violations, missing evidence and predefined mandatory weaknesses—even when DeepSeek approved them.
 3. A deterministic configurable audit sample also checks approvals. Audit rate is explicit experiment configuration, not a promised production escalation rate or cost target.
-4. All Astra scopes from steps 2–3 and mandatory style criteria are combined into one bounded collection request, against each scene's own approved contract. This avoids paying separate general inspections and then another style call. The request does not assume every scene/product must match unrelated scenes.
+4. All Astra scopes from steps 2–3 and mandatory style criteria are combined into bounded collection requests of at most six scenes, against each scene's own approved contract. This avoids paying separate general inspections and then another style call. The request does not assume every scene/product must match unrelated scenes.
 5. The controller merges confirmations. Every criterion must be covered. Only a confirmed visible blocking violation with a concrete consequence can produce `repair`.
 
-Neither module generates images, rewrites prompts or starts H3. `animationReady` is a pilot result only. The existing worker must not consume it without a production integration and gate test. In particular, the worker currently skips its collection review when individual stills are already approved: a future integration must always run the collection-style gate before the first H3 submission, including resumes and image replacements.
+The policy modules do not start H3. The production adapter checks each still with DeepSeek before allowing it to anchor another scene. Only during this provisional anchor check, mandatory style approvals are deferred; proposed style defects still escalate. The worker ALWAYS runs the full collection-style gate before H3, even with recovered individual approvals or reused images. Confirmed defects get a separately checkpointed DeepSeek repair prompt. Unknown evidence blocks animation.
+
+Contracts are derived deterministically from Astra’s approved opening shot, visible identities, preserve list and visual style before generating stills, then persisted as `material-contracts-v1`. Repairs cannot relax them. Motion/end-state requirements are not judged from a still. Original references and immutable target bytes are loaded server-side, hashed and mapped explicitly to numbered visual inputs. Only the dedicated DeepSeek `inspector` role accepts images; the editing role remains text-only.
 
 ## Persistence and cost
 
@@ -44,6 +46,6 @@ All provider costs, confirmation costs, collection review, sampled audits, inval
 
 The calibration uses prior disagreements and a deterministic sample of prior agreements. It is development/regression evidence, **not unseen validation**. The supervising assistant had seen some cases; hiding model decisions does not make it independent human ground truth. Ambiguous source contracts are excluded from correctness scores and preserved for diagnosis.
 
-Before activation: wire durable production storage and budget accounting, verify collection gate placement before H3, run held-out ads grouped by product/character family, and measure unnecessary regenerations and blocking defects reaching animation under the same acceptance standard. Keep final Astra video review unchanged during the pilot.
+Production checkpoints use lease-fenced `material-call-<sha256>` keys in the existing job steps and spending ledger. Responses are saved before policy validation; uncertain started calls fail closed without resubmission. Outer review steps do not double-reserve costs already held by individual calls. Rollout tests cover visual transport, cache invalidation, scoped repairs, uncertainty and mandatory gate placement. Still pending after deployment: a real client delivery, held-out ads grouped by product/character family, and observed regeneration/escape rates. A successful deployment is not evidence of those outcomes.
 
 Local policy tests: `node --test tests/image-review-policy.test.mjs`.

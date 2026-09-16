@@ -34,6 +34,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   }:await (async()=>{const raw=await providers.plan(project,invoke);return {...validatePlan(raw,project.data.scriptDraft),providerUsage:raw.providerUsage||null};})());
   // A retry may replay an older cached plan created before this normalization.
   if(revision)plan.continuity=project.data.videoContinuity||'Preserve the existing product, characters, setting and visual style.';
+  if(providers.prepareImageReview)plan.imageContracts=await once('material-contracts-v1','planning',()=>providers.prepareImageReview(project,plan));
+  const reviewPrefix=providers.imageReviewVersion?'material-v1-':'';
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:project.data.narrationRevision?await patchNarration(project,plan,providers,invoke,once,job.id):await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
   const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):narration.timeline||alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));
@@ -48,7 +50,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    // Production providers review each still before the next one may inherit it.
    if(providers.reviewImage&&!(reuseApprovedStills&&s.imageAssetId))for(let attempt=0;attempt<=2;attempt++){
     const key=1000+i*3+attempt;
-    const report=await once(`still-check-${i}-${attempt}`,'images',()=>providers.reviewImage({project,plan,images,index:i,invoke}));
+    const report=await once(`${reviewPrefix}still-check-${i}-${attempt}`,'images',()=>providers.reviewImage({project,plan,images,index:i,invoke}));
     validateReview(report,plan.scenes.map((x,j)=>({...x,start:j,end:j+1})));
     if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId))||report.issues.some(x=>x.sceneId!==s.id))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
     if(report.verdict==='pass'){
@@ -71,7 +73,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   for(let round=0;round<=2;round++){
    const unchanged=reuseApprovedStills&&images.every((im,i)=>im.assetId===existing.find(s=>s.id===plan.scenes[i].id)?.imageAssetId);
    const checked=plan.scenes.every((s,i)=>imageApprovals.get(s.id)?.assetId===images[i].assetId);
-   const report=checked?{verdict:'pass',summary:'Every immutable still already passed its own contextual review.',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[...imageApprovals.values()].flatMap(x=>x.report.observedStates||[]),reusedReviews:true}:unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
+   const report=!providers.imageReviewVersion&&checked?{verdict:'pass',summary:'Every immutable still already passed its own contextual review.',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[...imageApprovals.values()].flatMap(x=>x.report.observedStates||[]),reusedReviews:true}:!providers.imageReviewVersion&&unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`${reviewPrefix}image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
    const reviewScenes=plan.scenes.map((s,i)=>({...s,start:i,end:i+1}));
    validateReview(report,reviewScenes);
    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');
@@ -140,8 +142,9 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
      scene.imageAssetId=image.assetId;
     }
    }
+   if(plan.imageContracts)repairPlan.imageContracts=repairPlan.scenes.map(s=>{const source=timeline.find(t=>t.id===s.id)?.planSceneId||s.id;const c=plan.imageContracts.find(c=>c.sceneId===source);if(!c)throw Error('PRODUCTION_IMAGE_CONTRACT_MISSING');return {...c,sceneId:s.id};});
    const repairedImages=repaired.scenes.map(s=>({assetId:s.imageAssetId}));
-   const stillReview=await once(`repair-still-review-${round}`,'images',()=>providers.reviewImages({project:{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},plan:repairPlan,images:repairedImages,invoke}));
+   const stillReview=await once(`${reviewPrefix}repair-still-review-${round}`,'images',()=>providers.reviewImages({project:{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},plan:repairPlan,images:repairedImages,invoke}));
    validateReview(stillReview,repairPlan.scenes.map((s,i)=>({...s,start:i,end:i+1})));
    if(stillReview.verdict!=='pass'||JSON.stringify(stillReview.assetIds)!==JSON.stringify(repairedImages.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGES_BLOCKED');
    Object.assign(repaired,remember({data:repaired},{approvedAssets:repairedImages.map(x=>x.assetId),observedStates:stillReview.observedStates||[]}).data);

@@ -209,3 +209,21 @@ test('explicit retry preserves paid voice and fences an ambiguous synthesis chec
  await assert.rejects(work(j,'begin_step',{key:pending,stage:'narration'}),/PRODUCTION_UNCERTAIN/);
  await work(j,'fail',{code:'TEST_DONE'});
 });
+
+test('material inspector subcalls persist and settle without charging their outer review twice',async()=>{
+ const f=await fixture();await ready(db);const initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const stub=mockSupabase(db),network=globalThis.fetch;globalThis.fetch=stub.fetch;
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters'};
+ const invoke=async(action,data)=>{const r=await productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action,data})})});assert.equal(r.status,200,await r.clone().text());return (await r.json()).value;};
+ try{
+  await invoke('begin_step',{key:'material-v1-image-review-0',stage:'images'});
+  const key='material-call-'+'a'.repeat(64);await invoke('begin_step',{key,stage:'images'});
+  await invoke('reserve_cost',{key,costUsd:.2});await invoke('record_cost',{key,costUsd:.035});
+  const result={assessments:[],costUsd:.035};await invoke('finish_step',{key,stage:'images',result});
+  assert.deepEqual((await invoke('begin_step',{key,stage:'images'})).result,result);
+  await invoke('finish_step',{key:'material-v1-image-review-0',stage:'images',result:{costUsd:0}});
+  const rows=(await db.query('select step_key,measured_microusd from production_spend_reservations where job_id=$1',[j.id])).rows;
+  assert.equal(rows.length,1);assert.equal(rows[0].step_key,key);assert.equal(Number(rows[0].measured_microusd),35000);
+ }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
+});

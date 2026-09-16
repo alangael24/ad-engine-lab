@@ -1,3 +1,4 @@
+import {materialImageReviewEnabled,prepareImageContracts,reviewMaterialImages} from './material-image-review.mjs';
 import {imageCost} from '../src/media-cost.js';
 import {productionWorkflow} from '../assets/production-workflow.js';
 import {MATERIAL_REVIEW_RULES} from '../assets/quality-model.js';
@@ -59,13 +60,16 @@ function meteredVisionEnv(env,invoke){
  }};
 }
 export function createProductionProviders(env,{fetchImpl=fetch}={}){
+ const material=materialImageReviewEnabled(env);
  return {
+  imageReviewVersion:material?'material-v1':null,
+  prepareImageReview:material?prepareImageContracts:undefined,
   context:(_project,invoke)=>invoke('creative_context'),
   review:args=>reviewProduction({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
   async ready(){if(!(env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY)||!env.OPENAI_API_KEY||!(env.MINIMAX_API_KEY||(env.ELEVENLABS_API_KEY&&env.PRODUCTION_VOICE_ID)))fail('PRODUCTION_OFFLINE');},
   plan:(project,invoke)=>callDirector(project,meteredVisionEnv(env,invoke),{fetchImpl,invoke}),
-  reviewImages:args=>reviewImages({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
-  reviewImage:args=>reviewImages({...args,targetIndex:args.index,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
+  reviewImages:args=>material?reviewMaterialImages({...args,env,fetchImpl}):reviewImages({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
+  reviewImage:args=>material?reviewMaterialImages({...args,targetIndex:args.index,env,fetchImpl}):reviewImages({...args,targetIndex:args.index,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
   composeSpeech:args=>composeNarration({...args,fetchImpl,save:(bytes,duration)=>saveAsset('narration',bytes,args.invoke,fetchImpl,duration)}),
   async speech(project,plan,invoke,_jobId,stepKey='narration'){
    if(env.MINIMAX_API_KEY)return recoverableSpeech(project.data.scriptDraft,env,invoke,async bytes=>{

@@ -31,15 +31,15 @@ export function validateImageAssessment(raw,contract,scope=contract.criteria.map
  }
  return raw;
 }
-export function imageEscalation(contract,assessment,{audit=false}={}){
+export function imageEscalation(contract,assessment,{audit=false,deferStyle=false}={}){
  validateImageAssessment(assessment,contract);
  const checks=new Map(assessment.checks.map(c=>[c.criterionId,c]));
- const scoped=contract.criteria.filter(c=>c.kind!=='style'&&(audit||c.blocking&&(c.risk==='known_weakness'||checks.get(c.id).status!=='met')));
- return {criteria:scoped.map(c=>c.id),styleCriteria:contract.criteria.filter(c=>c.kind==='style'&&c.blocking).map(c=>c.id),reasons:scoped.map(c=>({criterionId:c.id,reason:audit?'sample_audit':c.risk==='known_weakness'?'known_weakness':checks.get(c.id).status==='violated'?'confirm_rejection':'missing_evidence'}))};
+ const scoped=contract.criteria.filter(c=>(c.kind!=='style'||deferStyle)&&(audit||c.blocking&&(c.risk==='known_weakness'||checks.get(c.id).status!=='met')));
+ return {criteria:scoped.map(c=>c.id),styleCriteria:deferStyle?[]:contract.criteria.filter(c=>c.kind==='style'&&c.blocking).map(c=>c.id),reasons:scoped.map(c=>({criterionId:c.id,reason:audit?'sample_audit':c.risk==='known_weakness'?'known_weakness':checks.get(c.id).status==='violated'?'confirm_rejection':'missing_evidence'}))};
 }
-export function decideImage(contract,primary,{confirmed=[],style=[],audit=false}={}){
+export function decideImage(contract,primary,{confirmed=[],style=[],audit=false,deferStyle=false}={}){
  validateImageAssessment(primary,contract);
- const escalated=imageEscalation(contract,primary,{audit}),needed=new Set([...escalated.criteria,...escalated.styleCriteria]);
+ const escalated=imageEscalation(contract,primary,{audit,deferStyle}),needed=new Set([...escalated.criteria,...escalated.styleCriteria]);
  const confirmations=[...confirmed,...style];
  // Scope is fixed by the caller, never expanded by a reviewer.
  if(confirmations.length)new Set(confirmations.map(c=>c.criterionId)).size===confirmations.length||invalid('duplicate_confirmation');

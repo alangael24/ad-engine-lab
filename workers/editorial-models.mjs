@@ -18,22 +18,22 @@ export function priceUsage(role,u,model=role==='director'?'gpt-6-astra':'deepsee
 }
 function validModel(actual,expected){return actual===expected||expected==='deepseek-flash'&&/^deepseek-v4\.1-flash(?:[-\w.]*)$/.test(actual||'');}
 async function attemptCall({role,name,schema,system,context,images=[],usage,env,signal,fetchImpl,repair=false,onUsage,maxTokens}){
- const cfg=editorialConfig(env),model=cfg[role],key=role==='director'?cfg.directorKey:cfg.editorKey;
- if(!model||role==='editor'&&images.length)throw Error('EDITORIAL_ROLE_INVALID');
+ const cfg=editorialConfig(env),model=role==='inspector'?cfg.editor:cfg[role],key=role==='director'?cfg.directorKey:cfg.editorKey;
+ if(!model||role==='editor'&&images.length||role==='inspector'&&model!=='deepseek-flash')throw Error('EDITORIAL_ROLE_INVALID');
  if(!key)throw Error('EDITORIAL_NOT_CONFIGURED');
  const deepseek=model==='deepseek-flash',maxOutput=deepseek?(repair?16000:12000):role==='director'?Math.min(12000,Math.max(4500,maxTokens||0)):12000;
  const text=JSON.stringify(context),estimatedInput=new TextEncoder().encode(system+text+JSON.stringify(schema)).length+images.length*10000;
  const reservation=(estimatedInput*Math.max(prices[model][0],prices[model][2])+maxOutput*prices[model][3])/1e6;
  const held=usage.calls.filter(x=>x.cost==null&&x.status==='started').reduce((n,x)=>n+x.reserved,0);
  if(estimatedInput>200000||usage.calls.length>=9||usage.unknown||usage.total+held+reservation>cfg.budget)throw Error('EDITORIAL_BUDGET_REACHED');
- const call={id:crypto.randomUUID(),role,model,name,workflowProfile:cfg.version,status:'started',reserved:reservation,startedAt:new Date().toISOString(),basis:role==='editor'?'OpenCode usage at peak API-equivalent rates; subscription debit unavailable':'OpenAI API usage at standard rates'};
+ const call={id:crypto.randomUUID(),role,model,name,workflowProfile:cfg.version,status:'started',reserved:reservation,startedAt:new Date().toISOString(),basis:role!=='director'?'OpenCode usage at peak API-equivalent rates; subscription debit unavailable':'OpenAI API usage at standard rates'};
  usage.calls.push(call);let result,error;
  // Persist the reservation before dispatch so a crashed process cannot erase
  // an in-flight paid request from the audit trail.
  if(onUsage)await onUsage(structuredClone(usage));
  try{
   const endpoint=deepseek?'https://opencode.ai/zen/go/v1/chat/completions':role==='director'?'https://api.openai.com/v1/responses':'https://opencode.ai/zen/go/v1/responses';
-  const body=deepseek?{model,reasoning_effort:'low',thinking:{type:'enabled'},stream:true,stream_options:{include_usage:true},max_tokens:maxOutput,response_format:{type:'json_object'},messages:[{role:'system',content:system+'\nReturn exactly one JSON object satisfying this schema: '+JSON.stringify(schema)},{role:'user',content:text}]}:{model,store:false,stream:true,max_output_tokens:maxOutput,reasoning:{effort:cfg.reasoning},parallel_tool_calls:false,tool_choice:{type:'function',name},tools:[{type:'function',name,description:'Return the requested structured result.',parameters:schema,strict:false}],input:[{role:'system',content:system},{role:'user',content:[{type:'input_text',text},...images.map(url=>({type:'input_image',image_url:url}))]}]};
+  const body=deepseek?{model,reasoning_effort:'low',thinking:{type:'enabled'},stream:true,stream_options:{include_usage:true},max_tokens:maxOutput,response_format:{type:'json_object'},messages:[{role:'system',content:system+'\nReturn exactly one JSON object satisfying this schema: '+JSON.stringify(schema)},{role:'user',content:images.length?[{type:'text',text},...images.map(url=>({type:'image_url',image_url:{url}}))]:text}]}:{model,store:false,stream:true,max_output_tokens:maxOutput,reasoning:{effort:cfg.reasoning},parallel_tool_calls:false,tool_choice:{type:'function',name},tools:[{type:'function',name,description:'Return the requested structured result.',parameters:schema,strict:false}],input:[{role:'system',content:system},{role:'user',content:[{type:'input_text',text},...images.map(url=>({type:'input_image',image_url:url}))]}]};
   const r=await fetchImpl(endpoint,{method:'POST',headers:{authorization:`Bearer ${key}`,'content-type':'application/json','x-opencode-session':'creativerush-editorial-'+call.id},signal:signal?AbortSignal.any([signal,AbortSignal.timeout(cfg.timeout)]):AbortSignal.timeout(cfg.timeout),body:JSON.stringify(body)});
   call.requestId=r.headers.get('x-request-id');call.httpStatus=r.status;
   if(!r.ok){
@@ -56,7 +56,7 @@ async function attemptCall({role,name,schema,system,context,images=[],usage,env,
   if(providerError||deepseek&&finish!=='stop'||!deepseek&&response?.status!=='completed')throw Error('EDITORIAL_RESPONSE_INCOMPLETE');
   if(!validModel(call.returnedModel,model))throw Error('EDITORIAL_MODEL_MISMATCH');
   if(!deepseek){const calls=response.output?.filter(x=>x.type==='function_call')||[];if(calls.length!==1||calls[0].name!==name)throw Error('EDITORIAL_RESPONSE_INVALID');textOut=calls[0].arguments;}
-  try{result=JSON.parse(textOut);}catch{throw Error('EDITORIAL_RESPONSE_JSON');}
+  try{result=JSON.parse(textOut);}catch{throw Object.assign(Error('EDITORIAL_RESPONSE_JSON'),{rawResponse:textOut});}
   if(!result||typeof result!=='object'||Array.isArray(result))throw Error('EDITORIAL_RESPONSE_JSON');
   call.status='completed';
  }catch(e){call.status='failed';call.error=e.message;error=e;}
@@ -72,7 +72,7 @@ async function attemptCall({role,name,schema,system,context,images=[],usage,env,
 export async function editorialCall(args){
  const options={fetchImpl:fetch,...args,env:args.env||{},images:args.images||[]};
  try{return await attemptCall(options);}catch(e){
-  if(args.role!=='editor'||args.usage.unknown||args.signal?.aborted||!['EDITORIAL_RESPONSE_INCOMPLETE','EDITORIAL_RESPONSE_JSON','EDITORIAL_RESPONSE_INVALID'].includes(e.message))throw e;
+  if(!['editor','inspector'].includes(args.role)||args.usage.unknown||args.signal?.aborted||!['EDITORIAL_RESPONSE_INCOMPLETE','EDITORIAL_RESPONSE_JSON','EDITORIAL_RESPONSE_INVALID'].includes(e.message))throw e;
   return attemptCall({...options,repair:true,system:options.system+'\nThe previous metered response was incomplete or invalid JSON. Return a concise complete JSON object. Preserve the supplied direction and all validation constraints.'});
  }
 }

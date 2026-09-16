@@ -202,3 +202,10 @@ test('caption/timing feedback returns to the editor without regenerating images 
  const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
  assert.equal(result.ok,true);assert.equal(f.state.renders.length,2);assert.equal(f.counts.images,0);assert.equal(f.counts.clips,0);assert.match(f.state.project.data.creativeMemory.rejections.join(' '),/Caption stays/);assert.equal(f.counts.complete,1);
 });
+
+test('material collection gate cannot be skipped by inherited approvals or prior successful render',async()=>{
+ const f=pipelineFixture();f.job.snapshot.data.editing={baseRenderId:crypto.randomUUID()};
+ f.providers.imageReviewVersion='material-v1';f.providers.prepareImageReview=()=>[];
+ f.providers.reviewImages=async({plan,images})=>({verdict:'blocked',summary:'Unverified collection',issues:[{...issue({...plan.scenes[0],start:0}),action:'none',visual:'',motion:''}],assetIds:images.map(x=>x.assetId)});
+ const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(r.code,'PRODUCTION_IMAGES_BLOCKED');assert.equal(f.counts.clips,0);assert.equal(f.state.renders.length,0);assert.ok(f.steps['material-v1-image-review-0']);
+});
