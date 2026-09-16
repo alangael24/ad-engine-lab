@@ -164,13 +164,14 @@ test('chat approval creates one production atomically and duplicate completion r
  assert.equal((await db.query('select status from studio_chat_edits where id=$1',[gid])).rows[0].status,'running');
 });
 
-test('automatic version writes use H3 image-aware prompts and reuse frozen output on retry',async()=>{
+test('clip preparation checkpoints prompts before enqueue, survives lost replies and rejects conflicting replay',async()=>{
  const f=await fixture();await ready(db);const initial=await start(f);let j;
  do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
  const scene={id:crypto.randomUUID(),text:'Hola mundo.',visual:'Show the complete filter.',motion:'Continuous flowing water.',start:0,end:5,imageAssetId:f.p.brand_snapshot.productAssetId};
  await work(j,'write',{key:'prepare-test',stage:'images',action:'save_project',data:{...f.p.data,scenes:[scene]}});
- const stub=mockSupabase(db),network=globalThis.fetch;let llm=0;
+ const stub=mockSupabase(db),network=globalThis.fetch;let llm=0,failEnqueue=false;
  globalThis.fetch=async(input,opts)=>{
+  if(failEnqueue&&String(input).endsWith('/rpc/studio_production_work')){const b=JSON.parse(opts.body);if(b.p_action==='write'&&b.p_data?.action==='version'){const after=failEnqueue==='after';failEnqueue=false;if(after)await stub.fetch(input,opts);return Response.json({message:'TEST_ENQUEUE_UNAVAILABLE'},{status:503});}}
   if(String(input).startsWith('https://api.openai.com/')){
    llm++;const req=JSON.parse(opts.body);assert.equal(req.input[1].content[1].type,'input_image');
    return new Response('data: '+JSON.stringify({type:'response.completed',response:{model:'gpt-6-astra',status:'completed',usage:{input_tokens:100,output_tokens:100},output:[{type:'function_call',name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})}]}})+'\n\n');
@@ -178,12 +179,27 @@ test('automatic version writes use H3 image-aware prompts and reuse frozen outpu
  };
  const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'test-only'};
  const data={workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'write',data:{key:'clip-test',stage:'clips',action:'version',data:{requestId:crypto.randomUUID(),sceneId:scene.id}}};
- const invoke=()=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify(data)})});
+ const invoke=(body=data)=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify(body)})});
  try{
+  const prep={...data,action:'prepare_clip'};
+  const prepared=await invoke(prep);assert.equal(prepared.status,200,await prepared.clone().text());
+  assert.equal((await invoke(prep)).status,200);assert.equal(llm,1);
+  assert.equal((await db.query('select count(*)::int n from generation_jobs where request_id=$1',[data.data.data.requestId])).rows[0].n,0);
+  const checkpoint=(await db.query('select steps from studio_productions where id=$1',[j.id])).rows[0].steps['clip-test-prompt'];
+  assert.equal(checkpoint.status,'done');assert.match(checkpoint.result.prompt,/For the target video/);
+  const conflict=await invoke({...prep,data:{...prep.data,data:{...prep.data.data,requestId:crypto.randomUUID()}}});assert.equal(conflict.status,409);assert.equal(llm,1);
+  failEnqueue=true;const failed=await invoke();assert.notEqual(failed.status,200);assert.equal(llm,1);
+  failEnqueue='after';const lostReply=await invoke();assert.notEqual(lostReply.status,200);assert.equal(llm,1);
   const first=await invoke();assert.equal(first.status,200,await first.clone().text());const second=await invoke();assert.equal(second.status,200,await second.clone().text());assert.equal(llm,1);
   const rows=(await db.query('select prompt from generation_jobs where request_id=$1',[data.data.data.requestId])).rows;assert.equal(rows.length,1);assert.ok(rows[0].prompt.startsWith('For the target video'));assert.match(rows[0].prompt,/overall_soundscape: N\/A/);
   const spend=(await db.query('select measured_microusd from production_spend_reservations where job_id=$1 and step_key=$2',[j.id,'clip-test-prompt'])).rows;
   assert.equal(Number(spend[0].measured_microusd),6000);
+  const uncertainKey='clip-uncertain';
+  await work(j,'begin_step',{key:uncertainKey+'-prompt',stage:'clips'});
+  const uncertain=await invoke({...prep,data:{...prep.data,key:uncertainKey,data:{...prep.data.data,requestId:crypto.randomUUID()}}});
+  assert.notEqual(uncertain.status,200);assert.match(await uncertain.text(),/PRODUCTION_UNCERTAIN/);assert.equal(llm,1);
+  await db.query("update studio_productions set lease_expires_at=now()-interval '1 second' where id=$1",[j.id]);
+  const stale=await invoke(prep);assert.notEqual(stale.status,200);assert.equal(llm,1);
  }finally{globalThis.fetch=network;}
 });
 test('temporary test allowance expires and preserves the normal daily attempt limit',async()=>{

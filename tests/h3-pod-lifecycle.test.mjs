@@ -125,3 +125,11 @@ test('a reported bootstrap error stops without waiting the full preparation dead
  const m=mock({state:{token:'t',enabled:true,pending:true,run:{...run,pod_id:'abcdefgh',phase:'preparing',boot_error:'ImportError'}},clock:2000});
  assert.equal((await tickManagedPod(env,m)).reason,'startup_failed');
 });
+
+test('buffered jobs prevent idle shutdown even after ninety seconds',async()=>{
+ for(const backlog of [{pending:true,running:false},{pending:false,running:true}]){
+  const m=mock({state:{token:'t',enabled:true,...backlog,run:{...run,pod_id:'abcdefgh',phase:'running',ready_at:new Date(2000).toISOString(),idle_since:new Date(3000).toISOString()}},clock:150000});
+  assert.equal((await tickManagedPod(env,m)).status,'running');
+  assert.equal(m.calls.filter(c=>c.url.endsWith('/action')).length,0);
+ }
+});

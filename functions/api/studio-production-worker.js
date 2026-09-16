@@ -90,11 +90,12 @@ export async function onRequestPost(context){try{
   if(d.kind==='narration'&&(!Number.isFinite(d.duration)||d.duration<=0||d.duration>120))throw Error('PRODUCTION_TIMING');
   return json({value:await rpc(db,'studio_production_work',{...args,p_action:'write',p_data:{key:`asset-${d.assetId}`,stage:j.stage,action:'register_asset',assetId:d.assetId,data:{kind:d.kind,name:d.kind==='image'?'Imagen del anuncio':'Narración del anuncio',bucket,storage_path:path,mime_type:mime,size_bytes:size,duration_seconds:d.kind==='image'?null:d.duration}}})});
  }
- if(b.action==='write'){
-  const d={...b.data};if(!['save_project','version','select_version','render'].includes(d.action))throw Error('PRODUCTION_INVALID');
+ if(b.action==='write'||b.action==='prepare_clip'){
+  const preparing=b.action==='prepare_clip';
+  const d={...b.data,...(preparing?{action:'version'}:{})};if(!['save_project','version','select_version','render'].includes(d.action))throw Error('PRODUCTION_INVALID');
   if(d.action==='save_project')d.data=projectData(d.data);
   if(d.action==='version'){
-   if(!UUID.test(d.data?.requestId||'')||!UUID.test(d.data?.sceneId||''))throw Error('PRODUCTION_INVALID');
+   if(!/^[a-z0-9_-]{1,65}$/.test(d.key||'')||!UUID.test(d.data?.requestId||'')||!UUID.test(d.data?.sceneId||''))throw Error('PRODUCTION_INVALID');
    const request={requestId:d.data.requestId,sceneId:d.data.sceneId,assetId:d.data.assetId||null,instruction:'Producción automática'};
    const previous=await previousVideoRequest(db,j.user_id,j.project_id,request);
    if(previous)d.data=previous;
@@ -106,15 +107,30 @@ export async function onRequestPost(context){try{
      if(!scene)throw Error('PRODUCTION_INVALID');
      await reserve(d.key,'clip',Math.ceil((scene.end-scene.start)/5));
     }
-    if(!request.assetId)await reserve(d.key+'-prompt','planning');
-    const promptEnv={...context.env,PRODUCTION_ON_USAGE:async usage=>{
-     const unknown=usage.calls.some(c=>!Number.isFinite(c.cost));
-     const amount=usage.calls.reduce((n,c)=>n+(Number.isFinite(c.cost)?c.cost:c.reserved),0);
-     await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:d.key+'-prompt',p_action:unknown?'reserve':'settle',p_amount:Math.ceil(amount*1000000)});
-    }};
-    const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',promptEnv);
-    d.data={...request,prompt};
+    // Persist the expensive prompt independently of enqueueing the GPU job.
+    // A lost enqueue response can reuse both this prompt and the request ID.
+    const promptKey=d.key+'-prompt';
+    let checkpoint;
+    if(!request.assetId){
+     if(j.steps?.[promptKey]?.status!=='done')await reserve(promptKey,'planning');
+     checkpoint=await rpc(db,'studio_production_work',{...args,p_action:'begin_step',p_data:{key:promptKey,stage:d.stage}});
+    }
+    if(checkpoint?.status==='done'){
+     const saved=checkpoint.result;
+     if(!saved||Object.keys(request).some(k=>saved[k]!==request[k])||typeof saved.prompt!=='string')throw new ApiError('IDEMPOTENCY_CONFLICT');
+     d.data=saved;
+    }else{
+     const promptEnv={...context.env,PRODUCTION_ON_USAGE:async usage=>{
+      const unknown=usage.calls.some(c=>!Number.isFinite(c.cost));
+      const amount=usage.calls.reduce((n,c)=>n+(Number.isFinite(c.cost)?c.cost:c.reserved),0);
+      await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:d.key+'-prompt',p_action:unknown?'reserve':'settle',p_amount:Math.ceil(amount*1000000)});
+     }};
+     const prompt=request.assetId?scenePrompt(p,request.sceneId):await prepareSceneVideoPrompt(db,j.user_id,p,request.sceneId,'',promptEnv);
+     d.data={...request,prompt};
+     if(!request.assetId)await rpc(db,'studio_production_work',{...args,p_action:'finish_step',p_data:{key:promptKey,stage:d.stage,result:d.data}});
+    }
    }
+   if(preparing)return json({value:{prepared:true}});
   }
   if(d.action==='render'&&j.steps?.[d.key]?.status!=='done'){await reserve(d.key,'assembly');await reserve(d.key+'-editor','editing');}
   return json({value:await rpc(db,'studio_production_work',{...args,p_data:d})});

@@ -1,3 +1,4 @@
+import {runClipBuffer} from './production-clip-buffer.mjs';
 import {repairOnOriginalTimeline} from '../assets/editorial-timeline.js';
 import {measuredEditorialCost} from '../src/production-spend.js';
 import {patchNarration} from './narration-revision.mjs';
@@ -11,7 +12,7 @@ export async function stableId(scope,key){const b=new Uint8Array(await crypto.su
 export function productionApi({appUrl,token,workerId,fetchImpl=fetch}){
  const u=new URL(appUrl);if(u.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(u.hostname))throw Error('HTTPS required');
  if(!token||token.length<32||!/^[\w-]{1,80}$/.test(workerId||''))throw Error('Missing production configuration');
- return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(action==='write'&&body.data?.action==='version'?960000:30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
+ return async(action,body={})=>{const r=await fetchImpl(u.origin+'/api/studio-production-worker',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,workerId,...body}),signal:AbortSignal.timeout(action==='prepare_clip'||action==='write'&&body.data?.action==='version'?960000:30000)});const d=await r.json();if(!r.ok)throw Object.assign(Error(d.code),{code:d.code});return d;};
 }
 export async function processProduction(job,api,providers,{pollMs=3000,deadlineMs=90*60*1000}={}){
  const identity={jobId:job.id,leaseToken:job.lease_token},started=Date.now();let lost=false,beating=false,last=Date.now();
@@ -101,13 +102,20 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   });
   const {narrationRevision,...savedData}=project.data;
   await write('prepare','images','save_project',{...savedData,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
-  for(const [i,s] of scenes.entries()){
-   if(s.selectedVersionId)continue;
-   const source=await once(`source-${i}`,'clips',()=>providers.clip?.({project,plan,scene:s,index:i,invoke})||{});
-   const v=await write(`clip-${i}`,'clips','version',{requestId:await stableId(job.id,`clip-${i}`),sceneId:s.id,assetId:source.assetId||null});
-   await wait(c=>{const version=c.versions.find(x=>x.id===v.id);if(version?.status==='failed'||version?.status==='canceled')throw Error('PRODUCTION_CLIP_FAILED');return version?.status==='succeeded';});
-   await write(`select-${i}`,'clips','select_version',{versionId:v.id});
-  }
+  const generateClips=async(entries,clipProject,clipPlan)=>runClipBuffer(entries,{
+   prepare:async({scene,index,key,sourceKey,stage})=>{
+    const source=await once(sourceKey,stage,()=>providers.clip?.({project:clipProject,plan:clipPlan,scene,index,invoke})||{});
+    const data={requestId:await stableId(job.id,key),sceneId:scene.id,assetId:source.assetId||null};
+    await invoke('prepare_clip',{key,stage,data});return data;
+   },
+   submit:({key,stage},data)=>write(key,stage,'version',data),
+   inspect:()=>invoke('inspect'),
+   select:({selectKey,stage},version)=>write(selectKey,stage,'select_version',{versionId:version.id}),
+   check,pollMs
+  });
+  await generateClips(scenes.flatMap((scene,index)=>scene.selectedVersionId?[]:[{
+   scene,index,key:`clip-${index}`,sourceKey:`source-${index}`,selectKey:`select-${index}`,stage:'clips'
+  }]),project,plan);
   // Render candidates remain private until their exact immutable output passes review.
   for(let round=0;round<=2;round++){
    const renderKey=round?`render-${round}`:'render';
@@ -149,13 +157,10 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    if(stillReview.verdict!=='pass'||JSON.stringify(stillReview.assetIds)!==JSON.stringify(repairedImages.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGES_BLOCKED');
    Object.assign(repaired,remember({data:repaired},{approvedAssets:repairedImages.map(x=>x.assetId),observedStates:stillReview.observedStates||[]}).data);
    await write(`repair-save-${round}`,'repair','save_project',repaired);
-   for(const issue of review.issues.slice(0,3)){
-    const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId),scene=repaired.scenes[index],key=`repair-clip-${round}-${index}`;
-    const source=await once(`repair-source-${round}-${index}`,'repair',()=>providers.clip?.({project:{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},plan:repairPlan,scene,index,invoke})||{});
-    const version=await write(key,'repair','version',{requestId:await stableId(job.id,key),sceneId:scene.id,assetId:source.assetId||null});
-    await wait(c=>{const v=c.versions.find(v=>v.id===version.id);if(v?.status==='failed'||v?.status==='canceled')throw Error('PRODUCTION_CLIP_FAILED');return v?.status==='succeeded';});
-    await write(`repair-select-${round}-${index}`,'repair','select_version',{versionId:version.id});
-   }
+   await generateClips(review.issues.slice(0,3).map(issue=>{
+    const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId);
+    return {scene:repaired.scenes[index],index,key:`repair-clip-${round}-${index}`,sourceKey:`repair-source-${round}-${index}`,selectKey:`repair-select-${round}-${index}`,stage:'repair'};
+   }),{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},repairPlan);
   }
 
  }catch(e){const code=e.code||e.message;await api('fail',{...identity,data:{code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'};}

@@ -70,6 +70,30 @@ test('sequential still gate repairs before the next image inherits approved obse
  assert.equal(f.state.project.data.creativeMemory.observedStates.length,2);
  const again=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(again.ok,true);assert.equal(events.length,6);
 });
+test('production fills a bounded clip queue after image approval and renders only after all selections',async()=>{
+ const f=pipelineFixture(),events=[];
+ f.job.snapshot.data.scenes=Array.from({length:7},(_,i)=>({...scene(crypto.randomUUID(),i*2),selectedVersionId:null}));
+ f.state.project=structuredClone(f.job.snapshot);f.state.versions=[];
+ f.providers.reviewImages=async({images})=>{events.push('images-approved');return {verdict:'pass',summary:'Approved',issues:[],assetIds:images.map(x=>x.assetId)};};
+ f.providers.review=async({renderId})=>review(f.state.project.data.scenes,'pass',renderId);
+ const original=f.api;
+ f.api=async(action,body)=>{
+  if(action==='prepare_clip'){assert.ok(events.includes('images-approved'));events.push('prepare:'+body.data.key);}
+  if(action==='write'&&body.data.action==='render')assert.ok(f.state.project.data.scenes.every(s=>s.selectedVersionId));
+  if(action==='inspect'&&f.counts.clips>=3){const v=f.state.versions.find(v=>v.status==='running');if(v)v.status='succeeded';}
+  const value=await original(action,body);
+  if(action==='write'&&body.data.action==='version'){
+   events.push('enqueue:'+body.data.key);f.state.versions.at(-1).status='running';
+   assert.ok(f.counts.clips-f.writes.filter(w=>w.action==='select_version').length<=3);
+  }
+  if(action==='write'&&body.data.action==='select_version')events.push('select:'+body.data.key);
+  return value;
+ };
+ const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(result.ok,true);assert.equal(f.counts.clips,7);assert.equal(f.counts.complete,1);
+ assert.ok(events.indexOf('enqueue:clip-2')<events.indexOf('select:select-0'));
+ assert.equal(f.state.renders.length,1);
+});
 test('blocked first still prevents generating the second and submitting H3',async()=>{
  const f=pipelineFixture();for(const s of f.job.snapshot.data.scenes){s.imageAssetId=null;s.selectedVersionId=null;}
  f.providers.reviewImage=async({plan,images})=>({verdict:'blocked',summary:'Wrong product',issues:[{...issue({...plan.scenes[0],start:0}),action:'none',visual:'',motion:''}],assetIds:images.map(x=>x.assetId)});
