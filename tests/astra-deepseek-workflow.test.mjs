@@ -25,7 +25,7 @@ const words=[{text:'Hola',start:.1,end:.7},{text:'mundo.',start:.9,end:1.5}];
 const edl={segments:[{source:'S01',in:0,out:2,frames:48,crop:1}],captions:true,captionGroups:[[0,1]],captionColor:'yellow',captionSize:46,hook:'',captionFadeMs:0,captionHighlight:true,sourceCaptionScenes:[]};
 const pass={verdict:'pass',summary:'Sin defectos materiales.',issues:[],coverage:['one']};
 const caption={sceneId:'one',relatedSceneId:null,kind:'caption',at:1,evidence:'Missing phrase.',action:'none',visual:'',motion:''};
-test('new workflow uses Astra for vision and DeepSeek text-only; legacy model pairs remain explicit',()=>{
+test('workflow keeps Astra direction and DeepSeek text-only editing; legacy model pairs remain explicit',()=>{
  assert.equal(productionWorkflow().director,'gpt-6-astra');assert.equal(productionWorkflow().editor,'deepseek-flash');
  assert.equal(productionWorkflow({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}).editor,'gpt-5.6-luna');
  assert.equal(editorialReviewModelMatches({workflowProfile:'astra-deepseek-v1',model:'gpt-6-astra'}),true);
@@ -96,11 +96,11 @@ test('real render runs Astra → DeepSeek → Astra and reuses only the matching
 });
 
 test('image usage cost includes reference inputs and cannot treat missing usage as free',()=>{assert.equal(imageCost('gpt-image-2',{input_tokens_details:{text_tokens:205,image_tokens:4104},output_tokens:1372}).costUsd,.075017);assert.equal(imageCost('gpt-image-2',{}).costUsd,null);});
-test('production H3 prompt writer uses Astra vision and its actual first frame through the shared adapter',async()=>{
+test('production H3 prompt writer uses DeepSeek with its actual first frame through the shared adapter',async()=>{
  const {writeH3Prompt}=await import('../src/h3-prompts.js');
  let request;
  const prompt=await writeH3Prompt({referenceId:'owned-image',usedDuration:3,generatedDuration:5},env,{referenceUrl:'https://owned.test/frame.png',fetchImpl:async(url,init)=>{
-  request=JSON.parse(init.body);assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(request.model,'gpt-6-astra');assert.equal(request.input[1].content[1].image_url,'https://owned.test/frame.png');
+  request=JSON.parse(init.body);assert.equal(url,'https://opencode.ai/zen/go/v1/chat/completions');assert.equal(request.model,'deepseek-flash');assert.equal(request.messages[1].content[1].image_url.url,'https://owned.test/frame.png');
   return response(request,{integrated_multimodal_description:'[Shot 1] Polished 3D character gently turns the shallow disc at chest height, maintaining hand contact and the exact original product shape throughout the continuous shot.'});
  }});assert.match(prompt,/overall_soundscape: N\/A/);assert.match(prompt,/Polished 3D/);
 });

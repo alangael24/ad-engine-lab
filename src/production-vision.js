@@ -2,10 +2,15 @@ import {productionWorkflow} from '../assets/production-workflow.js';
 import {WORKFLOW_MODEL} from '../assets/model-routing.js';
 import {modelFetch} from './model-provider.js';
 import {editorialCall} from '../workers/editorial-models.mjs';
+export const productionPromptModel=env=>productionWorkflow(env).version==='astra-deepseek-v1'?productionWorkflow(env).editor:WORKFLOW_MODEL;
 export const productionVisionModel=env=>productionWorkflow(env).version==='astra-deepseek-v1'?'gpt-6-astra':WORKFLOW_MODEL;
 // Preserve the existing validated tool protocol, while routing production vision
 // explicitly. The general chat and script writer retain their separate routing.
-export async function productionVisionFetch(fetchImpl,url,init,env){
+export const productionVisionFetch=(fetchImpl,url,init,env)=>productionStructuredFetch(fetchImpl,url,init,env,'director');
+// H3 transcription of the approved direction is a separate model role. Never
+// switch reference analysis or visual direction along with the prompt writer.
+export const productionPromptFetch=(fetchImpl,url,init,env)=>productionStructuredFetch(fetchImpl,url,init,env,'prompter');
+async function productionStructuredFetch(fetchImpl,url,init,env,role){
  if(productionWorkflow(env).version!=='astra-deepseek-v1')return modelFetch(fetchImpl,url,init);
  const request=JSON.parse(init.body),tool=request.tools?.[0]?.function;
  if(!tool||request.tools.length!==1)throw Error('PRODUCTION_VISION_TOOL');
@@ -16,8 +21,9 @@ export async function productionVisionFetch(fetchImpl,url,init,env){
   }context.push({role:message.role,text:content.join('\n')});
  }
  const usage={total:0,calls:[],unknown:false};
- const raw=await editorialCall({role:'director',name:tool.name,schema:tool.parameters,system:messages.filter(x=>x.role==='system').map(x=>x.content).join('\n'),context,images,usage,env,signal:init.signal,fetchImpl,maxTokens:request.max_tokens,onUsage:env.PRODUCTION_ON_USAGE});
- const last=usage.calls.at(-1),model=last.returnedModel;
+ const raw=await editorialCall({role,name:tool.name,schema:tool.parameters,system:messages.filter(x=>x.role==='system').map(x=>x.content).join('\n'),context,images,usage,env,signal:init.signal,fetchImpl,maxTokens:request.max_tokens,onUsage:env.PRODUCTION_ON_USAGE});
+ // editorialCall has already verified the provider model (including valid aliases).
+ const last=usage.calls.at(-1),model=last.model;
  const normalized={prompt_tokens:usage.calls.reduce((n,x)=>n+x.input,0),completion_tokens:usage.calls.reduce((n,x)=>n+x.output,0),total_tokens:usage.calls.reduce((n,x)=>n+x.input+x.output,0),calls:usage.calls,cost:usage.total,unknown:usage.unknown};
  return new Response('data: '+JSON.stringify({model,usage:normalized,choices:[{delta:{tool_calls:[{index:0,function:{name:tool.name,arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});
 }

@@ -18,8 +18,8 @@ export function priceUsage(role,u,model=role==='director'?'gpt-6-astra':'deepsee
 }
 function validModel(actual,expected){return actual===expected||expected==='deepseek-flash'&&/^deepseek-v4\.1-flash(?:[-\w.]*)$/.test(actual||'');}
 async function attemptCall({role,name,schema,system,context,images=[],usage,env,signal,fetchImpl,repair=false,onUsage,maxTokens}){
- const cfg=editorialConfig(env),model=role==='inspector'?cfg.editor:cfg[role],key=role==='director'?cfg.directorKey:cfg.editorKey;
- if(!model||role==='editor'&&images.length||role==='inspector'&&model!=='deepseek-flash')throw Error('EDITORIAL_ROLE_INVALID');
+ const cfg=editorialConfig(env),model=['inspector','prompter'].includes(role)?cfg.editor:cfg[role],key=role==='director'?cfg.directorKey:cfg.editorKey;
+ if(!model||role==='editor'&&images.length||['inspector','prompter'].includes(role)&&model!=='deepseek-flash')throw Error('EDITORIAL_ROLE_INVALID');
  if(!key)throw Error('EDITORIAL_NOT_CONFIGURED');
  const deepseek=model==='deepseek-flash',maxOutput=deepseek?(repair?16000:12000):role==='director'?Math.min(12000,Math.max(4500,maxTokens||0)):12000;
  const text=JSON.stringify(context),estimatedInput=new TextEncoder().encode(system+text+JSON.stringify(schema)).length+images.length*10000;

@@ -172,12 +172,12 @@ test('clip preparation checkpoints prompts before enqueue, survives lost replies
  const stub=mockSupabase(db),network=globalThis.fetch;let llm=0,failEnqueue=false;
  globalThis.fetch=async(input,opts)=>{
   if(failEnqueue&&String(input).endsWith('/rpc/studio_production_work')){const b=JSON.parse(opts.body);if(b.p_action==='write'&&b.p_data?.action==='version'){const after=failEnqueue==='after';failEnqueue=false;if(after)await stub.fetch(input,opts);return Response.json({message:'TEST_ENQUEUE_UNAVAILABLE'},{status:503});}}
-  if(String(input).startsWith('https://api.openai.com/')){
-   llm++;const req=JSON.parse(opts.body);assert.equal(req.input[1].content[1].type,'input_image');
-   return new Response('data: '+JSON.stringify({type:'response.completed',response:{model:'gpt-6-astra',status:'completed',usage:{input_tokens:100,output_tokens:100},output:[{type:'function_call',name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})}]}})+'\n\n');
+  if(String(input).startsWith('https://opencode.ai/')){
+   llm++;const req=JSON.parse(opts.body);assert.equal(req.model,'deepseek-flash');assert.equal(req.messages[1].content[1].type,'image_url');
+   return new Response('data: '+JSON.stringify({model:'deepseek-v4.1-flash',usage:{prompt_tokens:100,completion_tokens:100},choices:[{delta:{content:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete filter in <Picture 1>. Water flows steadily as the camera slowly pushes in, preserving every product part through the final frame.'})},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
   }return stub.fetch(input,opts);
  };
- const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'test-only'};
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENCODE_API_KEY:'test-only'};
  const data={workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'write',data:{key:'clip-test',stage:'clips',action:'version',data:{requestId:crypto.randomUUID(),sceneId:scene.id}}};
  const invoke=(body=data)=>productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify(body)})});
  try{
@@ -193,7 +193,7 @@ test('clip preparation checkpoints prompts before enqueue, survives lost replies
   const first=await invoke();assert.equal(first.status,200,await first.clone().text());const second=await invoke();assert.equal(second.status,200,await second.clone().text());assert.equal(llm,1);
   const rows=(await db.query('select prompt from generation_jobs where request_id=$1',[data.data.data.requestId])).rows;assert.equal(rows.length,1);assert.ok(rows[0].prompt.startsWith('For the target video'));assert.match(rows[0].prompt,/overall_soundscape: N\/A/);
   const spend=(await db.query('select measured_microusd from production_spend_reservations where job_id=$1 and step_key=$2',[j.id,'clip-test-prompt'])).rows;
-  assert.equal(Number(spend[0].measured_microusd),6000);
+  assert.equal(Number(spend[0].measured_microusd),150);
   const uncertainKey='clip-uncertain';
   await work(j,'begin_step',{key:uncertainKey+'-prompt',stage:'clips'});
   const uncertain=await invoke({...prep,data:{...prep.data,key:uncertainKey,data:{...prep.data.data,requestId:crypto.randomUUID()}}});
