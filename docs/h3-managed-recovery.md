@@ -1,6 +1,6 @@
 # Managed H3 recovery and conditional GPU fallback
 
-Implementation status: local code and simulated integration tests. This is NOT a receipt of deployment or a live RTX4090 compatibility test. The 4090 profile ships disabled, with no approved clip matrix. No GPU was rented for these tests.
+Implementation status: deployed to production on 2026-09-16, release `d5b01db7d93af5df814ebaad4191564ba2390da5`. See the deployment receipt below. This is NOT a live RTX4090 compatibility test. The 4090 profile remains disabled, with no approved clip matrix. No GPU was rented for the local tests or this deployment.
 
 ## Customer order and physical attempts
 
@@ -72,3 +72,15 @@ If rollback is needed, disable admission and reconcile all active attempts first
 Tests cover actual PostgreSQL RPCs, worker/API/Storage transport, stale leases, no duplicate credit charges, isolated failed-boot cohorts, persistent order limits, admission including upload, capacity fallback, lost creation acknowledgement, output recovery, and resumed coordinator checkpoints. Live GPU and FFmpeg suites that require external prerequisites remain separate.
 
 Validation receipt (local, 2026-09-16): 386 tests discovered, 377 passed, zero failures, nine prerequisite-dependent tests skipped. Cloudflare Pages Functions compiled successfully; Python bootstrap syntax and `git diff --check` passed. This run used mocked GPU/provider transport and isolated PostgreSQL/Storage simulation, with no GPU rental, migration application to production, container publication or deployment.
+
+## Production deployment receipt — 2026-09-16
+
+- Source release: `d5b01db7d93af5df814ebaad4191564ba2390da5`, pushed to `main` and `codex/sol-luna-production`.
+- Pages production deployment: `ec60e78f-751b-4729-b5dc-36caa74ec4c9`, https://ec60e78f.ad-engine-lab.pages.dev, serving https://creativerushai.com. Deployment metadata matches the release; the public production panel matches the built file byte for byte.
+- Render production deployment: `dep-dalhol2d0e5s73fev96g`, service `srv-daedg0gu01pc73e20q50`, status `live`. `/health` reports the same release, DeepSeek H3 prompt writer, material image review and three-clip buffer. No post-start error logs were returned.
+- Supabase project: `ozkewphfxaohtihxmgoo`. Migration `managed_h3_attempt_recovery` applied successfully; the management API recorded version `20260916224632` for local source migration `20260916221655_managed_h3_attempt_recovery.sql`.
+- Controller: `creativerush-generation-sweeper`, version `4ec9d850-7466-474a-8974-0ddc79a533b1`, minute cron. All six existing secret bindings were preserved.
+- Published GPU image: `ghcr.io/alangael24/creativerush-h3-pod@sha256:d488620a3f3a898c04999c4483ca0d8d1d4be541bff7cae42ac39ef5f71d55c0`. Built by GitHub Actions run `35159127136`; anonymous manifest pull returned HTTP 200. Both the controller secret and primary profile pin this digest.
+- No queued/running generations, active productions or provider pods existed during rollout. Admission was enabled only after deployment, keeping the existing global limit of 2,084,046 microusd and per-rental reservation of 750,000 microusd unchanged. Previously accounted infrastructure usage was 1,002,868 microusd; these internal estimates are not the provider wallet balance.
+- Authenticated live controller acquire/release succeeded. New internal tables have RLS enabled and no browser-role grants. Supabase's security advisor reported informational no-policy notices for deliberately private tables and the pre-existing leaked-password-protection warning.
+- This rollout verifies deployment and control-plane compatibility. It does not claim a newly generated acceptance clip, live failure injection or 4090 validation. The 4090 remains disabled pending its measured acceptance matrix.
