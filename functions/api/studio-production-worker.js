@@ -1,3 +1,4 @@
+import {readProductionClipProgress} from '../../src/h3-production-status.js';
 import {paidStep,measuredStepCost} from '../../src/production-spend.js';
 import {recoveredStillApprovals} from '../../src/recovered-still-approvals.js';
 import {narrationAlignment,approvedBase} from '../../src/partial-edit.js';
@@ -19,7 +20,12 @@ export async function onRequestPost(context){try{
   return json({job:await rpc(db,'studio_production_work',args)});
  }
  if(!UUID.test(b.jobId||'')||!UUID.test(b.leaseToken||''))throw new ApiError('LEASE_LOST');
- if(['heartbeat','inspect','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
+ if(b.action==='inspect'){
+  const value=await rpc(db,'studio_production_work',args);
+  const production=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
+  return json({value:{...value,compute:await readProductionClipProgress(db,production)}});
+ }
+ if(['heartbeat','yield_gpu','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
  const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
  if(b.action==='record_cost'||b.action==='reserve_cost'){

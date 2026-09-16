@@ -18,7 +18,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
  const identity={jobId:job.id,leaseToken:job.lease_token},started=Date.now();let lost=false,beating=false,last=Date.now();
  const invoke=async(action,data={})=>{if(lost)throw Error('LEASE_LOST');const r=await api(action,{...identity,data});return r.value??r;};
  const timer=setInterval(async()=>{if(beating)return;beating=true;try{await invoke('heartbeat');last=Date.now();}catch(e){if(e.code==='LEASE_LOST'||e.code==='STUDIO_CONFLICT'||Date.now()-last>100000)lost=true;}finally{beating=false;}},20000);
- const check=()=>{if(lost)throw Error('LEASE_LOST');if(Date.now()-started>deadlineMs)throw Error('PRODUCTION_TIMEOUT');};
+ const check=()=>{if(lost)throw Error('LEASE_LOST');if(Date.now()>((job.delivery_deadline_at&&Date.parse(job.delivery_deadline_at))||started+deadlineMs))throw Error('PRODUCTION_TIMEOUT');};
  const once=async(key,stage,fn)=>{check();const s=await invoke('begin_step',{key,stage});if(s.status==='done')return s.result;invoke.costStep=key;const result=await fn();check();await invoke('finish_step',{key,stage,result});return result;};
  const write=async(key,stage,action,data)=>{check();return (await invoke('write',{key,stage,action,data})).result;};
  const wait=async(predicate)=>{while(true){check();const current=await invoke('inspect');const value=predicate(current);if(value)return value;await sleep(pollMs);}};
@@ -163,7 +163,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    }),{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},repairPlan);
   }
 
- }catch(e){const code=e.code||e.message;await api('fail',{...identity,data:{code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'};}
+ }catch(e){const code=e.code||e.message;if(code==='PRODUCTION_GPU_WAIT'){await api('yield_gpu',identity);return {ok:false,deferred:true,code};}await api('fail',{...identity,data:{code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'}}).catch(()=>{});return {ok:false,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:'PRODUCTION_PROVIDER'};}
  finally{clearInterval(timer);}
 }
 export async function main(){

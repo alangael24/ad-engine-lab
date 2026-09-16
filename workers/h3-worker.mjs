@@ -1,3 +1,4 @@
+import {infrastructureFailure} from '../src/h3-pod-policy.js';
 import { H3Adapter } from './h3-adapter.mjs';
 import { H3ServerlessAdapter } from './h3-serverless-adapter.mjs';
 import { pathToFileURL } from 'node:url';
@@ -21,6 +22,7 @@ export function createApi({ appUrl, token, workerId, fetchImpl = fetch }) {
 export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbeatMs = 20000,clock=realClock } = {}) {
   const identity = { jobId:job.id, leaseToken:job.leaseToken };
   let leaseLost = false, beating = false, lastHeartbeat = clock.now(), promptId = job.providerPromptId;
+  const managed=Boolean(job.managedAttemptId),submissionId=job.managedAttemptId||job.id;
   const serverless=adapter.directUpload===true,submittedAt=Date.parse(job.providerSubmittedAt||job.providerClaimedAt)||clock.now();
   const deadlineAt=Date.parse(job.providerDeadlineAt)||submittedAt+H3_LIMITS.providerTtlMs+H3_LIMITS.reconciliationMs;
   let shutdownRequired=job.providerShutdownRequired===true,executing=Boolean(job.providerStartedAt);
@@ -52,10 +54,10 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
   const interval = clock.setInterval(beat, heartbeatMs);
   try {
     if(shutdownRequired&&!await shutdown())return {status:'deferred',reason:'SHUTDOWN_UNCONFIRMED'};
-    if(serverless&&job.submissionStarted&&await recover())return {status:'succeeded',recovered:true};
+    if((serverless||managed)&&job.submissionStarted&&await recover())return {status:'succeeded',recovered:true};
     if(serverless&&(job.providerPhase==='reconciling'||clock.now()>=deadlineAt))throw Error('H3_SERVERLESS_TIMEOUT');
     if (!promptId && job.submissionStarted) {
-      promptId = await adapter.findSubmission(job.id);
+      promptId = await adapter.findSubmission(submissionId);
       // A crash around submission is ambiguous. Never silently re-generate/bill twice.
       if (!promptId) throw Object.assign(new Error('AMBIGUOUS_SUBMISSION'),{retryable:serverless});
     }
@@ -64,29 +66,50 @@ export async function processJob(job, api, adapter, { fetchImpl = fetch, heartbe
       const workflow = await adapter.build(job, target); assertLease();
       if(serverless&&adapter.ensureActive)await adapter.ensureActive(async()=>{assertLease();await api('heartbeat',identity);assertLease();});
       await api('heartbeat', { ...identity, submissionStarted:true });
-      try { promptId = await adapter.submit(workflow, job.id, {assertLease}); }
-      catch { promptId = await adapter.findSubmission(job.id); if (!promptId) throw Object.assign(new Error('AMBIGUOUS_SUBMISSION'),{retryable:serverless}); }
+      try { promptId = await adapter.submit(workflow, submissionId, {assertLease}); }
+      catch { promptId = await adapter.findSubmission(submissionId); if (!promptId) throw Object.assign(new Error('AMBIGUOUS_SUBMISSION'),{retryable:serverless}); }
     }
     await checkpoint({ ...identity, providerPromptId:promptId });
     const video = await adapter.wait(promptId, assertLease,{
       submittedAt,executionStartedAt:Date.parse(job.providerStartedAt)||undefined,
       deadlineAt:Math.min(deadlineAt,submittedAt+H3_LIMITS.providerTtlMs),
-      onProgress:async phase=>{executing=true;try{return await api('progress',{...identity,phase});}catch(error){throw Object.assign(error,{retryable:true});}},
+      onProgress:async phase=>{executing=true;if(!serverless&&!managed)return;try{return await api('progress',{...identity,phase});}catch(error){throw Object.assign(error,{retryable:true});}},
     }); assertLease();
     if (adapter.directUpload) {
       if (video.jobId !== job.id) throw new Error('H3_RESULT_JOB_MISMATCH');
       console.log(JSON.stringify({event:'h3_serverless_result',jobId:job.id,executionMs:video.executionMs,queueMs:video.queueMs,bytes:video.bytes}));
     } else {
-    const { uploadUrl } = await api('upload', identity);
-    const uploaded = await fetchImpl(uploadUrl, { method:'PUT', headers:{ 'content-type':'video/mp4','x-upsert':'false' },
-      body:video, signal:AbortSignal.timeout(120000) });
-    // An upload may have succeeded before an ack was lost. Completion verifies private storage.
-    if (!uploaded.ok && ![400,409].includes(uploaded.status)) throw new Error('UPLOAD_FAILED');
+    if(managed)await api('progress',{...identity,phase:'uploading'});
+    // Retry the same bytes, not inference. Recover an upload with a lost ACK.
+    let delivered=false;
+    for(let attempt=0;attempt<3;attempt++){
+      assertLease();
+      if(attempt&&await recover()){delivered=true;break;}
+      try{
+        const {uploadUrl}=await api('upload',identity);
+        const uploaded=await fetchImpl(uploadUrl,{method:'PUT',headers:{'content-type':'video/mp4','x-upsert':'false'},body:video,signal:AbortSignal.timeout(120000)});
+        if(uploaded.ok){delivered=true;break;}
+        if([400,409].includes(uploaded.status)&&await recover()){delivered=true;break;}
+      }catch(error){if(error.code==='LEASE_LOST')throw error;}
+      if(attempt<2)await clock.sleep(1000);
+    }
+    if(!delivered)throw Error('UPLOAD_FAILED');
     }
     await api('complete', identity);
     console.log(`completed ${job.id}`);
     return {status:'succeeded'};
   } catch (error) {
+    if(managed){
+      if(leaseLost||error.code==='LEASE_LOST'||error.message==='LEASE_LOST')return {status:'deferred',reason:'LEASE_LOST'};
+      try{
+        if(await recover())return {status:'succeeded',recovered:true};
+        // Keep Comfy's history/output on this machine for transient storage,
+        // lost submit ACK, and checkpoint errors. No fail/refund or re-submit.
+        if(clock.now()<deadlineAt&&(error.retryable||['UPLOAD_FAILED','AMBIGUOUS_SUBMISSION','RESULT_NOT_READY'].includes(error.code||error.message)))return {status:'deferred',reason:error.message};
+        await api('infrastructure_failure',{...identity,reason:infrastructureFailure(error.code||error.message).reason});
+      }catch{return {status:'deferred',reason:'RECONCILIATION_UNAVAILABLE'};}
+      return {status:'deferred',reason:'AWAITING_VERIFIED_SHUTDOWN'};
+    }
     if(serverless){
       // Losing ownership never authorizes this process to cancel another owner's work.
       if(leaseLost||error.code==='LEASE_LOST'||error.message==='LEASE_LOST')return {status:'deferred',reason:'LEASE_LOST'};

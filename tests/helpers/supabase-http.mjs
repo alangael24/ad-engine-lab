@@ -1,8 +1,8 @@
 // Test-only transport: real supabase-js requests execute against isolated PostgreSQL.
 // This module is never imported by production code or the static build.
-const tables = new Set(['generation_jobs','generation_workers','generation_references','credit_balances','purchases','studio_assets','studio_brands','studio_projects','studio_scene_versions','studio_renders','studio_workers','studio_reference_analyses','studio_chat_edits','studio_productions','studio_production_workers','video_edit_sessions','video_edit_jobs','video_edit_workers']);
-const functions = new Set(['account_production_spend','serverless_idle_work','reserve_production_spend','gpu_idle_check','reserve_generation','register_generation_reference','claim_generation','claim_serverless_generation','generation_provider_progress','generation_serverless_shutdown','heartbeat_generation','finish_generation','cancel_generation','sweep_generations','apply_saas_purchase','studio_read','studio_write','studio_render_worker','studio_editorial_begin','studio_editorial_checkpoint','studio_editorial_manifest','studio_reference_write','studio_chat_write','studio_production_start','studio_production_work','video_edit_write','video_edit_work']);
-const safe = name => { if (!/^[a-z_]+$/.test(name)) throw Error('Invalid test identifier'); return `"${name}"`; };
+const tables = new Set(['h3_pod_control','h3_pod_runs','h3_generation_attempts','generation_jobs','generation_workers','generation_references','credit_balances','purchases','studio_assets','studio_brands','studio_projects','studio_scene_versions','studio_renders','studio_workers','studio_reference_analyses','studio_chat_edits','studio_productions','studio_production_workers','video_edit_sessions','video_edit_jobs','video_edit_workers']);
+const functions = new Set(['h3_pod_work','h3_attempt_progress','h3_pod_ready','h3_pod_boot_progress','h3_pod_download_progress','account_production_spend','serverless_idle_work','reserve_production_spend','gpu_idle_check','reserve_generation','register_generation_reference','claim_generation','claim_serverless_generation','generation_provider_progress','generation_serverless_shutdown','heartbeat_generation','finish_generation','cancel_generation','sweep_generations','apply_saas_purchase','studio_read','studio_write','studio_render_worker','studio_editorial_begin','studio_editorial_checkpoint','studio_editorial_manifest','studio_reference_write','studio_chat_write','studio_production_start','studio_production_work','video_edit_write','video_edit_work']);
+const safe = name => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw Error('Invalid test identifier'); return `"${name}"`; };
 export function mockSupabase(db) {
   const users = new Map(), media = new Map(), invites = [];
   const respond=(data,status=200,headers={})=>new Response(data==null ? null : JSON.stringify(data),{status,headers:{'content-type':'application/json',...headers}});
@@ -43,6 +43,7 @@ export function mockSupabase(db) {
         if(['select','order','limit'].includes(key)) continue;
         if(value==='not.is.null'){conditions.push(`${safe(key)} is not null`);continue;}
         const dot=value.indexOf('.'),op=value.slice(0,dot),rhs=value.slice(dot+1);
+        if(op==='in'){args.push(rhs.slice(1,-1).split(',').map(v=>v.replace(/^"|"$/g,'')));conditions.push(`${safe(key)} = any($${args.length})`);continue;}
         if(!['eq','gt'].includes(op)) throw Error(`Unexpected filter ${op}`);
         args.push(rhs);conditions.push(`${safe(key)} ${op==='eq'?'=':'>'} $${args.length}`);
       }

@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
       }
       return json({ job: { id: job.id, leaseToken: job.lease_token, prompt: job.prompt,
         durationSeconds: job.duration_seconds, resolution: job.resolution, aspectRatio: job.aspect_ratio,
-        preset: job.preset, referenceUrl, submissionStarted: job.submission_started, providerPromptId: job.provider_prompt_id,
+        managedAttemptId:job.managed_attempt_id,noiseSeed:job.managed_seed,preset: job.preset, referenceUrl, submissionStarted: job.submission_started, providerPromptId: job.provider_prompt_id,
         providerPhase:job.provider_phase,providerShutdownRequired:job.provider_shutdown_required,providerClaimedAt:job.provider_claimed_at,
         providerSubmittedAt:job.provider_submitted_at,providerStartedAt:job.started_at,providerDeadlineAt:job.provider_deadline_at } });
     }
@@ -59,6 +59,10 @@ export async function onRequestPost(context) {
       await rpc(db, 'heartbeat_generation', { ...args, p_submission_started: body.submissionStarted === true,
         p_provider_prompt_id: body.providerPromptId || null });
       return json({ ok: true });
+    }
+    if(job.managed_attempt_id&&['progress','infrastructure_failure'].includes(body.action)){
+      await rpc(db,'h3_attempt_progress',{...args,p_stage:body.action==='infrastructure_failure'?'reconciling':body.phase,p_failure:body.action==='infrastructure_failure'?body.reason:null});
+      return json({ok:true});
     }
     if (body.action === 'progress') {
       if(!['generating','reconciling'].includes(body.phase))throw new ApiError('INVALID_GENERATION');
@@ -75,7 +79,7 @@ export async function onRequestPost(context) {
     }
     if (['complete','recover'].includes(body.action) && job.status === 'succeeded') return json({ status: job.status,ready:true });
     if (job.status !== 'running' || Date.parse(job.lease_expires_at) <= Date.now()) throw new ApiError('LEASE_LOST');
-    const resultPath = `${job.user_id}/${job.id}.mp4`;
+    const resultPath = job.managed_attempt_id?`${job.user_id}/${job.id}/${job.managed_attempt_id}.mp4`:`${job.user_id}/${job.id}.mp4`;
     if (body.action === 'upload') {
       const { data, error } = await db.storage.from(RESULT_BUCKET).createSignedUploadUrl(resultPath);
       if (error) throw error;

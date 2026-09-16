@@ -1,5 +1,7 @@
 # H3 dedicated RTX5090 controller
 
+The local recovery upgrade is documented in [h3-managed-recovery.md](h3-managed-recovery.md). It supersedes the failure/refund behavior below only after its coordinated migration and rollout; the historical live receipts remain unchanged.
+
 The minute cron in `workers/sweeper.js` can manage a single Community RTX5090 when `H3_BACKEND=pod`. The model, FL2V turbo8 graph and four exact weight files are unchanged. No SSH or public ComfyUI ports are exposed in production. The GPU polls the authenticated generation queue and uploads completed MP4s to private storage before acknowledging completion.
 
 ## Lifecycle

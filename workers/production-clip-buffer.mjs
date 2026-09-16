@@ -3,9 +3,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 // Three outstanding jobs match the existing per-user admission limit: one
 // executing and up to two waiting. No concurrent project writes or orphaned
 // promises; the single GPU worker remains responsible for serial execution.
-export async function runClipBuffer(entries,{prepare,submit,inspect,select,check=()=>{},pollMs=3000,capacity=CLIP_BUFFER_CAPACITY}){
+export async function runClipBuffer(entries,{prepare,submit,inspect,select,check=()=>{},pollMs=3000,capacity=CLIP_BUFFER_CAPACITY,yieldAfterMs=30000,now=()=>Date.now()}){
  if(!Number.isInteger(capacity)||capacity<1||capacity>3)throw Error('PRODUCTION_INVALID');
- const pending=[];let next=0;
+ const pending=[];let next=0,waitingSince=null;
  const assertHealthy=current=>{
   for(const {version} of pending){
    const v=current.versions.find(v=>v.id===version.id);
@@ -29,6 +29,10 @@ export async function runClipBuffer(entries,{prepare,submit,inspect,select,check
    check();const head=pending[0];await select(head.entry,head.version);
    pending.shift();selected=true;
   }
-  if(pending.length&&!selected)await sleep(pollMs);
+  if(pending.length&&!selected){
+   if(current.compute?.waiting){waitingSince??=now();if(now()-waitingSince>=yieldAfterMs)throw Error('PRODUCTION_GPU_WAIT');}
+   else waitingSince=null;
+   await sleep(pollMs);
+  }
  }
 }

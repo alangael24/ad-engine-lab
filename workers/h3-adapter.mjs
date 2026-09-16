@@ -3,17 +3,19 @@ import {readFileSync} from 'node:fs';
 const template = JSON.parse(readFileSync(new URL('./workflows/h3.json', import.meta.url), 'utf8'));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 export class H3Adapter {
-  constructor(baseUrl, { fetchImpl = fetch } = {}) {
+  constructor(baseUrl, { fetchImpl = fetch,clock={now:()=>Date.now(),sleep:delay} } = {}) {
+    this.clock=clock;
     this.baseUrl = baseUrl.replace(/\/$/, ''); this.fetch = fetchImpl;
     const parsed = new URL(this.baseUrl);
     if (!['http:','https:'].includes(parsed.protocol)) throw new Error('Invalid ComfyUI URL');
   }
   async json(resource, body) {
-    const response = await this.fetch(`${this.baseUrl}${resource}`, {
+    let response;try{response = await this.fetch(`${this.baseUrl}${resource}`, {
       ...(body ? { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } } : {}),
       signal: AbortSignal.timeout(60000),
     });
-    if (!response.ok) throw new Error('ComfyUI request failed');
+    }catch(error){throw Object.assign(error,{retryable:true});}
+    if(!response.ok)throw Object.assign(Error(response.status>=500?'H3_COMFY_UNAVAILABLE':'H3_MODEL_REQUEST_ERROR'),{retryable:response.status>=500});
     return response.json();
   }
   async ready() { await this.json('/system_stats'); }
@@ -29,7 +31,7 @@ export class H3Adapter {
     const [width,height] = job.aspectRatio === '9:16' ? [short,long] : job.aspectRatio === '16:9' ? [long,short] : [short,short];
     graph['104'].inputs = {...graph['104'].inputs,width,height,length:job.durationSeconds*24,
       prompt:job.prompt};
-    graph['15'].inputs.noise_seed = Math.floor(Math.random()*2147483647);
+    graph['15'].inputs.noise_seed = Number.isSafeInteger(job.noiseSeed)?job.noiseSeed:Math.floor(Math.random()*2147483647);
     graph['92'].inputs.filename_prefix = 'creativerush/h3';
     graph['119'] = {class_type:'LoraLoaderModelOnly',inputs:{model:['6',0],lora_name:'minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors',strength_model:1}};
     graph['120'] = {class_type:'MiniMaxH3SigmaShift',inputs:{model:['119',0],shift_video:12,shift_audio:3}};
@@ -68,22 +70,32 @@ export class H3Adapter {
     const history = await this.json('/history?max_items=200');
     return Object.entries(history).find(([,record]) => record.prompt?.[3]?.creativeRushJobId === jobId)?.[0] || null;
   }
-  async wait(promptId, assertLease, { timeoutMs = 40 * 60 * 1000, pollMs = 4000 } = {}) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
+  async wait(promptId, assertLease, { timeoutMs = 40 * 60 * 1000, pollMs = 4000,deadlineAt=Infinity,onProgress=async()=>{} } = {}) {
+    const stop=Math.min(deadlineAt,this.clock.now()+timeoutMs);let reported=false;
+    while (this.clock.now() < stop) {
       assertLease();
       const history = await this.json(`/history/${encodeURIComponent(promptId)}`);
       const record = history[promptId];
-      if (record?.status?.status_str === 'error') throw new Error('H3 generation failed');
+      if(record?.status?.status_str==='error'){
+        const messages=JSON.stringify(record.status.messages||[]);
+        throw Error(/out of memory|OutOfMemory/i.test(messages)?'H3_OOM':'H3_MODEL_EXECUTION_ERROR');
+      }
       const media = findVideo(record?.outputs);
-      if (media && record?.status?.completed !== false) return this.download(media);
-      await delay(pollMs);
+      if(media&&record?.status?.completed!==false)return this.download(media);
+      if(!reported){
+        const queue=await this.json('/queue');
+        if((queue.queue_running||[]).some(row=>row[1]===promptId)){
+          await onProgress('generating');reported=true;
+        }
+      }
+      await this.clock.sleep(Math.min(pollMs,Math.max(0,stop-this.clock.now())));
     }
-    throw new Error('H3 generation timed out');
+    throw new Error('H3_EXECUTION_DEADLINE');
   }
   async download(media) {
     const query = new URLSearchParams({ filename:media.filename, subfolder:media.subfolder || '', type:media.type || 'output' });
-    const response = await this.fetch(`${this.baseUrl}/view?${query}`, { signal:AbortSignal.timeout(90000) });
+    let response;try{response=await this.fetch(`${this.baseUrl}/view?${query}`,{signal:AbortSignal.timeout(90000)});}catch(error){throw Object.assign(error,{retryable:true});}
+    if(!response.ok)throw Object.assign(Error('H3_DOWNLOAD_FAILED'),{retryable:true});
     if (!response.ok || Number(response.headers.get('content-length')) > 52428800) throw new Error('Invalid H3 result');
     // Bound streaming memory even when the upstream omits Content-Length.
     const reader = response.body.getReader(); const parts = []; let size = 0;

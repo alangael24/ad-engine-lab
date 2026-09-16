@@ -133,3 +133,12 @@ test('buffered jobs prevent idle shutdown even after ninety seconds',async()=>{
   assert.equal(m.calls.filter(c=>c.url.endsWith('/action')).length,0);
  }
 });
+test('confirmed no 5090 capacity selects a validated 4090 before renting, same pinned graph',async()=>{
+ const profile={id:'h3-4090',gpu:'NVIDIA GeForce RTX 4090',cloud:'COMMUNITY',min_cuda:'13.0',min_vram_gb:23,enabled:true,validated_at:'2026-09-16',validation_evidence:'test-fixture-only',image_digest:env.H3_POD_IMAGE,max_hourly_usd:.71};
+ const primary={...profile,id:'h3-5090',gpu:'NVIDIA GeForce RTX 5090',min_vram_gb:31};
+ const m=mock({state:{token:'t',enabled:true,pending:true,running:false,run:null,profiles:[primary,profile]}});
+ const base=m.fetchImpl;m.fetchImpl=(url,options)=>url.includes('RTX%205090')?Promise.resolve(Response.json({availability:'NONE',price:{community:.69}})):base(url,options);
+ assert.equal((await tickManagedPod(env,m)).status,'preparing');
+ const create=m.calls.find(c=>c.url.endsWith('/pods')&&c.method==='POST');assert.equal(create.body.gpu.id,profile.gpu);assert.equal(create.body.image,env.H3_POD_IMAGE);
+ assert.equal(create.body.env.H3_EXPECTED_GPU,profile.gpu);assert.equal(m.calls.filter(c=>c.url.endsWith('/pods')&&c.method==='POST').length,1);
+});

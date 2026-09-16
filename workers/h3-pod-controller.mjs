@@ -1,5 +1,5 @@
 // Used by the independent minute cron, not by the GPU or an LLM.
-const GPU='NVIDIA GeForce RTX 5090';
+import {DEFAULT_H3_PROFILE,eligibleProfiles,managedStopReason} from '../src/h3-pod-policy.js';
 export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}){
  if(env.H3_BACKEND!=='pod')return {status:'disabled'};
  const origin=new URL(env.CREATIVE_RUSH_URL);
@@ -21,17 +21,21 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   let run=s.run;
   if(!run?.id||run.phase==='closed'){
    if(!s.enabled||!s.pending||s.running)return {status:'idle'};
-   const catalog=await control('/catalog/gpus/'+encodeURIComponent(GPU)+'?include=AVAILABILITY&product=POD&cloud=COMMUNITY&minCudaVersion=13.0');
-   const rate=catalog?.price?.community;
-   if(!Number.isFinite(rate)||rate>0.71||!['LOW','MEDIUM','HIGH'].includes(catalog?.availability))return {status:'no_approved_capacity'};
-   s=await state('begin');run=s.run;
+   let chosen;
+   for(const profile of eligibleProfiles(s.profiles)){
+    const catalog=await control('/catalog/gpus/'+encodeURIComponent(profile.gpu)+'?include=AVAILABILITY&product=POD&cloud='+profile.cloud+'&minCudaVersion='+profile.min_cuda);
+    const rate=catalog?.price?.[profile.cloud.toLowerCase()];
+    if(Number.isFinite(rate)&&rate<=profile.max_hourly_usd&&['LOW','MEDIUM','HIGH'].includes(catalog?.availability)){chosen=profile;break;}
+   }
+   if(!chosen)return {status:'no_approved_capacity'};
+   s=await state('begin',{profileId:chosen.id,imageDigest:chosen.image_digest||env.H3_POD_IMAGE});run=s.run;
    // Intent is committed before POST. An uncertain POST is NEVER sent twice.
    await state('heartbeat');
    try{
-    const pod=await control('/pods','POST',{name:run.name,cloud:'COMMUNITY',image:env.H3_POD_IMAGE,
-     disk:30,ports:[],gpu:{id:GPU,count:1,minCudaVersion:'13.0'},mounts:{persistent:{path:'/workspace',size:100}},
+    const pod=await control('/pods','POST',{name:run.name,cloud:chosen.cloud,image:chosen.image_digest||env.H3_POD_IMAGE,
+     disk:30,ports:[],gpu:{id:chosen.gpu,count:1,minCudaVersion:chosen.min_cuda},mounts:{persistent:{path:'/workspace',size:100}},
      startSsh:false,startJupyter:false,env:{CREATIVE_RUSH_URL:origin.origin,GENERATION_WORKER_TOKEN:env.GENERATION_WORKER_TOKEN,
-      H3_POD_RUN_ID:run.id,H3_WORKER_ID:run.worker_prefix,H3_POD_DEADLINE:run.deadline_at}});
+      H3_POD_RUN_ID:run.id,H3_WORKER_ID:run.worker_prefix,H3_POD_DEADLINE:run.deadline_at,H3_EXPECTED_GPU:chosen.gpu,H3_MIN_VRAM_GB:String(chosen.min_vram_gb)}});
     if(pod?.id)await state('attach',{podId:pod.id});
    }catch{return {status:'create_ack_unknown'};}
    return {status:'preparing',runId:run.id};
@@ -47,14 +51,8 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   if(!pod){if(run.phase==='draining')await state('close');else await state('block',{reason:'provider_absence_unresolved'});return {status:'absent'};}
   // Name + stored ID identify only this controller's own resource.
   if(pod.id!==run.pod_id||pod.name!==run.name)throw Error('POD_OWNERSHIP_MISMATCH');
-  const age=now()-Date.parse(run.created_at);
-  let reason=run.phase==='draining'?run.reason:null;
-  if(pod.gpu?.id!==GPU||pod.gpu?.count!==1||pod.cloud!=='COMMUNITY'||!Number.isFinite(pod.cost)||pod.cost>0.71)reason='unexpected_gpu_or_price';
-  if(run.phase==='blocked'||!s.enabled)reason=reason||'disabled';
-  if(now()>=Date.parse(run.deadline_at)||age*730000/3600000+30000>=run.reserved_microusd)reason='budget_deadline';
-  if(!run.ready_at&&(run.boot_error||age>600000))reason='startup_failed';
-  if(run.phase==='running'&&!s.pending&&!s.running&&run.idle_since&&now()-Date.parse(run.idle_since)>=90000)reason='idle';
-  if(pod.status==='EXITED')reason=reason||'worker_exited';
+  const profile=run.profile||(s.profiles||[]).find(p=>p.id===run.profile_id)||DEFAULT_H3_PROFILE;
+  const reason=managedStopReason(run,pod,s,now(),profile);
   if(!reason)return {status:run.phase,podId:pod.id};
   await state('drain',{reason}); // Atomic drain prevents a new claim racing shutdown.
   if(pod.status!=='EXITED')await control('/pods/'+pod.id+'/action','POST',{action:'stop'});

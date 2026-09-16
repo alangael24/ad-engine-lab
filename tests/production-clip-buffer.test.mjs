@@ -83,3 +83,11 @@ test('empty or invalid windows never launch provider work',async()=>{
  await runClipBuffer([],callbacks);
  for(const capacity of [0,4,1.5])await assert.rejects(runClipBuffer(entries(1),{...callbacks,capacity}),/PRODUCTION_INVALID/);
 });
+test('capacity wait yields after a bounded interval with only persisted jobs in flight',async()=>{
+ let time=0,submits=0;const versions=[];
+ await assert.rejects(runClipBuffer(entries(5),{pollMs:0,yieldAfterMs:30,now:()=>time,
+  prepare:async()=>({}),submit:async e=>{submits++;const v={id:e.key,status:'queued'};versions.push(v);return v;},
+  inspect:async()=>{time+=10;return {versions,compute:{waiting:true}};},select:async()=>assert.fail('not generated')
+ }),/PRODUCTION_GPU_WAIT/);
+ assert.equal(submits,3);
+});

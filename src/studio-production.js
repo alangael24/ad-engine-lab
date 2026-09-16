@@ -1,7 +1,9 @@
+import {readProductionClipProgress} from './h3-production-status.js';
 import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ PRODUCTION_TIMEOUT:[409,'No pudimos completar el video dentro del plazo. Tu proyecto y los recursos terminados siguen guardados.'],
  PRODUCTION_GENERATION_OFFLINE:[503,'La animación no está disponible ahora. Conservamos tu avance sin iniciar nuevas imágenes ni voces.'],
  WORKER_OFFLINE:[503,'La animación se detuvo. Las imágenes y la voz están guardadas.'],
  PRODUCTION_VOICE_CONFIG:[503,'La voz no está configurada. Tu avance está guardado.'],
@@ -46,7 +48,7 @@ export async function productionAvailable(db,env,userId){if(!productionEnabled(e
 export async function getProduction(context){try{
  const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);
  const q=await db.from('studio_productions').select('*').eq('project_id',id).eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);if(q.error)throw q.error;
- return json({enabled:await productionAvailable(db,context.env,user.id),productions:q.data.map(publicProduction)});
+ return json({enabled:await productionAvailable(db,context.env,user.id),productions:await Promise.all(q.data.map(async j=>({...publicProduction(j),...(['queued','running'].includes(j.status)&&['clips','repair','waiting_gpu'].includes(j.stage)?{compute:await readProductionClipProgress(db,j)}:{})})))});
 }catch(e){return productionError(e);}}
 export async function postProduction(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2000);

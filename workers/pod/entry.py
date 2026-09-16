@@ -1,5 +1,6 @@
 """Pinned H3 bootstrap. No RunPod account key or public ports inside the GPU."""
 import json, os, shutil, subprocess, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 def report(action, **fields):
@@ -28,7 +29,7 @@ def main():
         os.environ.update(HF_HUB_OFFLINE='0',HF_HUB_CACHE='/workspace/.cache/huggingface',
             HF_XET_CACHE='/workspace/.cache/xet',HF_XET_HIGH_PERFORMANCE='1',
             HF_XET_NUM_CONCURRENT_RANGE_GETS='32')
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import hf_hub_download
         root = Path('/workspace/ComfyUI')
         if not root.exists():
             shutil.copytree('/opt/ComfyUI', root, symlinks=True)
@@ -36,8 +37,19 @@ def main():
         stage = 'models'
         report('boot_progress', stage=stage)
         started = time.time()
-        snapshot_download(manifest['sourceRepo'], revision=manifest['sourceRevision'],
-            allow_patterns=list(manifest['files']), local_dir=str(root/'models'), max_workers=4)
+        def download(name):
+            return hf_hub_download(manifest['sourceRepo'], filename=name,
+                revision=manifest['sourceRevision'], local_dir=str(root/'models'))
+        completed_bytes = 0
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {pool.submit(download, name):name for name in manifest['files']}
+            for future in as_completed(futures):
+                name = futures[future]
+                path = Path(future.result())
+                if path.stat().st_size != manifest['files'][name]['bytes']:
+                    raise RuntimeError('MODEL_SIZE_MISMATCH')
+                completed_bytes += path.stat().st_size
+                report('download_progress', bytes=completed_bytes)
         for name, spec in manifest['files'].items():
             if (root/'models'/name).stat().st_size != spec['bytes']:
                 raise RuntimeError('MODEL_SIZE_MISMATCH')
@@ -46,7 +58,7 @@ def main():
         os.environ['HF_HUB_OFFLINE'] = '1'
         stage = 'cuda'
         report('boot_progress', stage=stage)
-        subprocess.run(['python','-c','import torch; assert "5090" in torch.cuda.get_device_name(0); assert (torch.ones(1,device="cuda")+1).item()==2'],check=True)
+        subprocess.run(['python','-c','import os,torch; assert torch.cuda.get_device_name(0)==os.environ.get("H3_EXPECTED_GPU","NVIDIA GeForce RTX 5090"); assert torch.cuda.get_device_properties(0).total_memory>=float(os.environ.get("H3_MIN_VRAM_GB","31"))*1024**3; assert (torch.ones(1,device="cuda")+1).item()==2'],check=True)
         stage = 'comfy'
         report('boot_progress', stage=stage)
         comfy = subprocess.Popen(['python','main.py','--listen','127.0.0.1','--port','8188',
@@ -65,13 +77,21 @@ def main():
         report('boot_progress', stage=stage)
         report('ready')
         worker = subprocess.Popen(['node','workers/h3-worker.mjs'],cwd='/opt/creativerush')
+        stage = 'runtime'
         while comfy.poll() is None and worker.poll() is None:
             time.sleep(2)
         raise RuntimeError('H3_PROCESS_EXITED')
     except Exception as error:
-        # Only class name, never exception text, URLs or credentials.
+        # An allowlisted classification, never URLs, credentials or arbitrary text.
+        code = type(error).__name__
+        if isinstance(error, subprocess.CalledProcessError) and stage == 'cuda':
+            code = 'CUDA_HOST_FAILED'
+        elif isinstance(error, urllib.error.HTTPError) and error.code in (401,403):
+            code = 'CREDENTIALS_INVALID'
+        elif str(error) in ('MODEL_SIZE_MISMATCH','COMFY_EXITED','COMFY_NOT_READY','H3_PROCESS_EXITED'):
+            code = str(error)
         try:
-            report('boot_progress', stage=stage, error=type(error).__name__)
+            report('boot_progress', stage=stage, error=code)
         except Exception:
             pass
         raise

@@ -41,3 +41,30 @@ test('ComfyUI result discovery only accepts MP4 video outputs',()=>{
   assert.equal(findVideo({images:[{filename:'x.png'}]}),null);
   assert.equal(findVideo({node:{gifs:[{filename:'render.mp4'}]}}).filename,'render.mp4');
 });
+test('managed upload failure retries transfer bytes without another GPU submission',async()=>{
+ let submits=0,waits=0,uploads=0;const calls=[];
+ const job={id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),managedAttemptId:crypto.randomUUID()};
+ const adapter={build:async()=>({}),submit:async(_w,id)=>{assert.equal(id,job.managedAttemptId);submits++;return crypto.randomUUID();},wait:async()=>{waits++;return new Blob(['mp4']);}};
+ const api=async action=>{calls.push(action);return action==='upload'?{uploadUrl:'https://storage.test/result'}:{ready:false};};
+ const clock={now:()=>Date.now(),sleep:async()=>{},setInterval:()=>1,clearInterval:()=>{}};
+ const result=await processJob(job,api,adapter,{clock,fetchImpl:async()=>{uploads++;if(uploads===1)throw Error('network');return new Response(null,{status:200});}});
+ assert.equal(result.status,'succeeded');assert.equal(submits,1);assert.equal(waits,1);assert.equal(uploads,2);assert.ok(!calls.includes('fail'));
+});
+test('managed lost submit acknowledgement stays on the same attempt, without refund',async()=>{
+ const calls=[];const adapter={findSubmission:async()=>null};
+ const result=await processJob({id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),managedAttemptId:crypto.randomUUID(),submissionStarted:true},async action=>{calls.push(action);return{ready:false};},adapter);
+ assert.equal(result.status,'deferred');assert.equal(result.reason,'AMBIGUOUS_SUBMISSION');assert.ok(!calls.includes('fail'));assert.ok(!calls.includes('infrastructure_failure'));
+});
+test('managed worker recovers uploaded output before contacting an unavailable GPU',async()=>{
+ let gpu=0;const result=await processJob({id:crypto.randomUUID(),leaseToken:crypto.randomUUID(),managedAttemptId:crypto.randomUUID(),submissionStarted:true},async action=>({ready:action==='recover'}),{findSubmission:async()=>{gpu++;throw Error('down');}});
+ assert.equal(result.status,'succeeded');assert.equal(gpu,0);
+});
+test('Comfy wait obeys absolute deadline and does not count polling as progress',async()=>{
+ let now=0,progress=0;const h3=new H3Adapter('http://localhost:8188',{clock:{now:()=>now,sleep:async ms=>{now+=ms;}},fetchImpl:async url=>Response.json(url.endsWith('/queue')?{queue_running:[],queue_pending:[]}: {})});
+ await assert.rejects(h3.wait('p',()=>{},{deadlineAt:5000,pollMs:4000,onProgress:async()=>{progress++;}}),/H3_EXECUTION_DEADLINE/);
+ assert.equal(now,5000);assert.equal(progress,0);
+});
+test('same managed seed preserves the creative graph across GPU attempts',async()=>{
+ const h3=new H3Adapter('http://localhost:8188');const j={prompt:'Animate this product gently',durationSeconds:5,resolution:'720p',aspectRatio:'9:16',noiseSeed:12345};
+ assert.deepEqual(await h3.build(j),await h3.build(j));
+});
