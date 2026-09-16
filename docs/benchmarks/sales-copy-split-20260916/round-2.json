@@ -1,0 +1,196 @@
+{
+  "kind": "exploratory paired copy comparison; not conversion evidence",
+  "cases": [
+    {
+      "name": "CableNest (ficticio)",
+      "product": "Organizador adhesivo con cuatro ranuras para cables. Se fija al borde del escritorio.",
+      "benefits": "Mantiene hasta cuatro cables sujetos y accesibles.",
+      "claims": "Cuatro ranuras. Fijación adhesiva. Consultar medidas y superficies compatibles en la ficha.",
+      "avoid": "No afirmar que sirve para todas las superficies ni que nunca se despega.",
+      "idea": "Para quien trabaja desde casa y busca el cargador que se cae detrás del escritorio. Lleva a consultar medidas en la tienda. No hay oferta."
+    },
+    {
+      "name": "LumaClip (ficticio)",
+      "product": "Lámpara de lectura recargable con pinza, brazo flexible y tres niveles de brillo.",
+      "benefits": "Permite dirigir la luz hacia las páginas y elegir entre tres niveles.",
+      "claims": "Precio 24 dólares. Carga USB-C. Cable incluido.",
+      "avoid": "No inventar autonomía, beneficios para la vista, garantía ni descuento.",
+      "idea": "Para quien lee de noche en la cama. Prioriza cómo dirigir la luz al libro. CTA: elige tu LumaClip en la tienda."
+    },
+    {
+      "name": "FoldMat (ficticio)",
+      "product": "Alfombrilla plegable para cambiar al bebé fuera de casa, con superficie impermeable y bolsillo para pañales.",
+      "benefits": "Se pliega para transportarla y se limpia con un paño.",
+      "claims": "Precio 29 dólares. 30 días para devolverla. No hay descuento.",
+      "avoid": "No inventar protección contra bacterias, certificaciones ni testimonios.",
+      "idea": "Para padres que quieren llevar una superficie propia para el cambio de pañal al salir. Responde cómo se transporta y limpia. CTA: conoce FoldMat."
+    }
+  ],
+  "runs": [
+    {
+      "case": 1,
+      "name": "CableNest (ficticio)",
+      "profile": "continuity-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "a6f72cb9a5d68bca5716f7be3a0ae4b359cc8e56be1e7015e92e265eca4b9a09",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 663,
+            "completion_tokens": 203,
+            "total_tokens": 866,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 151,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          }
+        }
+      ],
+      "text": "¿Cuántas veces el cargador se ha caído detrás del escritorio? CableNest es un organizador adhesivo que se fija al borde de tu escritorio y sujeta hasta cuatro cables, para que queden accesibles mientras trabajas desde casa. Tiene cuatro ranuras y fijación adhesiva: cada cable en su sitio, sin enredos ni búsquedas a ciegas bajo la mesa. Antes de comprarlo, revisa en la ficha de la tienda las medidas y las superficies compatibles, y comprueba que encaja con tu escritorio y con el grosor de tus cables. Cuatro ranuras, fijación adhesiva, medida correcta. CableNest, para tener el cargador donde lo necesitas.",
+      "words": 100,
+      "elapsedMs": 3270
+    },
+    {
+      "case": 1,
+      "name": "CableNest (ficticio)",
+      "profile": "ads-sales-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "876be7874b6f5c0582c8ef4568f7fd1cf69a95fdc203f80b317162244a927586",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 1559,
+            "completion_tokens": 177,
+            "total_tokens": 1736,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 1047,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          },
+          "productProfile": "ads-sales-v1"
+        }
+      ],
+      "text": "Estás en medio de una videollamada y, otra vez, el cable del cargador se ha caído por detrás del escritorio. Te agachas, lo buscas, pierdes el hilo. CableNest es un organizador adhesivo con cuatro ranuras que se fija al borde de tu escritorio: deja hasta cuatro cables sujetos y a mano, listos para cuando los necesites. Antes de comprarlo, consulta en la ficha las medidas y las superficies compatibles, porque no todas las mesas son iguales. Si quieres ordenar tu zona de trabajo, entra y comprueba si encaja con tu escritorio.",
+      "words": 91,
+      "elapsedMs": 2084
+    },
+    {
+      "case": 2,
+      "name": "LumaClip (ficticio)",
+      "profile": "continuity-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "a6f72cb9a5d68bca5716f7be3a0ae4b359cc8e56be1e7015e92e265eca4b9a09",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 653,
+            "completion_tokens": 150,
+            "total_tokens": 803,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 141,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          }
+        }
+      ],
+      "text": "Lees de noche, en la cama, y la lámpara del techo no te sirve. LumaClip se engancha a tu libro con una pinza, y su brazo flexible dirige la luz justo hacia las páginas. Tres niveles de brillo: elige el que quieras para ese momento. Se carga por USB-C y el cable viene incluido. Cuesta 24 dólares. No alumbra toda la habitación ni molesta a quien duerme a tu lado. Elige tu LumaClip en la tienda.",
+      "words": 76,
+      "elapsedMs": 1809
+    },
+    {
+      "case": 2,
+      "name": "LumaClip (ficticio)",
+      "profile": "ads-sales-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "876be7874b6f5c0582c8ef4568f7fd1cf69a95fdc203f80b317162244a927586",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 1549,
+            "completion_tokens": 176,
+            "total_tokens": 1725,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 1037,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          },
+          "productProfile": "ads-sales-v1"
+        }
+      ],
+      "text": "Son las once de la noche y todavía te quedan páginas. Pero si enciendes la lámpara del techo, despiertas a quien duerme a tu lado. La LumaClip se engancha a tu libro con una pinza y su brazo flexible dirige la luz justo hacia las páginas, no hacia toda la habitación. Y eliges entre tres niveles de brillo: uno suave para no molestar, otro más claro cuando la letra es pequeña. Se recarga por USB-C y el cable viene incluido. Cuesta veinticuatro dólares. Elige tu LumaClip en la tienda y sigue leyendo hasta la última página.",
+      "words": 96,
+      "elapsedMs": 2097
+    },
+    {
+      "case": 3,
+      "name": "FoldMat (ficticio)",
+      "profile": "continuity-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "a6f72cb9a5d68bca5716f7be3a0ae4b359cc8e56be1e7015e92e265eca4b9a09",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 661,
+            "completion_tokens": 177,
+            "total_tokens": 838,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 149,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          }
+        }
+      ],
+      "text": "¿Sale de casa con el bebé y no le convence cambiar el pañal sobre la mesa de cualquier baño? FoldMat es una alfombrilla plegable pensada para eso. La extiendes, cambias al bebé y la vuelves a plegar: queda compacta y ocupa poco en el bolso. Su superficie es impermeable y se limpia con un paño. Además, tiene un bolsillo para llevar los pañales a mano. Cuesta 29 dólares y tienes 30 días para devolverla. Sin descuentos ni complicaciones. Es una superficie propia, la lleves donde la lleves. Conoce FoldMat.",
+      "words": 89,
+      "elapsedMs": 1972
+    },
+    {
+      "case": 3,
+      "name": "FoldMat (ficticio)",
+      "profile": "ads-sales-v1",
+      "model": "deepseek-v4-flash-vision-exp",
+      "systemSha256": "876be7874b6f5c0582c8ef4568f7fd1cf69a95fdc203f80b317162244a927586",
+      "request": "Escribe un guion hablado en español de 90 a 110 palabras, natural y concreto, para el producto y público indicados. Entrega una sola versión.",
+      "status": "completed",
+      "calls": [
+        {
+          "model": "deepseek-v4-flash-vision-exp",
+          "usage": {
+            "prompt_tokens": 1557,
+            "completion_tokens": 178,
+            "total_tokens": 1735,
+            "prompt_cache_hit_tokens": 512,
+            "prompt_cache_miss_tokens": 1045,
+            "prompt_tokens_details": {
+              "cached_tokens": 512
+            }
+          },
+          "productProfile": "ads-sales-v1"
+        }
+      ],
+      "text": "Cambiar un pañal fuera de casa casi siempre acaba en el mismo sitio: el asiento del coche, un banco o una mesa que no sabes quién usó antes. FoldMat es una alfombrilla plegable que llevas contigo. La despliegas y tienes una superficie propia e impermeable para el cambio, con un bolsillo para guardar el pañal. Cuando terminas, la limpias con un paño y la pliegas otra vez. Ocupa poco en la bolsa y está lista para la próxima salida. Cuesta 29 dólares y tienes 30 días para devolverla. Conoce FoldMat.",
+      "words": 90,
+      "elapsedMs": 1709
+    }
+  ]
+}

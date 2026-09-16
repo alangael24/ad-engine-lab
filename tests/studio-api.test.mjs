@@ -21,3 +21,18 @@ test('invalid H3 provider response reserves no GPU job or credits',async()=>{
  const before=await balance(db,a);rejectFlash=true;
  try{const requestId=crypto.randomUUID();const r=await postStudio(ctx('/api/studio','alice',{action:'version',id:project.id,expected:project.revision,data:{requestId,sceneId:scene.id,instruction:''}}));assert.equal(r.status,503);assert.equal((await r.json()).code,'H3_PROMPT_PROVIDER');assert.equal(await balance(db,a),before);assert.equal((await db.query('select count(*)::int n from generation_jobs where request_id=$1',[requestId])).rows[0].n,0);}finally{rejectFlash=false;}
 });
+
+test('sales projects persist separately through API saves and cannot replace the original product mode',async()=>{
+ const sales=await write('create_project',crypto.randomUUID(),{title:'Laboratorio',brandId:brand.id,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[],productProfile:'ads-sales-v1'});
+ assert.equal(sales.data.productProfile,'ads-sales-v1');
+ const saved=await write('save_project',sales.id,{...sales.data,scriptDraft:'Elige este producto.'},sales.revision);
+ assert.equal(saved.data.productProfile,'ads-sales-v1');
+ const library=await (await getStudio(ctx('/api/studio'))).json();
+ assert.equal(library.projects.find(p=>p.id===sales.id).productProfile,'ads-sales-v1');
+ assert.ok(!Object.hasOwn(library.projects.find(p=>p.id===project.id),'productProfile'));
+ for(const p of [saved,project]){
+  const altered={...p.data,productProfile:p.id===sales.id?'continuity-v1':'ads-sales-v1'};
+  const result=await postStudio(ctx('/api/studio','alice',{action:'save_project',id:p.id,data:altered,expected:p.revision}));
+  assert.equal(result.status,409);assert.equal((await result.json()).code,'STUDIO_PRODUCT_LOCKED');
+ }
+});

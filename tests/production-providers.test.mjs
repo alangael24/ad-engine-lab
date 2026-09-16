@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createProductionProviders} from '../workers/production-providers.mjs';
+test('sales director appends commercial intent without changing legacy direction or approved words',async()=>{
+ const {callDirector}=await import('../workers/production-providers.mjs');
+ const {CHAT_MODEL}=await import('../assets/chat-model.js');
+ const {SALES_VISUAL_DIRECTION}=await import('../src/sales-copy.js');
+ const {createHash}=await import('node:crypto');
+ const {readFile}=await import('node:fs/promises');
+ const baseline=JSON.parse(await readFile(new URL('./fixtures/continuity-script-baseline.json',import.meta.url)));
+ const requests=[];
+ const scene={text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}};
+ for(const profile of [undefined,'ads-sales-v1']){
+  const plan=await callDirector({brand_snapshot:{},data:{scriptDraft:'Hello.',...(profile?{productProfile:profile}:{})}},{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
+   requests.push(JSON.parse(options.body));
+   return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Same',scenes:[scene]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+  }});
+  assert.equal(plan.scenes[0].text,'Hello.');
+ }
+ const legacy=requests[0].input[0].content;
+ assert.equal(createHash('sha256').update(legacy).digest('hex'),baseline.directorSystemSha256);
+ assert.equal(requests[1].input[0].content,legacy+'\n'+SALES_VISUAL_DIRECTION);
+ assert.deepEqual(requests[0].input.slice(1),requests[1].input.slice(1));
+});
 test('provider diagnostics preserve status and error code without logging secret-bearing messages',async()=>{
  const lines=[],original=console.error;console.error=line=>lines.push(line);
  try{

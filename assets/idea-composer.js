@@ -1,7 +1,9 @@
+import {isSalesProduct} from './product-profiles.js';
 import {FORMATS,LOOKS,creativeLabel} from './creative-formats.js';
 import {ideaIntent,storeProductData} from './idea-intent.js';
 const $=s=>document.querySelector(s),el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n;};
 export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,attachReference,api,saveBrand}){
+ const sales=isSalesProduct({productProfile:document.body.dataset.productProfile});
  let fingerprint=null,brandId=null,creative={format:'auto',look:'auto'},file=null,requestId=null,currentProject=null,resumeAfterChoice=false,waitingForStore=false,savedIdea='',savedReference='',imported=null;
  const input=$('#idea-input'),status=$('#idea-status');
  const note=text=>{status.textContent=text;status.hidden=!text;};
@@ -11,8 +13,8 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
  function controls(){
   if(!brands().some(b=>b.id===brandId)){let last;try{last=localStorage.getItem('studio-last-product');}catch{}brandId=brands().some(b=>b.id===last)?last:brands().length===1?brands()[0].id:null;}
   const onboarding=waitingForStore||!brands().length;
-  $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':'¿Qué anuncio quieres crear?';
-  input.placeholder=onboarding?'Ej. mitienda.com':'Describe tu idea o añade una referencia…';
+  $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':sales?'¿Qué quieres que tu cliente entienda?':'¿Qué anuncio quieres crear?';
+  input.placeholder=onboarding?'Ej. mitienda.com':sales?'Describe el producto, a quién va dirigido y qué quieres destacar…':'Describe tu idea o añade una referencia…';
   $('#empty').classList.toggle('needs-product',onboarding);
   $('#idea-label').className=onboarding?'home-input-label':'sr-only';
   $('#idea-label').textContent=onboarding?'Pega el enlace de tu tienda o producto':'Tu idea o referencia';

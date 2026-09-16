@@ -13,6 +13,7 @@ async function applySession(next) {
   if (!next) { location.replace('/cuenta/'); return; }
   try {
     if(sessionStorage.getItem('creative-rush-return')==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
+    if(sessionStorage.getItem('creative-rush-return')==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
     const account = await apiRequest('/api/account');
     if (current !== revision) return;
     const destination = accountDestination(account);

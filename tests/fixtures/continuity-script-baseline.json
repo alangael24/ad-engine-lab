@@ -1,0 +1,7 @@
+{
+  "release": "a06ce8c",
+  "tag": "video-continuity-v1-20260916",
+  "model": "deepseek-v4-flash-vision-exp",
+  "scriptSystemSha256": "a6f72cb9a5d68bca5716f7be3a0ae4b359cc8e56be1e7015e92e265eca4b9a09",
+  "directorSystemSha256": "71d50775525857106530dee05ff14f80589b932adb8894b03db493baa37912c9"
+}

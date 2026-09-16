@@ -25,6 +25,7 @@ const staticEntries = [
   "videos",
   "herramienta",
   "estudio",
+  "anuncios-lab",
   "editor",
   "productos",
   "cuenta",
