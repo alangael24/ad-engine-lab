@@ -198,3 +198,22 @@ no path adds a second repair or repeats Astra. Targets of 120–180 characters a
 source validation still run after repair; failures cannot replace the draft.
 The captured failing response was repaired with the real provider, with all
 three titles and narrations verified identical to the original.
+
+### Full chat runtime offload (2026-09-17)
+
+Cloudflare `/api/studio-chat` is now a native HTTP stream proxy to the existing,
+pinned HTTPS Render service. It does not parse project JSON, model SSE, apply
+edits, or serialize saved variants. The same authenticated handlers run on
+Render, preserving ownership, revision checking, atomic request reservation,
+undo, commit and failure recording. There is no transport retry or fallback.
+
+The gateway sends its database credential to that authenticated internal route
+only (no redirects, fixed application database and runtime hosts). The runtime
+uses request-local configuration; it never mutates process.env or logs/returns
+credentials. Only public response headers are forwarded. Public callers cannot
+supply the gateway's internal configuration headers. Database authentication
+still checks the user's bearer token on every request.
+
+This removes model response length and preview packet count from edge JavaScript
+work. A finite benchmark is not a hard latency/CPU guarantee from Cloudflare;
+record cold and warm production samples before claiming the 10 ms target.

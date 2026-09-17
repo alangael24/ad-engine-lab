@@ -1,5 +1,5 @@
 import {timingSafeEqual,createHash} from 'node:crypto';
-import {callEditor} from '../src/studio-chat.js';
+import {callEditor,getStudioChat,postStudioChat} from '../src/studio-chat.js';
 import {workflowApiKey} from '../src/model-provider.js';
 
 const MAX_BODY=4*1024*1024;
@@ -11,9 +11,10 @@ export function createChatRuntime({env=process.env,edit=callEditor,log=entry=>co
  async function run(req,res){
   if(!ready||closing){reply(res,503,'CHAT_OFFLINE');return;}
   if(!timingSafeEqual(digest(req.headers['x-chat-runtime-token']),digest(env.CHAT_RUNTIME_TOKEN))){reply(res,401,'UNAUTHORIZED');return;}
-  if(req.method!=='POST'){reply(res,405,'METHOD_NOT_ALLOWED');return;}
+  if(!['GET','POST'].includes(req.method)||(new URL(req.url,'http://runtime').pathname==='/internal/chat-edit'&&req.method!=='POST')){reply(res,405,'METHOD_NOT_ALLOWED');return;}
   if(pending.size>=4){res.setHeader('retry-after','5');reply(res,503,'CHAT_OFFLINE');return;}
   try{
+   if(new URL(req.url,'http://runtime').pathname==='/internal/studio-chat'){await runStudio(req,res);return;}
    if(!req.headers['content-type']?.includes('application/json')){reply(res,400,'CHAT_INVALID');return;}
    if(Number(req.headers['content-length'])>MAX_BODY){reply(res,413,'CHAT_INVALID');req.resume();return;}
    const chunks=[];let size=0;
@@ -41,11 +42,32 @@ export function createChatRuntime({env=process.env,edit=callEditor,log=entry=>co
    finally{flush();clearInterval(heartbeat);res.end();}
   }catch(e){reply(res,503,'CHAT_PROVIDER');log({event:'chat_transport_failed',code:e.code||'TRANSPORT'});}
  }
+ async function runStudio(req,res){
+  const key=req.headers['x-chat-database-key'];
+  if(typeof key!=='string'||!key){reply(res,503,'CHAT_OFFLINE');return;}
+  // Never mutate process.env: independent requests may carry different users.
+  const requestEnv={...env,CHAT_RUNTIME_MODE:'local',SUPABASE_URL:'https://ozkewphfxaohtihxmgoo.supabase.co',SUPABASE_SERVICE_ROLE_KEY:key,PRODUCTION_ENABLED:req.headers['x-chat-production-enabled']==='true'?'true':'false',REFERENCE_ANALYSIS_ENABLED:req.headers['x-chat-reference-enabled']==='true'?'true':'false',PRODUCTION_ALLOWED_USERS:req.headers['x-chat-production-users']||''};
+  const headers=new Headers();for(const name of ['authorization','accept','content-type'])if(req.headers[name])headers.set(name,req.headers[name]);
+  let body;
+  if(req.method==='POST'){
+   if(Number(req.headers['content-length'])>2400000){reply(res,413,'CHAT_INVALID');req.resume();return;}
+   const chunks=[];let size=0;
+   for await(const chunk of req){size+=chunk.length;if(size>2400000){reply(res,413,'CHAT_INVALID');return;}chunks.push(chunk);}
+   body=Buffer.concat(chunks,size);
+  }
+  const tasks=[],start=Date.now();
+  const context={env:requestEnv,request:new Request('https://creativerushai.com/api/studio-chat'+new URL(req.url,'http://runtime').search,{method:req.method,headers,...(body?{body}:{})}),waitUntil:task=>tasks.push(task)};
+  const response=await (req.method==='GET'?getStudioChat:postStudioChat)(context);
+  if(!res.destroyed){res.writeHead(response.status,Object.fromEntries(response.headers));res.flushHeaders();}
+  // Drain even when the browser leaves: commit/undo/idempotency stay intact.
+  try{if(response.body){const reader=response.body.getReader();try{while(true){const {value,done}=await reader.read();if(done)break;if(!res.destroyed)res.write(value);}}finally{reader.releaseLock();}}}
+  finally{await Promise.allSettled(tasks);if(!res.destroyed)res.end();log({event:'chat_request_complete',status:response.status,wallMs:Date.now()-start});}
+ }
  return {
   ready,
   get pendingCount(){return pending.size;},
   async handle(req,res){
-   if(new URL(req.url,'http://runtime').pathname!=='/internal/chat-edit')return false;
+   if(!['/internal/chat-edit','/internal/studio-chat'].includes(new URL(req.url,'http://runtime').pathname))return false;
    const task=run(req,res);pending.add(task);try{await task;}finally{pending.delete(task);}return true;
   },
   async close(){closing=true;await Promise.allSettled([...pending]);}

@@ -69,3 +69,23 @@ test('remote work preserves ownership, disconnect recovery and request idempoten
   assert.equal(queries.length,0); // History comes from the same atomic prepare RPC.
  }finally{release();globalThis.fetch=original;await h.close();await db.close();}
 });
+test('full runtime route authenticates the user and preserves idempotency without edge JSON processing',async()=>{
+ const db=await database(),owner=await user(db),stub=mockSupabase(db),original=globalThis.fetch;
+ stub.users.set('alice',owner);let calls=0;
+ const h=await host();
+ globalThis.fetch=(url,opts)=>{
+  if(String(url).startsWith('https://ozkewphfxaohtihxmgoo.supabase.co'))return stub.fetch(String(url).replace('https://ozkewphfxaohtihxmgoo.supabase.co','http://supabase.test'),opts);
+  if(String(url)==='https://api.openai.com/v1/responses'){calls++;return Promise.resolve(new Response('data: '+JSON.stringify({model:'gpt-6-astra',choices:[{finish_reason:'tool_calls',delta:{tool_calls:[{index:0,function:{name:'edit_project',arguments:JSON.stringify({operation:'set_look',value:'clay',message:'Listo'})}}]}}]})+'\n\n'));}
+  return original(url,opts);
+ };
+ try{
+  const brand=await call(db,'studio_write',[owner.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Nebula',product:'Filtro'}),null]);
+  const project=await call(db,'studio_write',[owner.id,'create_project',crypto.randomUUID(),JSON.stringify({title:'Test',brandId:brand.id,scenes:[],aspectRatio:'9:16',referenceUrl:'',referenceNotes:''}),null]);
+  const body=JSON.stringify({projectId:project.id,expected:project.revision,requestId:crypto.randomUUID(),message:'Cambia a clay'}),url=h.url.replace('/chat-edit','/studio-chat');
+  const opts={method:'POST',headers:{...headers,'x-chat-database-key':'fixture','x-chat-reference-enabled':'true',authorization:'Bearer alice'},body};
+  assert.equal((await original(url,{...opts,headers:{...opts.headers,authorization:'Bearer invalid'}})).status,401);
+  const first=await original(url,opts),data=await first.json();assert.equal(first.status,200,JSON.stringify(data));assert.equal(data.edit.status,'succeeded');
+  const repeat=await original(url,opts);assert.equal((await repeat.json()).edit.status,'succeeded');assert.equal(calls,1);
+  assert.ok(!JSON.stringify(h.logs).includes('fixture'));
+ }finally{globalThis.fetch=original;await h.close();await db.close();}
+});
