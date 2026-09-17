@@ -159,3 +159,19 @@ without rerunning Astra, only if all three original titles and narrations are
 recoverable. Repaired titles/narrations must match those strings exactly. Both
 attempt usages are retained; transport/truncation/model-identity failures still
 have no retry. This is a format repair, not an approval bypass.
+
+### Further chat edge CPU reduction (2026-09-17)
+
+Chat now uses a request-scoped Auth/PostgREST transport for its two RPCs and four
+read-only tables, avoiding Supabase SDK session/realtime initialization on this
+route. User identity is still checked against `/auth/v1/user` on every request;
+privileged database calls retain the service credential, owner filters and the
+existing transactional RPCs. There is no shared session, retry, schema change or
+new service. All other routes keep their existing SDK.
+
+Chat history selects only public conversation fields, preserving the 20-entry UI
+history and the same latest eight entries supplied to the model. `before_data`
+snapshots remain in PostgreSQL for undo and are no longer copied into the model
+transport. Local workerd sampling (mock upstreams, not billing CPU) improved cold
+active time from 37.535 ms to 13.204 ms and warm average from 1.314 to 1.006 ms.
+Production CPU must be measured separately after rollout.

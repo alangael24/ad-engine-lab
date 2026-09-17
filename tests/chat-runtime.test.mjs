@@ -54,9 +54,10 @@ test('runtime failure/truncation never falls back to a second model call',async(
 });
 test('remote work preserves ownership, disconnect recovery and request idempotency at the edge',async()=>{
  const db=await database(),owner=await user(db),stub=mockSupabase(db),original=globalThis.fetch;stub.users.set('alice',owner);let modelCalls=0,release;
- const gate=new Promise(r=>release=r),h=await host(async()=>{modelCalls++;await gate;return {edit:{operation:'set_look',message:'Listo',value:'clay'},usage:{calls:[]}};});
+ const queries=[];
+ const gate=new Promise(r=>release=r),h=await host(async(p,v,history)=>{assert.ok(history.every(row=>!('before_data' in row)));modelCalls++;await gate;return {edit:{operation:'set_look',message:'Listo',value:'clay'},usage:{calls:[]}};});
  const settings={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',OPENAI_API_KEY:'fixture',REFERENCE_FLASH_KEY:'fixture',CHAT_RUNTIME_MODE:'remote',CHAT_RUNTIME_URL:'https://runtime.test',CHAT_RUNTIME_TOKEN:token};
- globalThis.fetch=(url,opts)=>String(url)==='https://runtime.test/internal/chat-edit'?original(h.url,opts):stub.fetch(url,opts);
+ globalThis.fetch=(url,opts)=>{if(String(url).includes('/rest/v1/studio_chat_edits'))queries.push(new URL(url));return String(url)==='https://runtime.test/internal/chat-edit'?original(h.url,opts):stub.fetch(url,opts);};
  try{
   const brand=await call(db,'studio_write',[owner.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Nebula',product:'Filtro'}),null]);
   const project=await call(db,'studio_write',[owner.id,'create_project',crypto.randomUUID(),JSON.stringify({title:'Test',brandId:brand.id,scenes:[],aspectRatio:'9:16',referenceUrl:'',referenceNotes:''}),null]);
@@ -65,5 +66,6 @@ test('remote work preserves ownership, disconnect recovery and request idempoten
   assert.equal((await postStudioChat(ctx('invalid'))).status,401);assert.equal(modelCalls,0);
   const response=await postStudioChat(ctx()),reader=response.body.getReader();await reader.read();await reader.cancel();release();await Promise.all(pending);
   const replay=await postStudioChat(ctx());assert.equal((await replay.json()).edit.status,'succeeded');assert.equal(modelCalls,1);
+  assert.equal(queries.length,1);assert.equal(queries[0].searchParams.get('limit'),'8');assert.equal(queries[0].searchParams.get('select'),'id,status,request_payload,result,applied_revision,created_at');
  }finally{release();globalThis.fetch=original;await h.close();await db.close();}
 });

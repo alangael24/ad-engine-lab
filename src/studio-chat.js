@@ -15,7 +15,8 @@ import {readEvents} from '../assets/chat-stream.js';
 import {previewEmitter} from './chat-stream.js';
 import {creativeGuide} from '../assets/creative-formats.js';
 import {json} from './backend.js';
-import {authContext,readJson,rpc,UUID} from './generations.js';
+import {readJson,rpc,UUID} from './generations.js';
+import {chatAuthContext as authContext} from './chat-database.js';
 import {own,studioError} from './studio.js';
 import {productionError,productionAccess} from './studio-production.js';
 import {CHAT_MODEL,OPS,validateEdit,applyEdit,editFollowup} from '../assets/chat-model.js';
@@ -35,7 +36,8 @@ export async function callEditor(project,versions,history,message,env,request=fe
  if(model!==CHAT_MODEL||finish!=='tool_calls'||calls.size!==1)fail('CHAT_INVALID');const call=[...calls.values()][0];if(call.name!=='edit_project')fail('CHAT_INVALID');let edit;try{const raw=JSON.parse(call.args);if(raw.operation==='produce'&&project.data.scriptVariants){return {edit:{operation:'clarify',value:null,message:'Elige la variante 1, 2 o 3 antes de producir el anuncio.'},usage,visualReview:{scenes:0,total:0}};}if(raw.operation==='select_script'){if(project.data.productProfile!=='ads-sales-v1')fail('CHAT_INVALID');return {edit:validateEdit(selectScriptVariant(project,raw.position)),usage,visualReview:{scenes:0,total:0}};}const supplied=providedScript(raw,{project,message});if(supplied){edit=validateEdit(supplied.edit);usage={...(usage||{}),inputMode:'provided_script',scriptSource:supplied.source};previewEmitter(onDelta)(JSON.stringify({operation:'draft_script',value:edit.value}));return {edit,usage,visualReview:{scenes:0,total:0}};}const structure=structuredClone(raw);for(const c of structure.operation==='batch'?(structure.changes||[]):[structure])if(SCRIPT_OPERATIONS.includes(c.operation))c.value='delegated';validateEdit(structure);const scriptUsage=await writeScriptChanges(raw,{project,history,message,env,request,onDelta});edit=validateEdit(raw);if(scriptUsage.length){const coordinatorUsage=usage;usage={prompt_tokens:(usage?.prompt_tokens||0)+scriptUsage.reduce((n,x)=>n+(x.usage?.prompt_tokens||0),0),completion_tokens:(usage?.completion_tokens||0)+scriptUsage.reduce((n,x)=>n+(x.usage?.completion_tokens||0),0),calls:[{model:CHAT_MODEL,usage:coordinatorUsage||null},...scriptUsage]};}}catch(e){fail(e.code||'CHAT_INVALID');}return {edit,usage,visualReview:{scenes:visuals.flatMap(s=>s.scenes??[s]).length,total:(project.data.scenes||[]).length}};
 }
 function publicRow(r){return {id:r.id,status:r.status==='running'&&Date.parse(r.created_at)<Date.now()-180000?'uncertain':r.status,message:r.request_payload.message,result:r.result,revision:r.applied_revision,createdAt:r.created_at};}
-async function rows(db,user,project){const r=await db.from('studio_chat_edits').select('*').eq('user_id',user).eq('project_id',project).order('created_at',{ascending:false}).limit(20);if(r.error)throw r.error;return r.data.reverse();}
+// Project snapshots are retained in PostgreSQL for undo, never needed by chat history.
+async function rows(db,user,project,limit=20){const r=await db.from('studio_chat_edits').select('id,status,request_payload,result,applied_revision,created_at').eq('user_id',user).eq('project_id',project).order('created_at',{ascending:false}).limit(limit);if(r.error)throw r.error;return r.data.reverse();}
 export async function getStudioChat(context){try{const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);return json({enabled:enabled(context.env),productionEnabled:await productionAccess(db,context.env,user.id),edits:(await rows(db,user.id,id)).map(publicRow)});}catch(e){return error(e);}}
 export async function postStudioChat(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2400000);
@@ -46,7 +48,7 @@ export async function postStudioChat(context){try{
  const execute=async onDelta=>{try{
   const contextData=await rpc(db,'studio_read',{p_user_id:user.id,p_project_id:b.projectId});
   if(contextData.project.revision!==b.expected)fail('STUDIO_CONFLICT');
-  const output=b.scriptChoice?{edit:validateEdit(selectScriptVariant(contextData.project,b.scriptChoice.index,b.scriptChoice.setId)),usage:{calls:[]},visualReview:{scenes:0,total:0}}:await callEditor(contextData.project,contextData.versions,await rows(db,user.id,b.projectId),b.message,{...context.env,PRODUCTION_ENABLED:await productionAccess(db,context.env,user.id)?'true':'false'},fetch,onDelta,b.visuals||[]);
+  const output=b.scriptChoice?{edit:validateEdit(selectScriptVariant(contextData.project,b.scriptChoice.index,b.scriptChoice.setId)),usage:{calls:[]},visualReview:{scenes:0,total:0}}:await callEditor(contextData.project,contextData.versions,await rows(db,user.id,b.projectId,8),b.message,{...context.env,PRODUCTION_ENABLED:await productionAccess(db,context.env,user.id)?'true':'false'},fetch,onDelta,b.visuals||[]);
   if([...LOCAL_EDIT_OPS,'finish_edit'].includes(output.edit.operation))output.edit={operation:'batch',message:output.edit.message,changes:[output.edit]};
   let nextData=applyEdit(contextData.project,output.edit,contextData.versions);
   if(nextData&&contextData.project.data.scenes.length){
