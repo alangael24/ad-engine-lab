@@ -7,7 +7,7 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
  const pending=id=>{try{return JSON.parse(sessionStorage.getItem(key(id)));}catch{return null;}};
  const saveDraft=(id,value)=>{drafts.set(id,value);try{sessionStorage.setItem(key(id)+':draft',value);}catch{}};
  const active=()=>getProject()?.id===projectId;
- function line(text,kind){if(kind==='detail'&&getProject()?.data?.productProfile==='creator-v1')text=text.replaceAll('anuncio','video');const p=document.createElement('p');p.className='chat-message '+kind;p.textContent=text;log.append(p);return p;}
+ function line(text,kind){if(kind.startsWith('detail')&&getProject()?.data?.productProfile==='creator-v1')text=text.replaceAll('anuncio','video');const p=document.createElement('p');p.className='chat-message '+kind;p.textContent=text;log.append(p);return p;}
  function busyLine(text){const p=line(text,'detail chat-working');p.setAttribute('role','status');}
  function streaming(event,id){
   if(projectId!==id||!active())return;

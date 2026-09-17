@@ -1,4 +1,4 @@
-import {creatorRequest} from './creator-model.js';
+import {creatorRequest,CONTENT_KINDS} from './creator-model.js';
 import {FORMATS,LOOKS,creativeLabel} from './creative-formats.js';
 const $=s=>document.querySelector(s);
 export function creatorComposer({task,tell,create,home,startChat,attachReference,uploadCharacter}){
@@ -34,7 +34,7 @@ export function creatorComposer({task,tell,create,home,startChat,attachReference
    const reference=file?.type.startsWith('video/')?file:null;
    input.value='';file=null;uploaded=null;requestId=null;fingerprint=null;attachment();note('');
    if(reference)await attachReference(reference);
-   else if(mode==='idea')await startChat(`Desarrolla la idea completa guardada en el proyecto como un video ${options.kind}, de unos ${options.targetDuration} segundos. Propón el guion para que lo revise antes de producir.`);
+   else if(mode==='idea')await startChat(`Desarrolla la idea completa guardada en el proyecto como un video de ${CONTENT_KINDS[options.kind].toLowerCase()}, de unos ${options.targetDuration} segundos. Propón el guion para que lo revise antes de producir.`);
    else tell('Guion guardado. Revísalo y pulsa «Aprobar guion y crear video» cuando esté listo.');
   }finally{$('#idea-submit').disabled=false;}
  });};
