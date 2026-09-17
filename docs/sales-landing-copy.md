@@ -3,6 +3,37 @@
 Applies only to `/anuncios-lab/` (`ads-sales-v1`). Original continuity and general
 content creator prompts remain unchanged.
 
+## One input for ideas and finished scripts
+
+Before a sales project has scenes, the existing chat coordinator classifies the
+client's input. Ready-to-speak copy uses the transient `accept_script` tool;
+ideas and explicit rewrite requests retain the sales writer route. Mixed notes
+and narration with unclear intent use one clarification. There is no separate
+classification call and no obligatory mode switch in the UI.
+
+`accept_script` must identify the current message or original project idea and
+quote the complete narration literally. The server copies from that source,
+rejecting changed words and missing beginnings/endings (except recognized short
+introductory labels). It maps the result to the existing `draft_script` operation
+for persistence, undo and idempotency. No new database operation or migration is
+needed. Usage records `inputMode: provided_script` and `scriptSource`; the writer
+is skipped. Existing scenes do not expose this intake operation.
+
+The sales composer and chat accept up to 3,000 characters without the previous
+2,000-character truncation. A domain inside a multi-line or long sales script
+does not automatically replace the selected product. URL-only and short product
+import requests still use the storefront importer. Literal intake never queues
+media: the user reviews and approves before production. The existing director
+and narrator preserve the approved script.
+
+`scripts/benchmark-script-intake.mjs OUTPUT` runs text-only real-provider cases
+using `REFERENCE_FLASH_KEY`. The initial six cases passed: bare script, explicit
+literal script, idea, requested rewrite, ambiguous mixed notes, and a short
+complete script. The three supplied scripts used one coordinator call and no
+writer; ideas/rewrites used both. This is a routing smoke test, not proof that
+all future natural-language inputs will be classified correctly. Automated
+tests also verify literal preservation, safe failure, replay and no media jobs.
+
 ## Source and persistence
 
 The sales import keeps up to 12,000 characters of landing text, including body

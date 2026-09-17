@@ -32,6 +32,17 @@ test('provider truncation, wrong model and multiple calls never apply; function 
 test('chat records and privileged writes inaccessible to browser roles',async()=>{await db.exec('set role authenticated');try{await assert.rejects(db.query('select * from studio_chat_edits'),/permission denied/);await assert.rejects(call(db,'studio_chat_write',[u.id,'reserve',crypto.randomUUID(),p.id,'{}']),/permission denied/);}finally{await db.exec('reset role');}});
 test('moving preserves source ranges and each clip while retiming captions',()=>{const before=structuredClone(p.data),last=before.scenes.at(-1);const d=applyEdit(p,validateEdit({operation:'move_scene',sceneId:last.id,position:1,message:'Mover'}));assert.equal(d.scenes[0].id,last.id);assert.equal(d.scenes[0].start,0);assert.equal(d.scenes[0].narrationStart,last.narrationStart??last.start);assert.equal(d.scenes[0].selectedVersionId,last.selectedVersionId);assert.equal(d.scenes.at(-1).end,before.scenes.at(-1).end);});
 test('expired requests cannot commit even before another instruction starts',async()=>{const b=request('X');await call(db,'studio_chat_write',[u.id,'reserve',b.requestId,p.id,JSON.stringify({expected:b.expected,message:b.message,enabled:true})]);await db.query("update studio_chat_edits set created_at=now()-interval '4 minutes' where id=$1",[b.requestId]);const r=await call(db,'studio_chat_write',[u.id,'complete',b.requestId,p.id,JSON.stringify({edit:{operation:'set_hook',message:'X'},nextData:p.data})]);assert.equal(r.status,'uncertain');assert.equal((await reload()).revision,b.expected);});
+test('provided sales script persists verbatim above the old 2000-char limit and replay does not re-run inference',async()=>{
+ const script='¿Dónde está tu cargador?\n'+('Esta frase conserva sus palabras y sus signos.\n').repeat(45)+'Cuesta $24. Elige el tuyo.';
+ assert.ok(script.length>2000&&script.length<3000);
+ const sales=await write('create_project',crypto.randomUUID(),projectData({...p.data,productProfile:'ads-sales-v1',title:'Guion del cliente',idea:script,scriptDraft:'',scenes:[],narrationAssetId:null,timingConfirmed:false}));
+ currentEdit={operation:'accept_script',scriptSource:'message',value:script,message:'Conservado.'};
+ const body={projectId:sales.id,requestId:crypto.randomUUID(),expected:sales.revision,message:script},count=calls;
+ const r=await postStudioChat(ctx(body));assert.equal(r.status,200,await r.clone().text());const result=(await r.json()).edit.result;
+ assert.equal(result.usage.inputMode,'provided_script');assert.equal(result.productionId??null,null);assert.equal(result.render??null,null);
+ const saved=(await call(db,'studio_read',[u.id,sales.id])).project;assert.equal(saved.data.scriptDraft,script);assert.equal(saved.data.scenes.length,0);
+ assert.equal((await postStudioChat(ctx(body))).status,200);assert.equal(calls,count+1);
+});
 test('quota prevents unbounded paid inference',async()=>{await db.query("insert into studio_chat_edits(id,user_id,project_id,request_payload,before_data,status) select gen_random_uuid(),$1,$2,'{}','{}','failed' from generate_series(1,30)",[u.id,p.id]);const count=calls;assert.equal((await postStudioChat(ctx(request('Otro')))).status,429);assert.equal(calls,count);});
 
 test('script tool requires a complete value while non-writing responses may use null',()=>{

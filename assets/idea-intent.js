@@ -12,3 +12,12 @@ export function ideaIntent(value){
 export function storeProductData(p){
  return {...(p.salesSource?{salesSource:p.salesSource}:{}),name:(p.brand||p.name).slice(0,80),product:[p.name,p.description].filter(Boolean).join('. ').slice(0,600),appearance:'',benefits:'',claims:'',avoid:'',sourceUrl:p.url,sourceText:(p.sourceText||p.description||'').slice(0,6000),productAssetId:null};
 }
+
+// A domain inside a pasted ad (e.g. its CTA) is not a request to replace the
+// product. Only sales uses this conservative routing; the LLM still decides
+// whether the message is narration or a brief.
+export function salesIdeaIntent(value){
+ const parsed=ideaIntent(value),text=value.trim();
+ if(parsed.kind==='store'&&parsed.idea&&(text.split(/\s+/u).length>35||text.split(/\n/).filter(x=>x.trim()).length>=3))return {text,kind:'idea',url:''};
+ return parsed;
+}

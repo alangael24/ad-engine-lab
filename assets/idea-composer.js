@@ -1,7 +1,7 @@
 import {isSalesProduct} from './product-profiles.js';
 import {enrichSalesBrand} from './sales-brand.js';
 import {FORMATS,LOOKS,creativeLabel} from './creative-formats.js';
-import {ideaIntent,storeProductData} from './idea-intent.js';
+import {ideaIntent,salesIdeaIntent,storeProductData} from './idea-intent.js';
 const $=s=>document.querySelector(s),el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n;};
 export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,attachReference,api,saveBrand}){
  const sales=isSalesProduct({productProfile:document.body.dataset.productProfile});
@@ -15,7 +15,7 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   if(!brands().some(b=>b.id===brandId)){let last;try{last=localStorage.getItem('studio-last-product');}catch{}brandId=brands().some(b=>b.id===last)?last:brands().length===1?brands()[0].id:null;}
   const onboarding=waitingForStore||!brands().length;
   $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':sales?'¿Qué quieres vender con este anuncio?':'¿Qué anuncio quieres crear?';
-  input.placeholder=onboarding?'Ej. mitienda.com':sales?'Ej. Un anuncio directo de 45 segundos sobre el problema que resuelve. Usa mi landing…':'Describe tu idea o añade una referencia…';
+  input.placeholder=onboarding?'Ej. mitienda.com':sales?'Pega tu guion completo o describe el anuncio que quieres…':'Describe tu idea o añade una referencia…';
   $('#empty').classList.toggle('needs-product',onboarding);
   $('#idea-label').className=onboarding?'home-input-label':'sr-only';
   $('#idea-label').textContent=onboarding?'Pega el enlace de tu tienda o producto':'Tu idea o referencia';
@@ -26,7 +26,7 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   const b=brands().find(b=>b.id===brandId);$('#idea-product').hidden=!b;$('#idea-product').textContent=b?b.data.name+' ⌄':'';
   $('#idea-style').textContent=creative.format==='auto'&&creative.look==='auto'?'Estilo automático':creativeLabel(creative);
  }
- function askStore(){closeChoices();closeDialogs();waitingForStore=true;if(!savedIdea&&input.value.trim()&&ideaIntent(input.value).kind==='idea')savedIdea=input.value.trim();input.value='';resize();controls();note('');input.focus();}
+ function askStore(){closeChoices();closeDialogs();waitingForStore=true;if(!savedIdea&&input.value.trim()&&(sales?salesIdeaIntent:ideaIntent)(input.value).kind==='idea')savedIdea=input.value.trim();input.value='';resize();controls();note('');input.focus();}
  function choices(title,products,choose){const root=$('#idea-products');root.replaceChildren();$('#product-question').textContent=title;for(const p of products){const b=el('button');b.type='button';b.className='product-choice';if(p.image){const img=el('img');img.src=p.image;img.alt='';img.referrerPolicy='no-referrer';b.append(img);}b.append(el('span',p.name));b.onclick=()=>task(()=>choose(p));root.append(b);}$('#idea-manual').hidden=true;$('#product-picker').hidden=false;}
  function chooseProduct(){
   if(!brands().length){askStore();return;}
@@ -66,12 +66,12 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   note('Preparando tu anuncio…');
   await create(requestId,{title:idea.slice(0,100),idea,creative,brandId,referenceUrl:savedReference,referenceNotes:'',aspectRatio:'9:16',scenes:[],narrationAssetId:null,timingConfirmed:false});requestId=null;
   input.value='';savedIdea='';savedReference='';waitingForStore=false;note('');closeChoices();resize();
-  if(file){const selected=file;file=null;$('#idea-file').value='';attachment();await attachReference(selected);}else await startChat(idea.slice(0,2000));
+  if(file){const selected=file;file=null;$('#idea-file').value='';attachment();await attachReference(selected);}else await startChat(sales?idea:idea.slice(0,2000));
  }
  async function submit(){
   const button=$('#idea-submit');button.disabled=true;
   try{
-   const parsed=ideaIntent(input.value),hasBrand=brands().some(b=>b.id===brandId);
+   const parsed=(sales?salesIdeaIntent:ideaIntent)(input.value),hasBrand=brands().some(b=>b.id===brandId);
    if(parsed.kind==='store'){
     if(parsed.idea&&!waitingForStore)savedIdea=parsed.idea;
     await inspect(parsed.url);return;
