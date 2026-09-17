@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {database,user,call} from './helpers/database.mjs';
@@ -57,10 +58,10 @@ test('creator direction, chat, reference and script use content rules without ch
  assert.doesNotMatch(creativeGuide({format:'skeleton',look:'3d'},project.data),/earned product reveal/);
  assert.doesNotMatch(referenceDirection({style:'Colorful'},project.data),/nuestra marca/);
  const edit={operation:'draft_script',value:'Desarrolla la historia'};
- await writeScriptChanges(edit,{project,history:[],message:'Escribe una historia',env:{REFERENCE_FLASH_KEY:'fixture'},request:async(url,options)=>{assert.ok(JSON.parse(options.body).messages[0].content.startsWith(CREATOR_SCRIPT_SYSTEM));return sse(SCRIPT_MODEL,'write_script',{value:'El astronauta encontró las llaves.'});}});
+ await writeScriptChanges(edit,{project,history:[],message:'Escribe una historia',env:{OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},request:async(url,options)=>{assert.ok(JSON.parse(options.body).messages[0].content.startsWith(CREATOR_SCRIPT_SYSTEM));return sse(SCRIPT_MODEL,'write_script',{value:'El astronauta encontró las llaves.'});}});
  assert.equal(edit.value,'El astronauta encontró las llaves.');assert.deepEqual(project.data,before);
  let requestBody;
- const plan=await callDirector(project,{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>{throw Error('No references should load');},fetchImpl:async(url,options)=>{requestBody=JSON.parse(options.body);return sse(CHAT_MODEL,'direct_ad',{continuity:'Same blue astronaut',scenes:[{text:project.data.scriptDraft,visual:'Astronaut on moon',motion:'Keys fall',shotContract:shot}]});}});
+ const plan=await callDirector(project,{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>{throw Error('No references should load');},fetchImpl:async(url,options)=>{requestBody=JSON.parse(options.body);return productionResponse(CHAT_MODEL,'direct_ad',{continuity:'Same blue astronaut',scenes:[{text:project.data.scriptDraft,visual:'Astronaut on moon',motion:'Keys fall',shotContract:shot}]});}});
  assert.equal(requestBody.input[0].content,CREATOR_DIRECTOR_SYSTEM);assert.equal(plan.scenes[0].text,before.scriptDraft);assert.equal(plan.scenes[0].shotContract.productVisible,false);
 });
 test('first creator still uses generations; subsequent approved identity uses edits, with measured usage',async()=>{
@@ -77,7 +78,7 @@ test('first creator still uses generations; subsequent approved identity uses ed
 
 test('creator writer retries an oversized draft once, meters both calls and never silently truncates',async()=>{
  const project={id:crypto.randomUUID(),data:data({targetDuration:15}),brand_snapshot:{}},edit={operation:'draft_script',value:'Comedia'};let calls=0;const deltas=[];
- const usage=await writeScriptChanges(edit,{project,history:[],message:'Guion',env:{REFERENCE_FLASH_KEY:'fixture'},onDelta:d=>deltas.push(d),request:async(url,options)=>{calls++;assert.match(JSON.parse(options.body).messages[0].content,/NUNCA más de 39/);return sse(SCRIPT_MODEL,'write_script',{value:calls===1?'Palabra '.repeat(100):'El astronauta buscó sus llaves en toda la Luna. Las llevaba dentro del casco.'});}});
+ const usage=await writeScriptChanges(edit,{project,history:[],message:'Guion',env:{OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},onDelta:d=>deltas.push(d),request:async(url,options)=>{calls++;assert.match(JSON.parse(options.body).messages[0].content,/NUNCA más de 39/);return sse(SCRIPT_MODEL,'write_script',{value:calls===1?'Palabra '.repeat(100):'El astronauta buscó sus llaves en toda la Luna. Las llevaba dentro del casco.'});}});
  assert.equal(calls,2);assert.equal(usage.length,2);assert.ok(edit.value.endsWith('casco.'));assert.ok(!JSON.stringify(deltas).includes('Palabra'));
- calls=0;await assert.rejects(writeScriptChanges({operation:'draft_script',value:'Comedia'},{project,history:[],message:'Guion',env:{REFERENCE_FLASH_KEY:'fixture'},request:async()=>{calls++;return sse(SCRIPT_MODEL,'write_script',{value:'Palabra '.repeat(100)});}}),/CHAT_SCRIPT_DURATION/);assert.equal(calls,2);
+ calls=0;await assert.rejects(writeScriptChanges({operation:'draft_script',value:'Comedia'},{project,history:[],message:'Guion',env:{OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},request:async()=>{calls++;return sse(SCRIPT_MODEL,'write_script',{value:'Palabra '.repeat(100)});}}),/CHAT_SCRIPT_DURATION/);assert.equal(calls,2);
 });

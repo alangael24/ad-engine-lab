@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
@@ -23,14 +24,14 @@ test('review confirms continuity allegation with separate actual frames, prior s
  const dir=await mkdtemp(join(tmpdir(),'continuity-test-'));try{
  const path=join(dir,'test.mp4');await command('ffmpeg',['-v','error','-y','-f','lavfi','-i','color=c=blue:s=96x160:r=24:d=2','-f','lavfi','-i','anullsrc=r=44100:cl=mono','-t','2','-c:v','libx264','-c:a','aac',path]);
  const scenes=[{id:'a',start:0,end:1,text:'First',shotContract:contract},{id:'b',start:1,end:2,text:'Second',shotContract:contract}];let calls=0;
- const result=await reviewVideo({path,scenes,directory:dir,project:{data:{}},env:{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},fetchImpl:async(_url,opts)=>{
+ const result=await reviewVideo({path,scenes,directory:dir,project:{data:{}},env:{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},fetchImpl:async(_url,opts)=>{
  const req=JSON.parse(opts.body),content=req.messages?.[1].content||req.input[1].content;
- const context=JSON.parse(content[0].text);calls++;
+ const text=JSON.parse(content[0].text)[0].text,context=JSON.parse(text.split('\n')[0]);calls++;
  assert.ok((req.messages||req.input)[0].content.includes(MATERIAL_REVIEW_RULES), 'overview and focused review share materiality criteria');
  if(calls===1){assert.equal(context.scenes[1].shotContract.endState,contract.endState);assert.ok(context.sampling[0].times[2]>.94);}
- else {assert.equal(context.scenes.length,2);const imgs=content.filter(x=>x.type==='image_url'||x.type==='input_image');assert.ok(imgs.length>=6);assert.ok(content.some(x=>x.text?.includes('Scene a, actual output time')));}
+ else {assert.equal(context.scenes.length,2);const imgs=content.filter(x=>x.type==='image_url'||x.type==='input_image');assert.ok(imgs.length>=6);assert.ok(text.includes('Scene a, actual output time'));}
  const raw=calls===1?{verdict:'repair',summary:'Proposed issue',issues:[{sceneId:'b',relatedSceneId:null,kind:'continuity',at:1.5,evidence:'Possible hand change',action:'replace_clip',visual:'Same case',motion:'Preserve hand'}]}:{verdict:'pass',summary:'Separate frames do not support allegation',issues:[]};
- return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'review_ad',arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}]})+'\n\n');
+ return productionResponse(CHAT_MODEL,'review_ad',raw);
  }});
  assert.equal(calls,2);assert.equal(result.verdict,'pass');assert.equal(result.issues.length,0);
  const sheet=await probe(join(dir,'sheet-0.jpg'));assert.equal(sheet.streams[0].width,768); // 3*240 + 4*12 gap/margin

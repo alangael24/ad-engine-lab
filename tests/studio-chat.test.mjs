@@ -6,14 +6,14 @@ import {postStudioChat,getStudioChat,chatRequest,callEditor} from '../src/studio
 import {applyEdit,validateEdit,CHAT_MODEL} from '../assets/chat-model.js';
 import {projectData,brandData} from '../assets/studio-model.js';
 let db,stub,original,u,p,versions=[],currentEdit,calls=0;
-const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'fixture'};
+const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'};
 const write=(action,id,data,expected)=>call(db,'studio_write',[u.id,action,id,JSON.stringify(data),expected??null]);
 const ctx=(body,token='alice')=>({env,request:new Request('https://app.test/api/studio-chat',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)})});
 const request=(message,expected=p.revision)=>({projectId:p.id,requestId:crypto.randomUUID(),expected,message});
 const reload=async()=>p=(await call(db,'studio_read',[u.id,p.id])).project;
 const event=e=>'data: '+JSON.stringify(e)+'\n\n';
 const stream=edit=>new Response(event({model:CHAT_MODEL,choices:[{delta:{tool_calls:null}}]})+event({choices:[{delta:{tool_calls:[{index:0,function:{name:'edit_project',arguments:JSON.stringify(edit)}}]},finish_reason:'tool_calls'}]})+'data: [DONE]\n\n');
-before(async()=>{db=await database();u=await user(db);stub=mockSupabase(db);stub.users.set('alice',u);original=globalThis.fetch;globalThis.fetch=async(url,opts)=>{if(String(url).includes('opencode.ai')){calls++;return stream(currentEdit);}return stub.fetch(url,opts);};
+before(async()=>{db=await database();u=await user(db);stub=mockSupabase(db);stub.users.set('alice',u);original=globalThis.fetch;globalThis.fetch=async(url,opts)=>{if((String(url).includes('opencode.ai')||url==='https://api.openai.com/v1/responses')){calls++;return stream(currentEdit);}return stub.fetch(url,opts);};
  const b=await write('save_brand',crypto.randomUUID(),brandData({name:'Nebula',product:'Filtro',appearance:'Cromo',benefits:'Filtrar',claims:'Reduce cloro',avoid:''}));
  p=await write('create_project',crypto.randomUUID(),projectData({title:'Prueba',brandId:b.id,referenceUrl:'',referenceNotes:'Azul',aspectRatio:'9:16',scenes:[]}));
  const audio=crypto.randomUUID();await write('register_asset',audio,{kind:'narration',name:'Voice',bucket:'studio-media',storage_path:audio,mime_type:'audio/wav',size_bytes:10,duration_seconds:9});

@@ -1,9 +1,7 @@
 import {productionWorkflow} from '../assets/production-workflow.js';
-import {WORKFLOW_MODEL} from '../assets/model-routing.js';
-import {modelFetch} from './model-provider.js';
 import {editorialCall} from '../workers/editorial-models.mjs';
-export const productionPromptModel=env=>productionWorkflow(env).version==='astra-deepseek-v1'?productionWorkflow(env).editor:WORKFLOW_MODEL;
-export const productionVisionModel=env=>productionWorkflow(env).version==='astra-deepseek-v1'?'gpt-6-astra':WORKFLOW_MODEL;
+export const productionPromptModel=env=>productionWorkflow(env).editor;
+export const productionVisionModel=env=>productionWorkflow(env).director;
 // Preserve the existing validated tool protocol, while routing production vision
 // explicitly. The general chat and script writer retain their separate routing.
 export const productionVisionFetch=(fetchImpl,url,init,env)=>productionStructuredFetch(fetchImpl,url,init,env,'director');
@@ -11,7 +9,7 @@ export const productionVisionFetch=(fetchImpl,url,init,env)=>productionStructure
 // switch reference analysis or visual direction along with the prompt writer.
 export const productionPromptFetch=(fetchImpl,url,init,env)=>productionStructuredFetch(fetchImpl,url,init,env,'prompter');
 async function productionStructuredFetch(fetchImpl,url,init,env,role){
- if(productionWorkflow(env).version!=='astra-deepseek-v1')return modelFetch(fetchImpl,url,init);
+ productionWorkflow(env); // Reject retired profiles before any paid request.
  const request=JSON.parse(init.body),tool=request.tools?.[0]?.function;
  if(!tool||request.tools.length!==1)throw Error('PRODUCTION_VISION_TOOL');
  const messages=request.messages||[],images=[],context=[];

@@ -7,7 +7,7 @@ import {SCRIPT_MODEL} from '../assets/model-routing.js';
 import {ideaIntent,salesIdeaIntent} from '../assets/idea-intent.js';
 const script='¿Otra vez buscando el cargador?\nLuma lo mantiene en tu mesa.\nCuesta $24, no $40. Entra a luma.example.com y elige el tuyo.';
 const project=(more={})=>({id:crypto.randomUUID(),revision:1,brand_snapshot:{product:'Organizador de cables'},data:{productProfile:'ads-sales-v1',title:'Prueba',idea:script,scriptDraft:'',brandId:null,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[],...more}});
-const env={REFERENCE_FLASH_KEY:'fixture',PRODUCTION_ENABLED:'true'};
+const env={OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture',PRODUCTION_ENABLED:'true'};
 const stream=(raw,model=CHAT_MODEL)=>new Response('data: '+JSON.stringify({model,choices:[{delta:{tool_calls:[{index:0,function:{name:model===CHAT_MODEL?'edit_project':'write_script',arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:30,completion_tokens:20}})+'\n\ndata: [DONE]\n\n');
 const accept=(value=script,scriptSource='message')=>({operation:'accept_script',value,scriptSource,message:'Conservado.'});
 

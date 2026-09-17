@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {database,user,ready,balance} from './helpers/database.mjs';
@@ -5,9 +6,9 @@ import {CHAT_MODEL} from '../assets/chat-model.js';
 import {mockSupabase} from './helpers/supabase-http.mjs';
 import {getStudio,postStudio} from '../src/studio.js';
 import {onRequestPost as renderWorker} from '../functions/api/studio-worker.js';
-let db,stub,original,flashCalls=0,rejectFlash=false;const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-only-server',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'test-only',STUDIO_WORKER_TOKEN:'studio-worker-test-secret-min-32-characters'};
+let db,stub,original,flashCalls=0,rejectFlash=false;const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-only-server',GENERATION_ENABLED:'true',PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'test-only',STUDIO_WORKER_TOKEN:'studio-worker-test-secret-min-32-characters'};
 before(async()=>{db=await database();stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=async(input,options)=>{
- if(String(input).startsWith('https://opencode.ai/')){flashCalls++;if(rejectFlash)return new Response('down',{status:503});return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_h3_prompt',arguments:JSON.stringify({integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete chrome cylinder. The camera slowly pushes in while the product stays rigid. The same water flow continues through the final frame.'})}}]},finish_reason:'tool_calls'}]})+'\n\n');}
+ if(String(input).startsWith('https://opencode.ai/')){flashCalls++;if(rejectFlash)return new Response('down',{status:503});return productionResponse('deepseek-flash','write_h3_prompt',{integrated_multimodal_description:'[Shot 1] Live-action close-up of the complete chrome cylinder. The camera slowly pushes in while the product stays rigid. The same water flow continues through the final frame.'});}
  return stub.fetch(input,options);
 };});after(async()=>{globalThis.fetch=original;await db.close();});
 function ctx(path,token='alice',body,extra={}){return {env,request:new Request('https://app.test'+path,{method:body?'POST':'GET',headers:{authorization:`Bearer ${token}`,...(body?{'content-type':'application/json'}:{}),...extra},...(body?{body:JSON.stringify(body)}:{})})};}

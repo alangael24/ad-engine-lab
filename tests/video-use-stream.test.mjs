@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {modelTurn,estimatedLunaCost,checkEditorBudget,validateEDL,editFingerprint} from '../workers/video-use/agent.mjs';
+import {modelTurn,estimatedEditorCost,checkEditorBudget,validateEDL,editFingerprint} from '../workers/video-use/agent.mjs';
 import {CHAT_MODEL} from '../assets/chat-model.js';
 
 test('editor accepts a valid tool payload fragmented into a large SSE transport',async()=>{
@@ -10,14 +10,14 @@ test('editor accepts a valid tool payload fragmented into a large SSE transport'
  chunks.push({choices:[{delta:{},finish_reason:'tool_calls'}],usage:{prompt_tokens:100,completion_tokens:200}});
  const body=chunks.map(x=>'data: '+JSON.stringify(x)+'\n\n').join('')+'data: [DONE]\n\n';
  assert.ok(body.length>150000);
- const r=await modelTurn([],[],{REFERENCE_FLASH_KEY:'fixture'},usage,{fetchImpl:async()=>new Response(body)});
+ const r=await modelTurn([],[],{OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},usage,{fetchImpl:async()=>new Response(body)});
  assert.equal(r.tool_calls[0].function.arguments,args);
  assert.equal(usage.calls,1);
 });
 test('editor budget charges cache hits, writes and outputs without rejecting repeated context as fresh input',()=>{
  const measured={calls:18,input:317121,output:9425,cached:260221,cacheWrite:50000,unmetered:0};
- assert.doesNotThrow(()=>checkEditorBudget(measured));
- assert.ok(Math.abs(estimatedLunaCost(measured)-.03039442)<1e-8);
+ assert.throws(()=>checkEditorBudget(measured),/budget reached/);assert.doesNotThrow(()=>checkEditorBudget({calls:2,input:1000,output:200,cached:500,unmetered:0}));
+ assert.ok(Math.abs(estimatedEditorCost(measured)-1.425471)<1e-8);
  assert.throws(()=>checkEditorBudget({...measured,input:2000000,cached:0,cacheWrite:0}),/budget reached/);
  assert.throws(()=>checkEditorBudget({...measured,calls:80}),/budget reached/);
  assert.throws(()=>checkEditorBudget({...measured,unmetered:2}),/budget reached/);

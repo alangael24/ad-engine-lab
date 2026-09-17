@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createProductionProviders} from '../workers/production-providers.mjs';
@@ -11,9 +12,9 @@ test('sales director appends commercial intent without changing legacy direction
  const requests=[];
  const scene={text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}};
  for(const profile of [undefined,'ads-sales-v1']){
-  const plan=await callDirector({brand_snapshot:{},data:{scriptDraft:'Hello.',...(profile?{productProfile:profile}:{})}},{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
+  const plan=await callDirector({brand_snapshot:{},data:{scriptDraft:'Hello.',...(profile?{productProfile:profile}:{})}},{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
    requests.push(JSON.parse(options.body));
-   return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Same',scenes:[scene]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+   return productionResponse(CHAT_MODEL,'direct_ad',{continuity:'Same',scenes:[scene]});
   }});
   assert.equal(plan.scenes[0].text,'Hello.');
  }
@@ -48,10 +49,10 @@ test('director receives the actual product and reference images, bounded to four
  const {callDirector}=await import('../workers/production-providers.mjs'),{CHAT_MODEL}=await import('../assets/chat-model.js');
  let request;const image='data:image/png;base64,iVBORw0KGgo=';
  const project={brand_snapshot:{productAssetId:crypto.randomUUID()},data:{scriptDraft:'Hello.',referenceNotes:'Large eyes',creativeMemory:{referenceAssetIds:[crypto.randomUUID(),crypto.randomUUID()]}},referenceEvidence:[image,image,image]};
- await callDirector(project,{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>({url:'https://storage.test/image'}),fetchImpl:async(url,options)=>{
+ await callDirector(project,{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},{invoke:async()=>({url:'https://storage.test/image'}),fetchImpl:async(url,options)=>{
   if(String(url).startsWith('https://storage.test/'))return new Response(Buffer.from([137,80,78,71,13,10,26,10]));
   request=JSON.parse(options.body);
-  return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered after waving',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}}]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+  return productionResponse(CHAT_MODEL,'direct_ad',{continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered after waving',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}}]});
  }});
  const content=request.input[1].content;assert.equal(content.filter(x=>x.type==='input_image').length,4);assert.match(JSON.stringify(content),/Actual product, authoritative geometry/);assert.match(JSON.stringify(content),/Large eyes/);
 });

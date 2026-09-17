@@ -27,7 +27,7 @@ const pass={verdict:'pass',summary:'Sin defectos materiales.',issues:[],coverage
 const caption={sceneId:'one',relatedSceneId:null,kind:'caption',at:1,evidence:'Missing phrase.',action:'none',visual:'',motion:''};
 test('workflow keeps Astra direction and DeepSeek text-only editing; legacy model pairs remain explicit',()=>{
  assert.equal(productionWorkflow().director,'gpt-6-astra');assert.equal(productionWorkflow().editor,'deepseek-flash');
- assert.equal(productionWorkflow({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}).editor,'gpt-5.6-luna');
+ assert.throws(()=>productionWorkflow({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}),/WORKFLOW_CONFIG/);assert.equal(editorialReviewModelMatches({model:'gpt-5.6-sol'}),true);
  assert.equal(editorialReviewModelMatches({workflowProfile:'astra-deepseek-v1',model:'gpt-6-astra'}),true);
  assert.equal(editorialReviewModelMatches({workflowProfile:'astra-deepseek-v1',model:'gpt-5.6-sol'}),false);
  assert.equal(editorialReviewModelMatches({model:'gpt-5.6-sol'}),true);

@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {imagePacket,normalizeShotContract} from '../assets/image-continuity.js';
@@ -67,10 +68,10 @@ test('actual multipart request uses scoped reference roles and omits old filmstr
 test('focused reviewer inspects only the requested target and binds observed state to its immutable asset',async()=>{
  const f=fixture(),images=[{assetId:uuid()},{assetId:uuid()}];
  f.plan.scenes.push({...f.plan.scenes[0],id:uuid()});let calls=0;
- const providers=createProductionProviders({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
+ const providers=createProductionProviders({PRODUCTION_IMAGE_REVIEW_MODE:'legacy',PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async(url,options)=>{
   if(String(url).startsWith('https://storage.test/'))return new Response(Buffer.from([137,80,78,71,13,10,26,10]));
   calls++;assert.match(JSON.stringify(JSON.parse(options.body)),/ACTUAL target state/);
-  return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'review_ad',arguments:JSON.stringify({verdict:'pass',summary:'Hands empty; no bottle visible in close-up.',issues:[]})}}]},finish_reason:'tool_calls'}]})+'\n\n');
+  return productionResponse(CHAT_MODEL,'review_ad',{verdict:'pass',summary:'Hands empty; no bottle visible in close-up.',issues:[]});
  }});
  const result=await providers.reviewImage({project:f.project,plan:f.plan,images,index:1,invoke:async()=>({url:'https://storage.test/image'})});
  assert.equal(calls,1);assert.deepEqual(result.observedStates,[{sceneId:f.plan.scenes[1].id,assetId:images[1].assetId,summary:'Hands empty; no bottle visible in close-up.'}]);
@@ -78,5 +79,5 @@ test('focused reviewer inspects only the requested target and binds observed sta
 });
 test('new director output without a scoped shot contract fails instead of silently using legacy prompts',async()=>{
  const f=fixture();
- await assert.rejects(callDirector(f.project,{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async()=>new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'direct_ad',arguments:JSON.stringify({continuity:'Same person',scenes:[{text:'Tell a story',visual:'Face reaction',motion:'Raise eyebrow'}]})}}]},finish_reason:'tool_calls'}]})+'\n\n')}),/PRODUCTION_PLAN/);
+ await assert.rejects(callDirector(f.project,{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},{fetchImpl:async()=>productionResponse(CHAT_MODEL,'direct_ad',{continuity:'Same person',scenes:[{text:'Tell a story',visual:'Face reaction',motion:'Raise eyebrow'}]})}),/PRODUCTION_PLAN/);
 });

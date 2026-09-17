@@ -1,5 +1,5 @@
 import {isCreatorProduct} from '../assets/product-profiles.js';
-import {modelFetch} from './model-provider.js';
+import {modelFetch,workflowApiKey} from './model-provider.js';
 import {json} from './backend.js';
 import {authContext,readJson,readBounded,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
@@ -8,7 +8,7 @@ import {ANALYSIS_VERSION,FLASH_MODEL,sampleFrames,validateAnalysis,referenceErro
 const ENDPOINT='https://opencode.ai/zen/go/v1/chat/completions';
 const errors={REFERENCE_INVALID:[400,'Usa un video de 2 a 120 segundos con sus imágenes y audio.'],REFERENCE_OFFLINE:[503,'El análisis de referencias no está disponible ahora.'],REFERENCE_LIMIT:[429,'Alcanzaste el límite de 5 referencias al día para esta prueba.'],REFERENCE_BUSY:[409,'Ya tienes una referencia en análisis. Recupera su resultado antes de enviar otra.'],REFERENCE_OUTPUT_INVALID:[422,'La respuesta no conservó correctamente las imágenes del video. No se incorporó al anuncio.'],REFERENCE_PROVIDER:[503,'El proveedor no completó el análisis. Consulta el estado; no se reenvía automáticamente.'],REFERENCE_NOT_READY:[409,'El análisis todavía no está listo para usar.']};
 export function analysisError(e){const code=Object.keys(errors).find(c=>e?.code===c||e?.message===c);return code?json({code,error:errors[code][1]},errors[code][0]):studioError(e);}
-export function analysisAvailability(env){return env.REFERENCE_ANALYSIS_ENABLED==='true'&&!!env.REFERENCE_FLASH_KEY&&!!(env.REFERENCE_OPENAI_KEY||env.REFERENCE_SCRIBE_KEY);}
+export function analysisAvailability(env){return env.REFERENCE_ANALYSIS_ENABLED==='true'&&!!workflowApiKey(env)&&!!(env.REFERENCE_OPENAI_KEY||env.REFERENCE_SCRIBE_KEY);}
 function fromBase64(value,max){if(typeof value!=='string'||value.length>Math.ceil(max/3)*4||!/^[A-Za-z0-9+/]*={0,2}$/.test(value))referenceError();try{if(typeof Uint8Array.fromBase64==='function')return Uint8Array.fromBase64(value);const raw=atob(value),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes;}catch{referenceError();}}
 export function validateInput(b){
   const s=b?.source;if(!UUID.test(b?.requestId||'')||!UUID.test(b?.projectId||'')||!s||typeof s.name!=='string'||s.name.length>180||!/^[a-f0-9]{64}$/.test(s.sha256||'')||!Number.isInteger(s.width)||!Number.isInteger(s.height)||s.width<64||s.height<64||s.width>7680||s.height>7680)referenceError();
@@ -44,7 +44,7 @@ export async function transcribeReference(input,env,request=fetch){
   return {mode:'asr',text,wordCount:words.length};
 }
 export async function callFlash(input,transcript,env,request=fetch){
-  const response=await modelFetch(request,ENDPOINT,{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(modelRequest(input,transcript)),signal:AbortSignal.timeout(90000)});
+  const response=await modelFetch(request,ENDPOINT,{method:'POST',headers:{authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json'},body:JSON.stringify(modelRequest(input,transcript)),signal:AbortSignal.timeout(90000)},env);
   if(!response.ok)referenceError('REFERENCE_PROVIDER');
   const stream=new TextDecoder().decode(await readBounded(response,500000));let answer='',finish=null,usage=null,model=null;
   for(const line of stream.split('\n')){if(!line.startsWith('data: ')||line.trim()==='data: [DONE]')continue;let d;try{d=JSON.parse(line.slice(6));}catch{referenceError('REFERENCE_OUTPUT_INVALID');}if(d.error)referenceError('REFERENCE_PROVIDER');if(d.model)model=d.model;if(d.usage)usage=d.usage;for(const c of d.choices||[]){answer+=c.delta?.content||'';finish=c.finish_reason||finish;}}

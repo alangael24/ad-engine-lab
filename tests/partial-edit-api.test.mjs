@@ -11,13 +11,13 @@ import {alignmentWords} from '../assets/editorial-timeline.js';
 import {projectFingerprint} from '../src/partial-edit.js';
 
 let db,stub,original,currentEdit,calls=0;
-const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'fixture',STUDIO_WORKER_TOKEN:'worker-fixture-'.repeat(4)};
+const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture',STUDIO_WORKER_TOKEN:'worker-fixture-'.repeat(4)};
 const context=(body,worker=false,token='alice')=>({env,request:new Request('https://app.test/api/'+(worker?'studio-worker':'studio-chat'),{method:'POST',headers:{authorization:'Bearer '+(worker?env.STUDIO_WORKER_TOKEN:token),'content-type':'application/json'},body:JSON.stringify(body)})});
 const worker=async(body)=>{const r=await renderWorker(context({workerId:'partial-test',...body},true));const result=await r.json();assert.equal(r.status,200,JSON.stringify(result));return result;};
 before(async()=>{
  db=await database();stub=mockSupabase(db);original=globalThis.fetch;
  globalThis.fetch=async(url,opts)=>{
-  if(String(url).startsWith('https://opencode.ai/')){calls++;return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'edit_project',arguments:JSON.stringify(currentEdit)}}]},finish_reason:'tool_calls'}]})+'\n\n');}
+  if((String(url).startsWith('https://opencode.ai/')||url==='https://api.openai.com/v1/responses')){calls++;return new Response('data: '+JSON.stringify({model:CHAT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'edit_project',arguments:JSON.stringify(currentEdit)}}]},finish_reason:'tool_calls'}]})+'\n\n');}
   return stub.fetch(url,opts);
  };
 });

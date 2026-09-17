@@ -8,7 +8,7 @@ import {projectData} from '../assets/studio-model.js';
 import {scriptVariantCards} from '../assets/script-variant-cards.js';
 import {database,user,call} from './helpers/database.mjs';
 import {mockSupabase} from './helpers/supabase-http.mjs';
-const env={REFERENCE_FLASH_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',PRODUCTION_ENABLED:'true'};
+const env={OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture',REFERENCE_ANALYSIS_ENABLED:'true',SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'fixture',PRODUCTION_ENABLED:'true'};
 const project=()=>({id:crypto.randomUUID(),revision:1,brand_snapshot:{product:'Organizador de cables'},data:projectData({productProfile:'ads-sales-v1',title:'Tres propuestas',idea:'Un anuncio de 30 segundos',scriptDraft:'',brandId:null,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[]})});
 const values=['¿Dónde cayó el cargador? Organiza tus cables en la mesa. Elige el tuyo.','¿Otra cinta para sujetar el cable? Mantén el cargador a mano con este organizador. Consulta los modelos.','Tu mesa también puede estar ordenada. Agrupa tus cables con nuestro organizador. Encuentra el tuyo.'];
 const titles=['El problema diario','La alternativa improvisada','Una mesa ordenada'];
@@ -52,7 +52,7 @@ test('supplied scripts and revisions stay single; variants do not change the oth
  const r=normalizeScriptVariants(output.edit.variants);r.options[1].script=r.options[0].script;assert.throws(()=>normalizeScriptVariants(r),/CHAT_INVALID/);
 });
 let db,stub,originalFetch,providerCalls=0,providerStep=0;
-before(async()=>{db=await database();originalFetch=globalThis.fetch;stub=mockSupabase(db);globalThis.fetch=(input,init)=>{if(String(input).startsWith('https://opencode.ai/')){providerCalls++;return ++providerStep%2===1?stream(coordinator):stream(result(),SCRIPT_MODEL);}return stub.fetch(input,init);};});
+before(async()=>{db=await database();originalFetch=globalThis.fetch;stub=mockSupabase(db);globalThis.fetch=(input,init)=>{if((String(input).startsWith('https://opencode.ai/')||input==='https://api.openai.com/v1/responses')){providerCalls++;return ++providerStep%2===1?stream(coordinator):stream(result(),SCRIPT_MODEL);}return stub.fetch(input,init);};});
 after(async()=>{globalThis.fetch=originalFetch;await db.close();});
 async function fixture(){const u=await user(db);stub.users.set(u.id,{...u,email_confirmed_at:new Date().toISOString()});const b=await call(db,'studio_write',[u.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Cable',product:'Organizador de cables'})]);const d=project().data;d.brandId=b.id;const p=await call(db,'studio_write',[u.id,'create_project',crypto.randomUUID(),JSON.stringify(d)]);return {u,p};}
 const ctx=(u,body)=>({env,request:new Request('https://app.test/api/studio-chat',{method:'POST',headers:{authorization:'Bearer '+u.id,'content-type':'application/json'},body:JSON.stringify(body)})});

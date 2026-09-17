@@ -1,6 +1,6 @@
 import {isCreatorProduct} from './product-profiles.js';
 // Shared limits and deterministic frame identity. Model output never supplies edit times.
-export const ANALYSIS_VERSION = 'luna-reference-v2';
+export const ANALYSIS_VERSION = 'astra-reference-v3';
 export {WORKFLOW_MODEL as FLASH_MODEL} from './model-routing.js';
 export function referenceError(code='REFERENCE_INVALID'){throw Object.assign(new Error(code),{code});}
 export function sampleFrames(duration){

@@ -1,4 +1,4 @@
-import {WORKFLOW_MODEL} from '../assets/model-routing.js';
+import {WORKFLOW_MODEL,SCRIPT_MODEL} from '../assets/model-routing.js';
 import {readEvents} from '../assets/chat-stream.js';
 
 export function responsesRequest(chat) {
@@ -8,7 +8,7 @@ export function responsesRequest(chat) {
   if(m.content) input.push({role:m.role,content:typeof m.content==='string'?m.content:m.content.map(c=>c.type==='image_url'?{type:'input_image',image_url:c.image_url.url,...(c.image_url.detail?{detail:c.image_url.detail}:{})}:{type:m.role==='assistant'?'output_text':'input_text',text:c.text})});
   for(const t of m.tool_calls||[]) input.push({type:'function_call',call_id:t.id,name:t.function.name,arguments:t.function.arguments});
  }
- const out={model:chat.model,input,stream:true,store:false,reasoning:{effort:'high'},max_output_tokens:Math.max(chat.max_tokens||0,24000)};
+ const out={model:chat.model,input,stream:true,store:false,reasoning:{effort:'low'},max_output_tokens:Math.max(chat.max_tokens||0,4500)};
  if(chat.tools?.length) {
   out.tools=chat.tools.map(t=>({type:'function',...t.function,strict:false}));
   out.tool_choice=chat.tool_choice?.function?{type:'function',name:chat.tool_choice.function.name}:chat.tool_choice||'auto';
@@ -20,11 +20,18 @@ export function responsesRequest(chat) {
 // Normalize Responses SSE into the existing, validated streaming tool protocol.
 // No model fallback: callers still verify the actual returned model and completion.
 export function openCodeHeaders(headers){return {...headers,'x-opencode-session':headers?.['x-opencode-session']||'creativerush-'+crypto.randomUUID()};}
-export async function modelFetch(fetchImpl,url,init) {
- init={...init,headers:openCodeHeaders(init.headers)};
+export const workflowApiKey=(env={})=>env.EDITORIAL_ASTRA_API_KEY||env.OPENAI_API_KEY;
+export async function modelFetch(fetchImpl,url,init,env={}) {
  const chat=JSON.parse(init.body);
- if(chat.model!==WORKFLOW_MODEL)return fetchImpl(url,init);
- const response=await fetchImpl(url.replace(/chat\/completions$/, 'responses'),{...init,body:JSON.stringify(responsesRequest(chat))});
+ if(chat.model!==WORKFLOW_MODEL){
+  if(![SCRIPT_MODEL,'deepseek-flash'].includes(chat.model))throw Error('WORKFLOW_MODEL_NOT_ALLOWED');
+  return fetchImpl(url,{...init,headers:openCodeHeaders(init.headers)});
+ }
+ const key=workflowApiKey(env);
+ if(!key)throw Error('ASTRA_NOT_CONFIGURED');
+ // Astra uses the same OpenAI credential/provider as production direction.
+ // Never send an OpenCode credential to OpenAI or substitute another model.
+ const response=await fetchImpl('https://api.openai.com/v1/responses',{...init,headers:{'content-type':'application/json',authorization:`Bearer ${key}`},body:JSON.stringify(responsesRequest(chat))});
  if(!response.ok)return response;
  const encoder=new TextEncoder();
  const stream=new ReadableStream({async start(controller){

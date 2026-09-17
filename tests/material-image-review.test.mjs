@@ -26,7 +26,7 @@ function fixture(){
 test('production inspector is enabled only for the matching model profile',()=>{
  assert.equal(materialImageReviewEnabled({}),true);
  assert.equal(materialImageReviewEnabled({PRODUCTION_IMAGE_REVIEW_MODE:'legacy'}),false);
- assert.equal(materialImageReviewEnabled({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}),false);
+ assert.throws(()=>materialImageReviewEnabled({PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}),/WORKFLOW_CONFIG/);
  assert.throws(()=>materialImageReviewEnabled({PRODUCTION_IMAGE_REVIEW_MODE:'typo'}));
 });
 test('contracts derive only pre-image requirements, not subtitle space or invisible subjects',()=>{

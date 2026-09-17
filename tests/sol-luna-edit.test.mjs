@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
@@ -14,7 +15,7 @@ const words=[{text:'Hello',type:'word',start:.1,end:.7},{text:'world.',type:'wor
 const edl={segments:[{source:'S01',in:0,out:2,frames:48,crop:1}],captions:true,captionGroups:[[0,1]],captionColor:'white',captionSize:46,hook:''};
 const plan={direction:'Clear movement, readable words.',scenes:[{source:'S01',direction:'Keep the moving pattern.'}],captions:true,captionColor:'white',hook:''};
 const pass={verdict:'pass',summary:'Revisado.',issues:[],coverage:['one']};
-const env={PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',OPENAI_API_KEY:'fixture-sol',REFERENCE_FLASH_KEY:'fixture-luna'};
+const env={PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-sol',REFERENCE_FLASH_KEY:'fixture-luna'};
 test('verbose DeepSeek transport reaches final usage without truncating a valid token-bounded response',async()=>{
  const encoder=new TextEncoder(),reasoning=encoder.encode('data: '+JSON.stringify({model:'deepseek-flash',choices:[{delta:{reasoning_content:'thinking '.repeat(64)}}]})+'\n\n');
  let n=0;const stream=new ReadableStream({pull(controller){
@@ -39,18 +40,18 @@ test('caption rendering derives text from original words and does not execute AS
  assert.match(ass,/Hello world\./);assert.doesNotMatch(ass,/\{\\pos\(1,1\)\}/);
  assert.doesNotMatch(wordCaptions({...edl,captions:false,hook:''},words,720,1280),/Dialogue:/);
 });
-test('Sol uses OpenAI, Luna uses OpenCode with no images; usage survives incomplete responses',async()=>{
+test('Astra uses OpenAI, DeepSeek uses OpenCode with no images; usage survives incomplete responses',async()=>{
  for(const role of ['director','editor']){
   const usage={total:0,calls:[],unknown:false};
   const result=await editorialCall({role,name:'test',schema:{type:'object'},system:'test',context:{},usage,env,fetchImpl:async(url,init)=>{
    assert.match(url,role==='director'?/^https:\/\/api.openai.com\//:/^https:\/\/opencode.ai\//);
-   const b=JSON.parse(init.body);assert.equal(b.store,false);assert.equal(b.input[1].content.length,1);
-   return new Response('data: '+JSON.stringify({type:'response.completed',response:{status:'completed',model:b.model,usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:50}},output:[{type:'function_call',name:'test',arguments:'{"ok":true}'}]}})+'\n\n');
+   const b=JSON.parse(init.body);if(role==='director'){assert.equal(b.store,false);assert.equal(b.input[1].content.length,1);}else{assert.equal(b.model,'deepseek-flash');assert.equal(typeof b.messages[1].content,'string');}
+   return productionResponse(b.model,'test',{ok:true},{usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:50}}});
   }});
   assert.equal(result.ok,true);assert.ok(usage.total>0);assert.equal(usage.calls.length,1);
  }
  const usage={total:0,calls:[],unknown:false};
- await assert.rejects(editorialCall({role:'editor',name:'test',schema:{},system:'',context:{},usage,env,fetchImpl:async()=>new Response('data: '+JSON.stringify({type:'response.incomplete',response:{usage:{input_tokens:50,output_tokens:10}}})+'\n\n')}),/INCOMPLETE/);
+ await assert.rejects(editorialCall({role:'editor',name:'test',schema:{},system:'',context:{},usage,env,fetchImpl:async()=>productionResponse('deepseek-flash','test',{}, {finish:'length',usage:{input_tokens:50,output_tokens:10}})}),/INCOMPLETE/);
  assert.ok(usage.total>0);assert.equal(usage.calls[0].status,'failed');
  await assert.rejects(editorialCall({role:'editor',name:'test',schema:{},system:'',context:{},images:['data:...'],usage,env}),/ROLE/);
  assert.ok(priceUsage('director',{input_tokens:100,output_tokens:10}).cost>priceUsage('editor',{input_tokens:100,output_tokens:10}).cost);
@@ -62,7 +63,7 @@ test('budget admission blocks before spending and missing usage cannot be counte
  await assert.rejects(editorialCall(args),/UNAVAILABLE/);assert.equal(args.usage.unknown,true);
  args.fetchImpl=()=>assert.fail('no automatic second charge');await assert.rejects(editorialCall(args),/BUDGET/);
 });
-test('Sol directs, Luna edits, Sol reviews; one repair requires a changed EDL',async()=>{
+test('Astra directs, DeepSeek edits, Astra reviews; one repair requires a changed EDL',async()=>{
  const root=await mkdtemp(join(tmpdir(),'sol-luna-test-'));try{
   const img=join(root,'panel.jpg');await writeFile(img,'fixture');const seen=[];let reviews=0;
   const options={root,project:{data:{scriptDraft:scene.text,scenes:[scene],aspectRatio:'9:16'}},shots:[],words,narration:'fixture',env,

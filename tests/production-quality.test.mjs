@@ -1,3 +1,4 @@
+import {productionResponse} from './helpers/production-model.mjs';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {validateReview,repairScenes,repeatedSources,QUALITY_VERSION} from '../assets/quality-model.js';
@@ -185,15 +186,15 @@ test('malformed reviewer response cannot reach completion or paid repairs',async
  const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(result.code,'PRODUCTION_QUALITY_INVALID');assert.equal(f.counts.complete,0);assert.equal(f.counts.images,0);assert.equal(f.counts.clips,0);
 });
 
-function reviewStream(raw){return new Response('data: '+JSON.stringify({model:CHAT_MODEL,usage:{prompt_tokens:100,completion_tokens:30,total_tokens:130},choices:[{delta:{tool_calls:[{index:0,function:{name:'review_ad',arguments:JSON.stringify(raw)}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n');}
+function reviewStream(raw){return productionResponse(CHAT_MODEL,'review_ad',raw);}
 test('malformed review gets one bounded correction without waiving an actual defect',async()=>{
  const scenes=[scene('a')],bad={...review(scenes,'repair'),issues:[{...issue(scenes[0]),motion:'x'.repeat(401)}]},good=review(scenes,'repair');let calls=0;
- const result=await askReview('Review actual frames',[],{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},async(_url,init)=>{calls++;if(calls===2)assert.match(JSON.parse(init.body).input[0].content,/text_limit_400/);return reviewStream(calls===1?bad:good);},null,scenes);
+ const result=await askReview('Review actual frames',[],{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},async(_url,init)=>{calls++;if(calls===2)assert.match(JSON.parse(init.body).input[0].content,/text_limit_400/);return reviewStream(calls===1?bad:good);},null,scenes);
  assert.equal(calls,2);assert.equal(result.raw.verdict,'repair');assert.equal(result.raw.issues.length,1);assert.equal(result.usage.total_tokens,260);
 });
 test('two invalid reviews remain blocked and provider failures are not automatically retried',async()=>{
- const scenes=[scene('a')];let calls=0;await assert.rejects(askReview('Review',[],{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return reviewStream({...review(scenes,'pass'),issues:[issue(scenes[0])]});},null,scenes),/QUALITY_INVALID/);assert.equal(calls,2);
- calls=0;await assert.rejects(askReview('Review',[],{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1',REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return new Response('',{status:503});},null,scenes),/QUALITY_OFFLINE/);assert.equal(calls,1);
+ const scenes=[scene('a')];let calls=0;await assert.rejects(askReview('Review',[],{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return reviewStream({...review(scenes,'pass'),issues:[issue(scenes[0])]});},null,scenes),/QUALITY_INVALID/);assert.equal(calls,2);
+ calls=0;await assert.rejects(askReview('Review',[],{PRODUCTION_WORKFLOW_PROFILE:'astra-deepseek-v1',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'fixture'},async()=>{calls++;return new Response('',{status:503});},null,scenes),/EDITORIAL_PROVIDER_UNAVAILABLE/);assert.equal(calls,1);
 });
 
 test('defective still blocks H3 and delivery when the review cannot offer a safe correction',async()=>{

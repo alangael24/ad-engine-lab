@@ -1,23 +1,25 @@
 # Production workflow: Astra direction, DeepSeek execution
 
-Local integration, 2026-09-11. The default `PRODUCTION_WORKFLOW_PROFILE` is now
+Active routing updated 2026-09-16. The default `PRODUCTION_WORKFLOW_PROFILE` is now
 `astra-deepseek-v1`. These are reusable product changes extracted from the
 Furbedz / BEA / CreativeRush experiment, not the experiment's private files.
 
 ## Execution
 
-1. The existing script approval remains the input gate. Script-writing and the
-   general-purpose editor/chat retain their separate routing; this change does
-   not silently rewrite approved copy.
+1. Astra (`gpt-6-astra`, low reasoning) interprets chat requests and uploaded
+   reference evidence using OpenAI Responses. DeepSeek writes scripts and three
+   variants through OpenCode; supplied scripts and selected variants stay exact.
+   The existing script approval remains the input gate.
 2. Astra (`gpt-6-astra`, low reasoning, OpenAI Responses) directs shots using the
    actual product, character references and reference evidence. It supplies the
    image direction and continuity contracts.
 3. GPT Image 2 API produces medium stills. MiniMax `speech-2.8-hd` supplies voice
    and word alignment. Product inputs and all image tokens are counted.
-4. Astra checks actual stills before H3. A contextual pass is bound to immutable
-   asset IDs and reused, instead of charging twice for the same still review.
-5. Astra writes image-aware H3 motion prompts from the approved still, measured
-   duration and neighboring scene context. H3 remains in the existing GPU queue.
+4. DeepSeek checks actual stills against material acceptance criteria. Astra
+   resolves escalations and sampled audits. Results bind immutable asset IDs.
+5. DeepSeek writes image-aware H3 motion prompts from the approved still, measured
+   duration and neighboring scene context, following the pinned MiniMax guide.
+   A bounded buffer prepares upcoming clips while the GPU executes its queue.
 6. Astra inspects the numbered clips and directs a simple edit. DeepSeek
    (`deepseek-flash` through OpenCode Go, low reasoning) executes a structured
    EDL, with no vision or shell access. FFmpeg renders cuts, captions and the
@@ -65,8 +67,8 @@ CPU runtime and Pages need the same profile. Required existing secrets are
 `OPENAI_API_KEY`; narration uses `MINIMAX_API_KEY`. No keys belong in this repo.
 `PRODUCTION_IMAGE_MODEL` and `PRODUCTION_IMAGE_QUALITY` remain explicit overrides.
 
-The alternative profile `sol-luna-v1` retains Sol/Luna. The stable EDL schema is
-also named `sol-luna-v1` for compatibility with stored projects; the new
+The retired model profile `sol-luna-v1` is rejected before dispatch. The stable
+EDL schema retains that name for compatibility with stored projects; the new
 `workflowProfile` field identifies the actual model combination. `/health`
 reports the selected profile and model names.
 
@@ -125,3 +127,24 @@ coordinator rescue. No live deployment or new paid media was performed here.
 Pricing snapshots: [OpenAI](https://developers.openai.com/api/docs/pricing) and
 [OpenCode Go](https://dev.opencode.ai/docs/go/). The measured experiment remains
 separate evidence; its average is not a guarantee for this production adapter.
+
+## Chat/reference provider boundary
+
+`assets/model-routing.js` is the shared chat/reference model authority. Astra
+uses `EDITORIAL_ASTRA_API_KEY` or `OPENAI_API_KEY` at OpenAI Responses; it never
+falls back to the OpenCode credential or to Luna. DeepSeek script calls use
+`OPENCODE_API_KEY` or the existing `REFERENCE_FLASH_KEY` secret. Production
+execution retains `deepseek-flash`; the script writer retains its separate
+DeepSeek model ID. GPT Image, MiniMax, H3 and transcription are unchanged.
+
+The reference cache version is `astra-reference-v3`; previously approved
+reference notes remain customer data. New analyses identify Astra. The legacy
+video-use tool path also uses Astra, and its budget accounting uses Astra rates
+from the shared production pricing snapshot instead of obsolete Luna rates.
+Stored old review/model pairs remain verifiable, but cannot enable new Sol/Luna
+requests. Retired or unknown production profiles fail closed.
+
+Deploy Pages and Render together. Model-routing tests verify endpoint, credential
+isolation, actual returned model identity, absent-key rejection, streaming and
+script delegation. Passing these tests does not establish end-to-end autonomy
+or remove platform CPU limits on the hosted chat.

@@ -7,11 +7,11 @@ import {monoWav} from '../assets/reference-media.js';
 import {getReferenceAnalysis,postReferenceAnalysis,validateInput,modelRequest,transcribeReference,analysisAvailability} from '../src/reference-analysis.js';
 import {postStudio} from '../src/studio.js';
 let db,stub,original,providerCalls,asrCalls,output,finish,model;
-const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-key',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'private-flash',REFERENCE_SCRIBE_KEY:'private-scribe'};
+const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-key',REFERENCE_ANALYSIS_ENABLED:'true',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'private-flash',REFERENCE_SCRIBE_KEY:'private-scribe'};
 const valid=()=>({topic:'Filtro de ducha de la referencia',hook:'Cabello en la mano',style:'Plastilina cálida',characters:['Adulto, camiseta clara'],beats:[{frameIds:sampleFrames(6).map(f=>f.id),visual:'Presenta el producto'}],cta:'Compra según la narración',sourceClaims:['Promesa de la referencia, sin verificar'],uncertainties:['No se conoce movimiento entre muestras']});
 before(async()=>{db=await database();stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=async(input,options={})=>{const url=typeof input==='string'?input:input.url;
  if(url.startsWith('https://api.elevenlabs.io/')){asrCalls++;assert.equal(options.headers['xi-api-key'],'private-scribe');return Response.json({words:[{type:'word',text:'Referencia',start:0,end:1}]});}
- if(url.startsWith('https://opencode.ai/')){providerCalls++;const request=JSON.parse(options.body);assert.equal(request.model,FLASH_MODEL);assert.equal(request.input[1].content.filter(c=>c.type==='input_image').length,4);return new Response('data: '+JSON.stringify({model:model||FLASH_MODEL,choices:[{delta:{content:JSON.stringify(output||valid()),reasoning_content:'must-not-be-saved'},finish_reason:finish||'stop'}],usage:{prompt_tokens:100,completion_tokens:100}})+'\n\ndata: [DONE]\n');}
+ if(url==='https://api.openai.com/v1/responses'){providerCalls++;const request=JSON.parse(options.body);assert.equal(request.model,FLASH_MODEL);assert.equal(request.input[1].content.filter(c=>c.type==='input_image').length,4);return new Response('data: '+JSON.stringify({model:model||FLASH_MODEL,choices:[{delta:{content:JSON.stringify(output||valid()),reasoning_content:'must-not-be-saved'},finish_reason:finish||'stop'}],usage:{prompt_tokens:100,completion_tokens:100}})+'\n\ndata: [DONE]\n');}
  return stub.fetch(input,options);
 };});
 after(async()=>{globalThis.fetch=original;await db.close();});
@@ -33,7 +33,7 @@ test('binary WAV lengths cannot shift magic offsets through UTF-8 decoding',()=>
 
 // The exact timestamp format used by the hosted OpenAI transcription adapter.
 test('OpenAI word timestamps feed the same bounded reference evidence',async()=>{
- const env={REFERENCE_OPENAI_KEY:'test-openai',REFERENCE_ANALYSIS_ENABLED:'true',REFERENCE_FLASH_KEY:'test'};
+ const env={REFERENCE_OPENAI_KEY:'test-openai',REFERENCE_ANALYSIS_ENABLED:'true',OPENAI_API_KEY:'fixture-astra',REFERENCE_FLASH_KEY:'test'};
  assert.equal(analysisAvailability(env),true);
  let calls=0;const invoke=async(url,options)=>{calls++;assert.equal(url,'https://api.openai.com/v1/audio/transcriptions');assert.equal(options.body.get('response_format'),'verbose_json');assert.equal(options.body.get('timestamp-granularities[]'),null);assert.equal(options.body.get('timestamp_granularities[]'),'word');return Response.json({words:[{word:'Hola',start:0,end:.4},{word:'mundo',start:.5,end:1}]});};
  const result=await transcribeReference({source:{duration:2},audio:new Uint8Array(44)},env,invoke);assert.equal(result.text,'Hola mundo');assert.equal(result.wordCount,2);assert.equal(calls,1);

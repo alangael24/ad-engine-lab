@@ -47,7 +47,7 @@ test('changing script, evidence, model or scope invalidates the old decision; si
  const cp=store();let n=0;const f=checkpointedCall(async a=>{n++;meter(a);return {n};},cp,{scope:'project-assets-v1'});
  const a={role:'director',name:'plan',schema:{},system:'rules',context:{script:'hello'},images:['first frames'],env};
  const run=x=>f({...a,...x,usage:usage()});await run();await run();assert.equal(n,1);
- await run({context:{script:'changed'}});await run({images:['different frames']});await run({env:{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}});assert.equal(n,4);
+ await run({context:{script:'changed'}});await run({images:['different frames']});await run({system:'Updated acceptance criteria'});assert.equal(n,4);await assert.rejects(run({env:{PRODUCTION_WORKFLOW_PROFILE:'sol-luna-v1'}}),/WORKFLOW_CONFIG/);assert.equal(n,4);
  const g=checkpointedCall(async a=>{n++;meter(a);return {};},cp,{scope:'new-assets'});await g({...a,usage:usage()});assert.equal(n,5);
  assert.equal(checkpointKey({b:2,a:1}),checkpointKey({a:1,b:2}));
  const p={data:{creativeMemory:{decisions:['approved','approved','make yellow'],preferences:['large']}}};assert.deepEqual(editorialRecoveryProject(p).data.creativeMemory.decisions,['approved','make yellow']);assert.equal(p.data.creativeMemory.decisions.length,3);
