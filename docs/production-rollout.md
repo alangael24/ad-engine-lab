@@ -147,3 +147,15 @@ These include fixture overhead and sampling error; they are not production CPU
 measurements and do not explain all of the previously logged 172 ms. Verify a
 real request with Cloudflare tail after deployment. No GPU or paid model calls
 were used by those local replays.
+
+The first live remote request completed without `exceededCpu` (23 ms CPU,
+23.109 s wall time), but its model output failed validation. A bounded local
+reproduction captured a complete DeepSeek tool response with malformed JSON
+(a missing salesPlan closing brace) and duplicate insight kinds. The output had
+4,993 SSE events; the provider/model/completion identity itself was correct.
+The writer schema/instructions now explicitly require unique insight kinds and
+salesPlan/value siblings. It can repair a completed invalid structure once,
+without rerunning Astra, only if all three original titles and narrations are
+recoverable. Repaired titles/narrations must match those strings exactly. Both
+attempt usages are retained; transport/truncation/model-identity failures still
+have no retry. This is a format repair, not an approval bypass.

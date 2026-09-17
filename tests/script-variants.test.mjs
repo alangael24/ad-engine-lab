@@ -79,3 +79,22 @@ test('variant cards use literal text and buttons pass the stable set identity',(
  assert.equal(root.children[0].children[2].textContent,values[0]);assert.ok(scriptVariantCards(variants,{disabled:true}).children.every(c=>c.children.at(-1).disabled));
  }finally{globalThis.document=old;}
 });
+test('one format repair preserves scripts, records both usages, and never reruns Astra',async()=>{
+ const original=result(),malformed=JSON.stringify(original).replaceAll(']},"value"','],"value"');let n=0;const requests=[];
+ const output=await callEditor(project(),[],[],'Dame tres variantes',env,async(_,opts)=>{
+  const b=JSON.parse(opts.body);requests.push(b);n++;
+  if(n===1)return stream(coordinator);
+  if(n===2)return new Response('data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_script',arguments:malformed}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:70,completion_tokens:90}})+'\n\n');
+  return stream(original,SCRIPT_MODEL);
+ });
+ assert.equal(n,3);assert.equal(requests.filter(r=>r.model===CHAT_MODEL).length,1);assert.equal(requests[2].reasoning_effort,'none');
+ assert.deepEqual(output.edit.variants.options.map(v=>v.script),values);
+ const usage=output.usage.calls[1];assert.equal(usage.attempts.length,2);assert.equal(usage.usage.prompt_tokens,120);assert.equal(usage.usage.completion_tokens,150);
+});
+test('format repair cannot silently rewrite scripts and stops after one repair',async()=>{
+ const original=result(),bad=structuredClone(original);bad.variants[0].salesPlan.insights.push(bad.variants[0].salesPlan.insights[0]);
+ for(const repaired of [bad,(()=>{const r=result();r.variants[0].value+=' Nueva promesa.';return r;})()]){
+  let n=0;await assert.rejects(callEditor(project(),[],[],'Dame tres variantes',env,async()=>{n++;return n===1?stream(coordinator):stream(n===2?bad:repaired,SCRIPT_MODEL);}),/CHAT_INVALID/);assert.equal(n,3);
+ }
+ let n=0;await assert.rejects(callEditor(project(),[],[],'Dame tres variantes',env,async()=>{n++;return n===1?stream(coordinator):new Response('Unavailable',{status:503});}),/CHAT_PROVIDER/);assert.equal(n,2);
+});

@@ -9,7 +9,7 @@ const fail=code=>{throw Object.assign(Error(code),{code});};
 export const VARIANTS_SYSTEM=`TRES VARIANTES PARA ELEGIR
 Para una idea o pedido de un guion nuevo, entrega EXACTAMENTE tres guiones completos, no tres hooks ni un solo guion con sinónimos. Cada variante desarrolla un ángulo de venta distinto y una apertura distinta: elige los tres enfoques más relevantes para esta landing, producto y petición. Pueden ser problema/frustración, objeción/contraste o deseo/demostración, sin imponer esa fórmula si no encaja.
 Conserva en las tres el idioma, duración, tono, producto, hechos, oferta y restricciones solicitados. Cada una debe tener hook, desarrollo, mecanismo o razón para elegir y CTA. Cumple las reglas de copy y fuentes en CADA variante. No inventes evidencia para diferenciar los ángulos.
-En esta llamada usa write_script UNA sola vez con {variants:[{title,salesPlan,value},...]} en lugar de salesPlan/value en la raíz. title es una etiqueta breve del enfoque; salesPlan explica ese ángulo y cita fuentes; value solo contiene la narración completa sin encabezados. No elijas una ganadora ni juntes los tres guiones para narrarlos. El cliente elegirá después.`;
+En esta llamada usa write_script UNA sola vez con {variants:[{title,salesPlan,value},...]} en lugar de salesPlan/value en la raíz. Estructura exacta: {"variants":[{"title":"...","salesPlan":{"angle":"...","insights":[...]},"value":"..."}, ...]}. Cierra salesPlan antes de value; value es hermano de salesPlan, nunca va dentro. Cada salesPlan incluye como máximo UN insight por kind: combina dos observaciones de la misma categoría. title es una etiqueta breve del enfoque; salesPlan explica ese ángulo y cita fuentes; value solo contiene la narración completa sin encabezados. No elijas una ganadora ni juntes los tres guiones para narrarlos. El cliente elegirá después.`;
 export function wantsScriptVariants(change,raw,project){return isSalesProduct(project.data)&&change.operation==='draft_script'&&raw.scriptMode!=='revision';}
 export function withScriptVariants(request,project){
  if(!isSalesProduct(project.data)||(project.data.scenes||[]).length)return request;
@@ -21,16 +21,33 @@ export function withScriptVariants(request,project){
 }
 export async function writeScriptVariants(change,{project,history,message,env,request}){
  if(project.data.scenes?.length)fail('CHAT_SCRIPT_EXISTS');
- const research=salesResearch(project,message);
- const response=await request('https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:openCodeHeaders({authorization:`Bearer ${env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY}`,'content-type':'application/json','x-opencode-session':'creativerush-script-'+project.id}),signal:AbortSignal.timeout(120000),body:JSON.stringify({model:SCRIPT_MODEL,reasoning_effort:'low',stream:true,stream_options:{include_usage:true},max_tokens:8000,tool_choice:'auto',tools:[{type:'function',function:{name:'write_script',parameters:{type:'object',additionalProperties:false,properties:{variants:{type:'array',minItems:3,maxItems:3,items:{type:'object',additionalProperties:false,properties:{title:{type:'string',maxLength:90},salesPlan:SALES_PLAN_SCHEMA,value:{type:'string',maxLength:10000}},required:['title','salesPlan','value']}}},required:['variants']}}}],messages:[{role:'system',content:SALES_COPY_SYSTEM+'\n'+VARIANTS_SYSTEM},{role:'user',content:JSON.stringify({request:message,editorialInstruction:change.value,salesResearch:research,brand:{...project.brand_snapshot,salesSource:undefined},data:project.data,history:history.slice(-8).map(r=>({request:r.request_payload?.message,result:r.result?.message}))})}]})});
+ const research=salesResearch(project,message),attempts=[];let repair='',preserved=null;
+ for(let attempt=0;attempt<2;attempt++){
+ const response=await request('https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:openCodeHeaders({authorization:`Bearer ${env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY}`,'content-type':'application/json','x-opencode-session':'creativerush-script-'+project.id}),signal:AbortSignal.timeout(120000),body:JSON.stringify({model:SCRIPT_MODEL,reasoning_effort:attempt?'none':'low',stream:true,stream_options:{include_usage:true},max_tokens:8000,tool_choice:'auto',tools:[{type:'function',function:{name:'write_script',parameters:{type:'object',additionalProperties:false,properties:{variants:{type:'array',minItems:3,maxItems:3,items:{type:'object',additionalProperties:false,properties:{title:{type:'string',maxLength:90},salesPlan:SALES_PLAN_SCHEMA,value:{type:'string',maxLength:10000}},required:['title','salesPlan','value']}}},required:['variants']}}}],messages:[{role:'system',content:SALES_COPY_SYSTEM+'\n'+VARIANTS_SYSTEM},{role:'user',content:JSON.stringify({request:message,editorialInstruction:change.value,salesResearch:research,brand:{...project.brand_snapshot,salesSource:undefined},data:project.data,history:history.slice(-8).map(r=>({request:r.request_payload?.message,result:r.result?.message}))})},...(repair?[{role:'assistant',content:repair},{role:'user',content:'La respuesta anterior no pasó el contrato de JSON/variantes/insights. Corrige solamente la estructura en write_script: EXACTAMENTE tres variantes, cada una con title, salesPlan y value como propiedades hermanas. Cierra cada objeto y array. Mantén literalmente los tres textos de narración y sus títulos; no escribas anuncios nuevos. Agrupa insights con el mismo kind en uno, dentro de 300 caracteres. Usa solo sourceIds existentes y evidencia de las fuentes para mecanismos, diferencias, pruebas y ofertas. No agregues hechos. No expliques la reparación.'}]:[])]})});
  if(!response.ok)fail('CHAT_PROVIDER');
  let model,finish,usage,args='',name='';const indices=new Set();
  await readEvents(response,d=>{if(d.error)fail('CHAT_PROVIDER');model=d.model||model;usage=d.usage||usage;for(const c of d.choices||[]){finish=c.finish_reason||finish;for(const t of c.delta?.tool_calls||[]){indices.add(t.index);name+=t.function?.name||'';args+=t.function?.arguments||'';}}},2500000);
  if(model!==SCRIPT_MODEL||finish!=='tool_calls'||name!=='write_script'||indices.size!==1)fail('CHAT_INVALID');
- let result;try{result=JSON.parse(args);}catch{fail('CHAT_INVALID');}
- if(!Array.isArray(result.variants)||result.variants.length!==3)fail('CHAT_INVALID');
- const plans=result.variants.map(v=>validateSalesPlan(v.salesPlan,research));
- const variants=normalizeScriptVariants({id:crypto.randomUUID(),options:result.variants.map((v,i)=>({title:v.title,angle:plans[i].angle,script:v.value}))});
+ attempts.push({stage:attempt?'format_repair':'draft',usage:usage||null});
+ let result,plans,variants;
+ try{
+  result=JSON.parse(args);
+  if(!Array.isArray(result.variants)||result.variants.length!==3)fail('CHAT_INVALID');
+  if(preserved&&result.variants.some((v,i)=>v.title!==preserved.title[i]||v.value!==preserved.value[i]))fail('CHAT_INVALID');
+  plans=result.variants.map(v=>validateSalesPlan(v.salesPlan,research));
+  variants=normalizeScriptVariants({id:crypto.randomUUID(),options:result.variants.map((v,i)=>({title:v.title,angle:plans[i].angle,script:v.value}))});
+ }catch{
+  console.warn(JSON.stringify({event:'script_variants_validation_failed',attempt:attempt+1,stage:result?'schema':'json',model:SCRIPT_MODEL,usage:usage||null}));
+  if(attempt||args.length>32000)fail('CHAT_INVALID');
+  // Repair format only when every original title and narration is recoverable.
+  // The repaired result must preserve those strings exactly; never rewrite copy.
+  preserved={title:[],value:[]};
+  try{for(const m of args.matchAll(/"(title|value)"\s*:\s*("(?:\\.|[^"\\])*")/g))preserved[m[1]].push(JSON.parse(m[2]));}catch{fail('CHAT_INVALID');}
+  if(preserved.title.length!==3||preserved.value.length!==3)fail('CHAT_INVALID');
+  repair=args;continue;
+ }
  Object.assign(change,{operation:'propose_scripts',variants,message:'Aquí tienes tres guiones con enfoques diferentes. Elige uno para continuar.'});delete change.value;
- return {model:SCRIPT_MODEL,usage:usage||null,productProfile:'ads-sales-v1',scriptVariants:variants,salesPlans:plans,researchVersion:research.version,landingIncluded:research.landingIncluded,sourceUrl:research.sourceUrl};
+ const total=attempts.every(x=>x.usage)?{prompt_tokens:attempts.reduce((n,x)=>n+(x.usage.prompt_tokens||0),0),completion_tokens:attempts.reduce((n,x)=>n+(x.usage.completion_tokens||0),0),prompt_tokens_details:{cached_tokens:attempts.reduce((n,x)=>n+(x.usage.prompt_tokens_details?.cached_tokens||x.usage.prompt_cache_hit_tokens||0),0)}}:null;
+ return {model:SCRIPT_MODEL,usage:total,attempts,productProfile:'ads-sales-v1',scriptVariants:variants,salesPlans:plans,researchVersion:research.version,landingIncluded:research.landingIncluded,sourceUrl:research.sourceUrl};
+ }
 }

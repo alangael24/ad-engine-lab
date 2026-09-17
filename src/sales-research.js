@@ -15,7 +15,7 @@ export function salesResearch(project,message){
 const kinds=['audience','pain','desire','mechanism','difference','objection','proof','offer'];
 export const SALES_PLAN_SCHEMA={type:'object',additionalProperties:false,properties:{
  angle:{type:'string',maxLength:300,description:'Una razón específica para elegir el producto; no una fórmula genérica.'},
- insights:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,properties:{
+ insights:{type:'array',description:'At most one insight per kind; combine observations within the same category.',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,properties:{
   kind:{type:'string',enum:kinds},text:{type:'string',maxLength:300},basis:{type:'string',enum:['source','creative_hypothesis']},sourceIds:{type:'array',maxItems:5,items:{type:'string'}}
  },required:['kind','text','basis','sourceIds']}}
 },required:['angle','insights']};

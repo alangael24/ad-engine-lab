@@ -21,7 +21,15 @@ export function createChatRuntime({env=process.env,edit=callEditor,log=entry=>co
    let b;try{b=JSON.parse(Buffer.concat(chunks,size));}catch{reply(res,400,'CHAT_INVALID');return;}
    if(!b?.project?.data||!Array.isArray(b.versions)||!Array.isArray(b.history)||!Array.isArray(b.visuals)||typeof b.message!=='string'||!b.message.trim()||b.message.length>3000||typeof b.productionEnabled!=='boolean'){reply(res,400,'CHAT_INVALID');return;}
    res.writeHead(200,{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-store, no-transform','x-accel-buffering':'no'});res.flushHeaders();
-   const emit=event=>{if(!res.destroyed)res.write('data: '+JSON.stringify(event)+'\n\n');};
+   const write=event=>{if(!res.destroyed)res.write('data: '+JSON.stringify(event)+'\n\n');};
+   let buffered=null,flushTimer;
+   const flush=()=>{clearTimeout(flushTimer);flushTimer=null;if(buffered){write(buffered);buffered=null;}};
+   const emit=event=>{
+    if(event.type!=='delta'){flush();write(event);return;}
+    if(buffered&&buffered.field!==event.field)flush();
+    if(!buffered)buffered={...event};else buffered.text+=event.text;
+    if(buffered.text.length>=256)flush();else if(!flushTimer){flushTimer=setTimeout(flush,100);flushTimer.unref();}
+   };
    emit({type:'started'});
    // Keep the connection alive while the script writer reasons without visible text.
    const heartbeat=setInterval(()=>{if(!res.destroyed)res.write(': heartbeat\n\n');},15000);heartbeat.unref();
@@ -30,7 +38,7 @@ export function createChatRuntime({env=process.env,edit=callEditor,log=entry=>co
     const result=await edit(b.project,b.versions,b.history,b.message,{...env,CHAT_RUNTIME_MODE:'local',PRODUCTION_ENABLED:b.productionEnabled?'true':'false'},fetch,emit,b.visuals);
     emit({type:'done',result});log({event:'chat_models_complete',wallMs:Date.now()-start,calls:result.usage?.calls?.map(c=>({model:c.model,usage:c.usage}))||[]});
    }catch(e){emit({type:'error',code:e.code||'CHAT_PROVIDER',error:'No se completó la respuesta. Recupera el resultado antes de intentar de nuevo.'});log({event:'chat_models_failed',code:e.code||'CHAT_PROVIDER'});}
-   finally{clearInterval(heartbeat);res.end();}
+   finally{flush();clearInterval(heartbeat);res.end();}
   }catch(e){reply(res,503,'CHAT_PROVIDER');log({event:'chat_transport_failed',code:e.code||'TRANSPORT'});}
  }
  return {
