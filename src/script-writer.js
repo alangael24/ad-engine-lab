@@ -1,3 +1,4 @@
+import {wantsScriptVariants,writeScriptVariants} from './script-variants.js';
 import {isCreatorProduct} from '../assets/product-profiles.js';
 import {CREATOR_SCRIPT_SYSTEM} from './creator-prompts.js';
 import {isSalesProduct,productProfile} from '../assets/product-profiles.js';
@@ -16,6 +17,7 @@ export async function writeScriptChanges(raw,{project,history,message,env,reques
  const changes=raw.operation==='batch'?raw.changes:[raw];const usages=[];
  for(const change of changes||[]){
   if(!SCRIPT_OPERATIONS.includes(change.operation))continue;
+  if(wantsScriptVariants(change,raw,project)){usages.push(await writeScriptVariants(change,{project,history,message,env,request}));raw.message='Aquí tienes tres guiones con enfoques diferentes. Elige uno para continuar.';continue;}
   const sales=isSalesProduct(project.data),research=sales?salesResearch(project,message):null,planRequired=sales&&change.operation==='draft_script';
   const bounded=isCreatorProduct(project.data)&&change.operation==='draft_script',maxWords=bounded?Math.ceil((project.data.creatorBrief?.targetDuration||30)*2.6):null;
   let durationFeedback='',previousDraft='';

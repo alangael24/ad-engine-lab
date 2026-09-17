@@ -28,7 +28,7 @@ test('sales adds sourced planning inside the same writer call; legacy tool and m
  const seen=[];
  for(const profile of [undefined,SALES_PRODUCT]){
   const d=data();if(profile)d.productProfile=profile;
-  const change={operation:'draft_script',value:'Escribe 90 palabras'};
+  const change={operation:'draft_script',scriptMode:'revision',value:'Escribe 90 palabras'};
   const usage=await writeScriptChanges(change,{project:{id:'same',brand_snapshot:{product:'Organizador de cables'},data:d},history:[],message:'Haz el guion',env:{REFERENCE_FLASH_KEY:'fixture'},request:async(u,init)=>{seen.push(JSON.parse(init.body));return response('Tus cables, donde los necesitas.',profile?{salesPlan:{angle:'Acceso al cargador',insights:[{kind:'mechanism',text:'Organiza cables.',basis:'source',sourceIds:['brand:product']}]}}:{});}});
   assert.equal(change.value,'Tus cables, donde los necesitas.');assert.equal(usage.length,1);
  }
@@ -53,7 +53,7 @@ test('sales writer provider failure does not fall back or produce media',async()
  let count=0;await assert.rejects(writeScriptChanges({operation:'draft_script',value:'Idea'},{project:{id:'p',data:{...data(),productProfile:SALES_PRODUCT}},history:[],message:'Idea',env:{REFERENCE_FLASH_KEY:'fixture'},request:async()=>{count++;return new Response('',{status:503});}}),/CHAT_PROVIDER/);assert.equal(count,1);
 });
 test('sales thinking packets are bounded separately and never appear in script previews',async()=>{
- const previews=[],change={operation:'draft_script',value:'Escribe'},plan={angle:'Organizar la mesa',insights:[{kind:'mechanism',text:'Sujeta cables',basis:'source',sourceIds:['brand:product']}]};let calls=0;
+ const previews=[],change={operation:'draft_script',scriptMode:'revision',value:'Escribe'},plan={angle:'Organizar la mesa',insights:[{kind:'mechanism',text:'Sujeta cables',basis:'source',sourceIds:['brand:product']}]};let calls=0;
  const reasoning='data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{reasoning_content:'x'.repeat(10000)}}]})+'\n\n';
  await writeScriptChanges(change,{project:{id:'thinking',data:{...data(),productProfile:SALES_PRODUCT},brand_snapshot:{product:'Organizador para sujetar cables'}},history:[],message:'Haz un guion',env:{REFERENCE_FLASH_KEY:'test'},onDelta:d=>previews.push(d),request:async()=>{calls++;return new Response(reasoning.repeat(60)+await response('Encuentra el cargador en tu mesa.',{salesPlan:plan}).text());}});
  assert.equal(calls,1);assert.equal(change.value,'Encuentra el cargador en tu mesa.');assert.ok(previews.every(p=>!p.text.includes('xxx')));

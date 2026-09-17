@@ -1,11 +1,15 @@
+import {normalizeScriptVariants,selectScriptVariant} from './script-variants.js';
+import {isSalesProduct} from './product-profiles.js';
 import {remember} from './creative-context.js';
 import {projectData,fail,ID} from './studio-model.js';
 import {LOCAL_EDIT_OPS,normalizeEditing,voiceRevision} from './partial-edit.js';
 export {WORKFLOW_MODEL as CHAT_MODEL} from './model-routing.js';
-export const OPS=['clarify','set_hook','draft_script','set_look','edit_scene','remove_scene','move_scene','select_version','undo','render','produce','batch','edit_text','finish_edit',...LOCAL_EDIT_OPS];
+export const OPS=['propose_scripts','select_script','clarify','set_hook','draft_script','set_look','edit_scene','remove_scene','move_scene','select_version','undo','render','produce','batch','edit_text','finish_edit',...LOCAL_EDIT_OPS];
 export function validateEdit(raw){
  if(!raw||!OPS.includes(raw.operation)||typeof raw.message!=='string'||!raw.message.trim()||raw.message.length>1000)fail('CHAT_INVALID');
  const edit={operation:raw.operation,message:raw.message.trim()};
+ if(edit.operation==='propose_scripts'){edit.variants=normalizeScriptVariants(raw.variants);return edit;}
+ if(edit.operation==='select_script'){if(!Number.isInteger(raw.position)||raw.position<1||raw.position>3)fail('CHAT_INVALID');edit.position=raw.position;return edit;}
  if(LOCAL_EDIT_OPS.includes(edit.operation)){
   if(edit.operation==='trim_scene'){
    if(!ID.test(raw.sceneId||''))fail('CHAT_INVALID');
@@ -19,7 +23,7 @@ export function validateEdit(raw){
  }
  if(edit.operation==='batch'){
   if(!Array.isArray(raw.changes)||raw.changes.length<1||raw.changes.length>12)fail('CHAT_INVALID');
-  edit.changes=raw.changes.map(c=>{if(!c||['batch','clarify','undo','render','produce'].includes(c.operation))fail('CHAT_INVALID');return validateEdit({...c,message:edit.message});});
+  edit.changes=raw.changes.map(c=>{if(!c||['batch','clarify','undo','render','produce','select_script'].includes(c.operation))fail('CHAT_INVALID');return validateEdit({...c,message:edit.message});});
   return edit;
  }
  if(['set_hook','draft_script','set_look','edit_scene','edit_text','finish_edit'].includes(edit.operation)){
@@ -35,6 +39,9 @@ export function validateEdit(raw){
 export function applyEdit(project,edit,versions=[]){
  if(edit.operation==='batch'){let p=structuredClone(project);for(const c of edit.changes)p.data=applyEdit(p,c,versions);return projectData(p.data);}
  const d=structuredClone(project.data),op=edit.operation;
+ if(op==='set_hook'&&d.scriptVariants)fail('CHAT_VARIANTS_STALE');
+ if(op==='select_script')return applyEdit(project,selectScriptVariant(project,edit.position),versions);
+ if(op==='propose_scripts'){if(!isSalesProduct(d)||d.scenes.length)fail('CHAT_INVALID');d.scriptVariants=normalizeScriptVariants(edit.variants);d.scriptDraft='';d.narrationAssetId=null;d.timingConfirmed=false;return projectData(d);}
  if(['clarify','undo','render','produce'].includes(op))return null;
  const idx=d.scenes.findIndex(s=>s.id===edit.sceneId),s=d.scenes[idx];
  if(LOCAL_EDIT_OPS.includes(op)){
@@ -56,7 +63,7 @@ export function applyEdit(project,edit,versions=[]){
   else{d.scriptDraft=(d.scriptDraft||'').replace(/^[\s\S]*?(?:[.!?](?:\s|$)|\n|$)/,()=>edit.value+' ');}
   d.narrationAssetId=null;d.timingConfirmed=false;for(const x of d.scenes)delete x.narrationStart;
  }else if(op==='draft_script'){
-  if(d.scenes.length)fail('CHAT_SCRIPT_EXISTS');d.scriptDraft=edit.value;d.narrationAssetId=null;d.timingConfirmed=false;
+  if(d.scenes.length)fail('CHAT_SCRIPT_EXISTS');delete d.scriptVariants;d.scriptDraft=edit.value;d.narrationAssetId=null;d.timingConfirmed=false;
  }else if(op==='set_look'){
   d.creative={...d.creative,look:edit.value};for(const x of d.scenes){x.selectedVersionId=null;x.imageAssetId=null;}
  }else if(op==='edit_scene'){s.visual=edit.value;delete s.motion;s.selectedVersionId=null;s.imageAssetId=null;}

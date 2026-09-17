@@ -1,3 +1,4 @@
+import {normalizeScriptVariants} from './script-variants.js';
 import {isCreatorProduct} from './product-profiles.js';
 import {creatorBrief} from './creator-model.js';
 import {salesSource} from './sales-source.js';
@@ -17,7 +18,7 @@ export function brandData(input){
 }
 export function projectData(input){
  if(isCreatorProduct(input)&&input.brandId!=null)fail();
- const revisionFields={...(input.editing?{editing:normalizeEditing(input.editing)}:{}),...(input.narrationRevision?{narrationRevision:normalizeNarrationRevision(input.narrationRevision)}:{})};
+ const revisionFields={...(input.scriptVariants?{scriptVariants:normalizeScriptVariants(input.scriptVariants)}:{}),...(input.editing?{editing:normalizeEditing(input.editing)}:{}),...(input.narrationRevision?{narrationRevision:normalizeNarrationRevision(input.narrationRevision)}:{})};
  const referenceUrl=string(input.referenceUrl,2000);if(referenceUrl){let u;try{u=new URL(referenceUrl);}catch{fail();}if(!['https:','http:'].includes(u.protocol)||u.username||u.password)fail();}
  if(!['9:16','16:9','1:1'].includes(input.aspectRatio)||!Array.isArray(input.scenes)||input.scenes.length>24)fail();
  const ids=new Set();let previous=0;

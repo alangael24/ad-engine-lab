@@ -1,3 +1,4 @@
+import {scriptVariantCards} from './script-variant-cards.js';
 import {createVisualCollector} from './chat-visuals.js';
 export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
  const collectVisuals=createVisualCollector(api);
@@ -44,6 +45,7 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   if(!rows.length&&!request)line(getProject()?.data?.productProfile==='creator-v1'?'Tu idea y tu guion están guardados. Dime qué quieres crear o cambiar.':'Tengo el contexto de tu producto. Dime qué quieres crear o cambiar.','assistant');
   for(const [index,r] of rows.entries()){line(r.message,'user');if(r.status==='succeeded'){
    line(r.result.message,'assistant');if(index===scriptRow&&script)log.append(scriptCard);salesPlan(r);
+   for(const call of r.result.usage?.calls||[])if(call.scriptVariants){const variants=call.scriptVariants;log.append(scriptVariantCards(variants,{disabled:!available||inFlight||Boolean(request)||variants.id!==getProject()?.data.scriptVariants?.id,onChoose:(index,setId)=>task(()=>send(`Usar variante ${index}`,{index,setId}))}));}
    if(r.result.productionId)line('Estoy preparando las tomas necesarias y la nueva versión.','detail');
    if(r.result.productionError)line(({PRODUCTION_LIMIT:'Los cambios están guardados. Alcanzaste el límite de producciones de esta prueba.',PRODUCTION_PRODUCT:'Los cambios están guardados. Falta una imagen del producto para generar las tomas.',PRODUCTION_BUSY:'Los cambios están guardados. Hay otra producción en curso.'}[r.result.productionError]||'Los cambios están guardados. La generación de nuevas tomas no está disponible ahora.'),'detail');
    if(r.result.renderError)line(({STUDIO_WORKER_OFFLINE:'El montaje está temporalmente sin conexión.',STUDIO_RENDER_BUSY:'Tu montaje está esperando a que terminen los anteriores.',STUDIO_NARRATION_REQUIRED:'El cambio está guardado. Falta la narración para montarlo.',STUDIO_AUDIO_TIMING:'El cambio está guardado. El audio necesita sincronizarse antes del montaje.',STUDIO_NOT_READY:'El cambio está guardado. Faltan tomas para montar el video.',STUDIO_CLIP_TOO_SHORT:'El cambio está guardado. Una toma necesita más duración.'}[r.result.renderError]||'El cambio está guardado; todavía no pude montar el video.'),'detail');
@@ -70,13 +72,13 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   if(projectId!==p.id){if(projectId)saveDraft(projectId,input.value);stop();projectId=p.id;rows=[];deliveryNote='';polls=0;input.value=drafts.get(p.id)||sessionStorage.getItem(key(p.id)+':draft')||'';}
   await sync(p.id);
  }
- async function send(message){
+ async function send(message,scriptChoice){
   if(!available||inFlight||!active())return;
   if(isDirty()){tell('Guarda los cambios de los detalles antes de continuar en el chat.',true);return;}
   const p=getProject(),id=p.id;message=message.trim();if(!message)return;
   const existing=pending(id);
   if(existing&&existing.message!==message){await sync(id);return;}
-  const request=existing||{projectId:id,expected:p.revision,requestId:crypto.randomUUID(),message};
+  const request=existing||{projectId:id,expected:p.revision,requestId:crypto.randomUUID(),message,...(scriptChoice?{scriptChoice}:{})};
   sessionStorage.setItem(key(id),JSON.stringify(request));if(!existing){input.value='';input.style.height='auto';saveDraft(id,'');}polls=0;inFlight=true;streamNodes=null;deliveryNote='';paint();
   followLatest=true;reveal();
   try{

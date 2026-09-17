@@ -51,8 +51,21 @@ and checking brand revision. Already-created projects keep their snapshots.
 
 ## Writing
 
+New ideas and requests for alternative scripts produce three complete drafts
+in one writer call, each with its own angle, hook and source-linked sales plan.
+The client sees all three and chooses using a button or a numbered chat reply.
+An explicit correction to the selected script uses `scriptMode: revision` and
+keeps the single-script writer. Provided scripts still bypass the writer.
+
+Pending choices are persisted as `data.scriptVariants`; `scriptDraft` is empty
+until selection, so media production cannot start on an arbitrary option.
+Button selection copies the exact stored script without a model call. Choices
+carry a set ID, revision fencing and the existing request idempotency; stale
+buttons cannot select a replacement set. Selection clears the pending choices.
+History retains the proposals after reload. Original/creator routes are unchanged.
+
 The existing OpenCode DeepSeek writer extracts available insights and selects
-one angle inside the same `write_script` call that returns narration. The
+an angle per draft inside the same `write_script` call that returns narration. The
 tool's `salesPlan` contains short source-linked insights; absent categories are
 omitted. Hypotheses are permitted for audience, pain, desire and objection, not
 for mechanisms, differentiators, proof or offers. These are client statements,
@@ -71,7 +84,10 @@ rejects thinking combined with a forced named tool. The response must still
 contain exactly one `write_script` tool call with valid arguments. SSE transport
 is capped at 2.5 MB for sales (reasoning chunks have significant envelope
 overhead); other profiles retain their 500 KB limit. Reasoning is never shown.
-The 4,500 output-token cap, timeout and accounting remain in place.
+Single-script revisions retain the 4,500 output-token cap. Three-option calls
+allow 8,000 output tokens with the same 120-second timeout and usage accounting.
+Invalid counts, duplicate scripts/hooks, invalid sources or truncated tool
+responses fail without replacing the current project state.
 
 `salesPlan`, source coverage and provider token usage are stored in the existing
 chat result usage record. The UI exposes an optional argument summary, and the
@@ -79,6 +95,13 @@ saved landing is inspectable under product context. No extra research model,
 images, voice, clips or GPU jobs are needed to draft the copy.
 
 ## Verification
+
+`scripts/benchmark-script-variants.mjs` runs a text-only real-provider smoke.
+The first run returned three complete LumaClip scripts with distinct openings,
+one coordinator call and one writer call. This verifies delivery and selection
+structure, not sales performance or exact spoken duration. Automated tests cover
+literal selection, persistence, idempotency, stale/foreign access rejection,
+unchanged provided-script routing and absence of media jobs before approval.
 
 `scripts/benchmark-sales-landing.mjs OUTPUT` runs three fictional LPs through
 the real writer. `REFERENCE_FLASH_KEY` is supplied securely; optionally set

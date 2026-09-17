@@ -49,11 +49,11 @@ test('literal verification failure never invokes the writer or overwrites an exi
  await assert.rejects(callEditor(p,[],[],script,env,async()=>{count++;return stream(accept(script+' Compra hoy.'));}),/CHAT_INVALID/);
  assert.equal(count,1);assert.equal(p.data.scriptDraft,'Borrador aprobado.');
 });
-test('ideas and explicit rewriting still use the sales writer, while ambiguity does not mutate the project',async()=>{
- for(const message of ['Haz un anuncio para organizar cables.','Mejora este guion: '+script]){
+test('explicit rewriting still uses the sales writer, while ambiguity does not mutate the project',async()=>{
+ for(const message of ['Mejora este guion: '+script]){
   const p=project({idea:message});let count=0;
   const result=await callEditor(p,[],[],message,env,async()=>{
-   count++;return count===1?stream({operation:'draft_script',value:'Redacta la propuesta solicitada',message:'Aquí está la propuesta.'}):stream({salesPlan:{angle:'Mesa ordenada',insights:[{kind:'mechanism',text:'Organiza cables',basis:'source',sourceIds:['brand:product']}]},value:'Tu cargador, en su lugar.'},SCRIPT_MODEL);
+   count++;return count===1?stream({operation:'draft_script',scriptMode:'revision',value:'Redacta la propuesta solicitada',message:'Aquí está la propuesta.'}):stream({salesPlan:{angle:'Mesa ordenada',insights:[{kind:'mechanism',text:'Organiza cables',basis:'source',sourceIds:['brand:product']}]},value:'Tu cargador, en su lugar.'},SCRIPT_MODEL);
   });
   assert.equal(count,2);assert.equal(result.edit.value,'Tu cargador, en su lugar.');assert.equal(result.usage.calls.length,2);
  }
