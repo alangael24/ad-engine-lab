@@ -5,6 +5,13 @@ and 480 seconds for MXN 2,000. Their fixed Stripe Payment Link IDs and prices
 are defined in `src/video-packages.js`. Legacy links and credit balances remain
 supported for existing purchases.
 
+The customer-facing offer is 1, 3 or 8 complete ads, each up to one minute,
+including script, images, voice, animation, subtitles and editing. Shorter
+videos and unused duration are presented as flexibility below the packages.
+Stripe product names and purchase confirmation use the same wording. This is
+presentation only: package codes, prices, payment links and seconds accounting
+are unchanged. Savings compare each bundle with buying MXN 500 ads separately.
+
 ## Checkout and crediting
 
 The authenticated checkout route accepts only a package code, locks the verified

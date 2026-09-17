@@ -9,7 +9,7 @@ const planIncludes = document.querySelector("#plan-includes");
 const planNames = {
   esencial: "CreativeRush AI — Launch",
   pro: "CreativeRush AI — Pro",
-  minute_1:"CreativeRush — 1 minuto", minute_3:"CreativeRush — 3 minutos", minute_8:"CreativeRush — 8 minutos",
+  minute_1:"CreativeRush — 1 anuncio completo", minute_3:"CreativeRush — 3 anuncios completos", minute_8:"CreativeRush — 8 anuncios completos",
 };
 
 function trackPurchase(data) {
@@ -51,7 +51,7 @@ async function checkPurchase(attempt = 0) {
     const data = await response.json();
     if (response.ok && data.ready) {
       if (planNames[data.plan]) planName.textContent = planNames[data.plan];
-      planIncludes.textContent = data.videoSeconds?`${data.videoSeconds} segundos de anuncios completos. Puedes repartirlos en varios videos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
+      planIncludes.textContent = data.videoSeconds?`Hasta 1 minuto por anuncio, con imágenes, voz, animación, edición y subtítulos. También puedes repartir la duración incluida en videos más cortos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
       if(toolButton)toolButton.href=data.videoSeconds?"/anuncios-lab/":"/herramienta/";
       if (data.paymentStatus === "paid") {
         document.querySelector('#payment-title').textContent = 'Pago confirmado.';

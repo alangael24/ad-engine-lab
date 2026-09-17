@@ -1,10 +1,10 @@
 // Prices and entitlements are server-owned; checkout input selects a code only.
 export const VIDEO_PACKAGES = Object.freeze({
-  minute_1: Object.freeze({code:'minute_1', name:'CreativeRush — 1 minuto', amount:500, currency:'MXN', videoSeconds:60,
+  minute_1: Object.freeze({code:'minute_1', name:'CreativeRush — 1 anuncio completo', amount:500, currency:'MXN', videoSeconds:60,
     paymentLinkId:'plink_1UGV1iEudyi7fxH7ivDoeENH', url:'https://buy.stripe.com/00wfZhgfJ2CT7Kg69ibwk03'}),
-  minute_3: Object.freeze({code:'minute_3', name:'CreativeRush — 3 minutos', amount:1000, currency:'MXN', videoSeconds:180,
+  minute_3: Object.freeze({code:'minute_3', name:'CreativeRush — 3 anuncios completos', amount:1000, currency:'MXN', videoSeconds:180,
     paymentLinkId:'plink_1UGV6qEudyi7fxH7On9MgVuV', url:'https://buy.stripe.com/14A8wP2oT1yP9So41abwk04'}),
-  minute_8: Object.freeze({code:'minute_8', name:'CreativeRush — 8 minutos', amount:2000, currency:'MXN', videoSeconds:480,
+  minute_8: Object.freeze({code:'minute_8', name:'CreativeRush — 8 anuncios completos', amount:2000, currency:'MXN', videoSeconds:480,
     paymentLinkId:'plink_1UGVCAEudyi7fxH7bTMhxCss', url:'https://buy.stripe.com/eVqcN5fbF6T9c0w1T2bwk05'}),
 });
 
