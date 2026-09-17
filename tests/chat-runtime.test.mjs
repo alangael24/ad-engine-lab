@@ -81,7 +81,7 @@ test('full runtime route authenticates the user and preserves idempotency withou
  try{
   const brand=await call(db,'studio_write',[owner.id,'save_brand',crypto.randomUUID(),JSON.stringify({name:'Nebula',product:'Filtro'}),null]);
   const project=await call(db,'studio_write',[owner.id,'create_project',crypto.randomUUID(),JSON.stringify({title:'Test',brandId:brand.id,scenes:[],aspectRatio:'9:16',referenceUrl:'',referenceNotes:''}),null]);
-  const body=JSON.stringify({projectId:project.id,expected:project.revision,requestId:crypto.randomUUID(),message:'Cambia a clay'}),url=h.url.replace('/chat-edit','/studio-chat');
+  const body=JSON.stringify({projectId:project.id,expected:project.revision,requestId:crypto.randomUUID(),message:'Cambia a clay. '+ 'x'.repeat(11000)}),url=h.url.replace('/chat-edit','/studio-chat');
   const opts={method:'POST',headers:{...headers,'x-chat-database-key':'fixture','x-chat-reference-enabled':'true',authorization:'Bearer alice'},body};
   assert.equal((await original(url,{...opts,headers:{...opts.headers,authorization:'Bearer invalid'}})).status,401);
   const first=await original(url,opts),data=await first.json();assert.equal(first.status,200,JSON.stringify(data));assert.equal(data.edit.status,'succeeded');

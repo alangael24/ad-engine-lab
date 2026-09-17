@@ -39,7 +39,7 @@ test('plans cannot invent source ids or classify fabricated mechanisms/proof/off
  assert.deepEqual(validateSalesPlan(plan,research),plan);
  assert.throws(()=>validateSalesPlan({...plan,insights:[{...plan.insights[0],sourceIds:['invented']}]},research),/CHAT_INVALID/);
  assert.throws(()=>validateSalesPlan({...plan,insights:[{...plan.insights[0],basis:'creative_hypothesis',sourceIds:[]}]},research),/CHAT_INVALID/);
- assert.throws(()=>validateSalesPlan({...plan,insights:[...plan.insights,...plan.insights]},research),/CHAT_INVALID/);
+ assert.equal(validateSalesPlan({...plan,insights:[...plan.insights,...plan.insights]},research).insights.length,2);
 });
 test('older sales brands read their LP once before new projects without overwriting client edits',async()=>{
  const old={id:'b',revision:4,data:{sourceUrl:url,product:'Ficha editada',claims:'Oferta actual'}};

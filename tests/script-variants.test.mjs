@@ -92,7 +92,7 @@ test('one format repair preserves scripts, records both usages, and never reruns
  const usage=output.usage.calls[1];assert.equal(usage.attempts.length,2);assert.equal(usage.usage.prompt_tokens,120);assert.equal(usage.usage.completion_tokens,150);
 });
 test('format repair cannot silently rewrite scripts and stops after one repair',async()=>{
- const original=result(),bad=structuredClone(original);bad.variants[0].salesPlan.insights.push(bad.variants[0].salesPlan.insights[0]);
+ const original=result(),bad=structuredClone(original);bad.variants[0].salesPlan.insights[0].sourceIds=['invented'];
  for(const repaired of [bad,(()=>{const r=result();r.variants[0].value+=' Nueva promesa.';return r;})()]){
   let n=0;await assert.rejects(callEditor(project(),[],[],'Dame tres variantes',env,async()=>{n++;return n===1?stream(coordinator):stream(n===2?bad:repaired,SCRIPT_MODEL);}),/CHAT_INVALID/);assert.equal(n,3);
  }
@@ -100,8 +100,8 @@ test('format repair cannot silently rewrite scripts and stops after one repair',
 });
 test('metadata repair fixes length and source-count failures without asking the model to rewrite narration',async()=>{
  const p=project();p.brand_snapshot.salesSource={text:'Source A\nSource B\nSource C\nSource D\nSource E\nSource F'};
- const bad=result();bad.variants[0].salesPlan.angle='x'.repeat(348);
- bad.variants[1].salesPlan.insights[0].sourceIds=['lp:1','lp:2','lp:3','lp:4','lp:5','lp:6'];
+ const bad=result();bad.variants[0].salesPlan.angle='x'.repeat(2001);
+ bad.variants[1].salesPlan.insights[0].sourceIds=Array(129).fill('lp:1');
  let n=0,repairRequest;
  const output=await callEditor(p,[],[],'Dame tres variantes',env,async(_,opts)=>{
   n++;if(n===1)return stream(coordinator);if(n===2)return stream(bad,SCRIPT_MODEL);
@@ -114,4 +114,10 @@ test('metadata repair fixes length and source-count failures without asking the 
  assert.ok(values.every(v=>!JSON.stringify(repairRequest).includes(v)));
  assert.deepEqual(output.edit.variants.options.map(v=>v.script),values);assert.deepEqual(output.edit.variants.options.map(v=>v.title),titles);
  assert.equal(output.usage.calls[1].attempts[1].stage,'metadata_repair');assert.equal(output.usage.calls[1].usage.completion_tokens,90);
+});
+
+test('editorial length, repeated categories and shared hooks do not buy a repair call',async()=>{
+ const p=project();p.brand_snapshot.salesSource={text:'A\nB\nC\nD\nE\nF'};
+ const r=result();for(const v of r.variants){v.title='Título compartido '+ 'x'.repeat(100);v.salesPlan.angle='Ángulo compartido '+ 'x'.repeat(348);v.value='Mismo hook. '+v.value;v.salesPlan.insights.push({...v.salesPlan.insights[0],text:'Detalle útil '+ 'x'.repeat(350),sourceIds:['lp:1','lp:2','lp:3','lp:4','lp:5','lp:6']});}
+ const out=await generate(p,r);assert.equal(out.count,2);assert.deepEqual(out.output.edit.variants.options.map(v=>v.script),r.variants.map(v=>v.value));
 });

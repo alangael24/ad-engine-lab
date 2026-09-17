@@ -224,3 +224,18 @@ single dynamic generation-ID route retains decoded params, and unknown routes
 fall back to ASSETS. The build fails if middleware or a new dynamic pattern is
 introduced, rather than bypassing it silently. This eliminates request-time
 `path-to-regexp` construction in Wrangler's default Pages router.
+
+### Flexible editorial metadata
+
+Titles and summaries are editorial preferences, not small hard acceptance gates.
+Technical ceilings are now 500 characters/title, 2000/angle or insight, 32
+insights and 128 cited IDs per insight. Repeated categories and shared titles,
+angles or opening lines are allowed; complete duplicate scripts still do not
+constitute three alternatives. Existing source-ID and factual-basis validation
+remains. Metadata is not silently truncated, rewritten or discarded.
+
+The Ads chat accepts 16000 characters (frontend and both runtime paths), enough
+for the existing 10000-character narration limit plus instructions. The initial
+project idea field remains separate. Regression fixtures accept the observed
+348-character/six-source case without a repair call. No paid model/media call is
+needed to exercise these validation paths.

@@ -41,7 +41,7 @@ async function rows(db,user,project,limit=20){const r=await db.from('studio_chat
 export async function getStudioChat(context){try{const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);return json({enabled:enabled(context.env),productionEnabled:await productionAccess(db,context.env,user.id),edits:(await rows(db,user.id,id)).map(publicRow)});}catch(e){return error(e);}}
 export async function postStudioChat(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2400000);
- if(!UUID.test(b.requestId||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1||typeof b.message!=='string'||!b.message.trim()||b.message.length>3000)fail('CHAT_INVALID');
+ if(!UUID.test(b.requestId||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1||typeof b.message!=='string'||!b.message.trim()||b.message.length>16000)fail('CHAT_INVALID');
  if(b.scriptChoice&&(!UUID.test(b.scriptChoice.setId||'')||!Number.isInteger(b.scriptChoice.index)||b.scriptChoice.index<1||b.scriptChoice.index>3))fail('CHAT_INVALID');
  const prepared=await rpc(db,'studio_chat_prepare',{p_user:user.id,p_id:b.requestId,p_project:b.projectId,p_data:{expected:b.expected,message:b.message.trim(),...(b.scriptChoice?{scriptChoice:b.scriptChoice}:{}),enabled:enabled(context.env)}});
  const record=prepared.record;
