@@ -14,7 +14,7 @@ The new project has no brand row or product-photo prerequisite. Identity belongs
 
 ## Scope
 
-This beta creates narrated videos with one voice and animated scenes. Target duration guides the script; measured narration determines the final timeline, with the shared 120-second engine limit. Multi-speaker voice casting, native lip-synced dialogue, original song generation and arbitrary recordings of software are not implemented by this lane.
+This beta creates narrated videos with one voice and animated scenes. New creator drafts have an explicit word budget derived from target duration, one bounded rewrite for an oversized response, and no automatic truncation. Pasted scripts bypass the writer. Target duration guides the script; measured narration determines the final timeline, with the shared 120-second engine limit. Multi-speaker voice casting, native lip-synced dialogue, original song generation and arbitrary recordings of software are not implemented by this lane.
 
 All existing credit, budget, ownership, recovery, still-approval and final-review gates remain enabled. Model/provider choices use the existing production configuration. A first still with no references uses the OpenAI generations endpoint; referenced stills use edits.
 

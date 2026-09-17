@@ -32,7 +32,7 @@ export function chatPanel({api,task,getProject,isDirty,refresh,tell}){
   $('#project-idea').hidden=rows.some(r=>r.message===idea)||request?.message===idea;
   $('#project-idea').parentElement.hidden=$('#project-idea').hidden;
   const scriptRow=rows.findLastIndex(r=>r.status==='succeeded'&&['draft_script','set_hook'].includes(r.result?.operation));
-  if(!rows.length&&!request)line('Tengo el contexto de tu producto. Dime qué quieres crear o cambiar.','assistant');
+  if(!rows.length&&!request)line(getProject()?.data?.productProfile==='creator-v1'?'Tu idea y tu guion están guardados. Dime qué quieres crear o cambiar.':'Tengo el contexto de tu producto. Dime qué quieres crear o cambiar.','assistant');
   for(const [index,r] of rows.entries()){line(r.message,'user');if(r.status==='succeeded'){
    line(r.result.message,'assistant');if(index===scriptRow&&script)log.append(scriptCard);
    if(r.result.productionId)line('Estoy preparando las tomas necesarias y la nueva versión.','detail');
