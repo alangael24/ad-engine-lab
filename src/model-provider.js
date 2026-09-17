@@ -40,6 +40,7 @@ export async function modelFetch(fetchImpl,url,init,env={}) {
   const add=(index,item)=>{if(calls.has(index))return;calls.set(index,{args:false});emit({model,choices:[{delta:{tool_calls:[{index,id:item.call_id,type:'function',function:{name:item.name,arguments:''}}]}}]});};
   try {
    await readEvents(response,d=>{
+    if([d.error?.code,d.response?.error?.code].includes('credit_balance_exhausted')){console.error(JSON.stringify({event:'chat_provider_unavailable',code:'CHAT_PROVIDER_QUOTA'}));throw Object.assign(Error('CHAT_PROVIDER_QUOTA'),{code:'CHAT_PROVIDER_QUOTA'});}
     if(d.error||['response.failed','response.incomplete','error'].includes(d.type))throw Error('Model response failed or incomplete');
     if(d.response?.model)model=d.response.model;
     // Some compatible gateways retain Chat SSE envelopes.
