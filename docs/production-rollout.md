@@ -109,3 +109,41 @@ Render Standard: $25/month. The RunPod GPU accrues $0.69/hour while running,
 plus its disk charges. Keep it running only when intended; stopping/terminating
 and scaling policies are separate operational decisions. Supabase/Pages and
 provider usage depend on their existing plans and actual consumption.
+
+## Web chat CPU split (2026-09-17)
+
+The `/api/studio-chat` Pages route still authenticates the user, checks project
+ownership, reserves the durable request ID, applies validated edits, and saves
+results. `CHAT_RUNTIME_MODE=remote` moves `callEditor` (Astra coordination and
+DeepSeek script writing, including provider SSE parsing) to the existing Render
+CPU service. Pages receives only visible previews and one final structured edit.
+No model, prompt, generation setting, GPU policy, or price is changed.
+
+Pages needs `CHAT_RUNTIME_MODE=remote`, `CHAT_RUNTIME_URL` (the HTTPS origin of
+`creativerush-production.onrender.com`), and secret `CHAT_RUNTIME_TOKEN` (at least
+32 characters). Render needs that same secret and `CHAT_RUNTIME_ENABLED=true`;
+it uses its existing OpenAI/OpenCode credentials. Database credentials stay in
+Pages. `/internal/chat-edit` requires the shared secret, limits payloads to 4 MiB
+and simultaneous model jobs to four. It does not expose shell or general tools.
+
+There is no automatic local fallback or provider retry after a transport error.
+A successful repeated request ID still returns its stored result without calling
+models again. The original provider timeouts and Pages disconnect/waitUntil
+lifetime still apply; this change does not introduce a durable model-job queue.
+A Render restart or a prolonged disconnected browser can still interrupt an
+in-flight result and must not be described as guaranteed background delivery.
+
+Rollback: switch Pages `CHAT_RUNTIME_MODE` to `local` and redeploy, understanding
+that the original Workers Free CPU risk returns. To deploy forward, enable and
+verify Render first, then update/deploy Pages. The Render health endpoint exposes
+`chatRuntime: "render-v1"` when credentials and configuration are available.
+
+Profiling evidence: a local workerd/V8 replay used the same saved three-variant
+response, with network/database/provider responses mocked. Warm sampled active
+CPU averaged 4.32 ms/request for 12-character fragments (40 requests), 26.39 ms
+for one-character fragments (15 requests), and 1.31 ms for the edge with model
+work offloaded (40 requests). Cold sampled totals were 70.64, 68.57, and 37.54 ms.
+These include fixture overhead and sampling error; they are not production CPU
+measurements and do not explain all of the previously logged 172 ms. Verify a
+real request with Cloudflare tail after deployment. No GPU or paid model calls
+were used by those local replays.
