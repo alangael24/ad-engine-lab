@@ -1,3 +1,4 @@
+import {isCreatorProduct} from './product-profiles.js';
 import {normalizeShotContract,imagePacket} from './image-continuity.js';
 import {creativeContext} from './creative-context.js';
 // A production plan preserves the approved narration; models only direct its visuals.
@@ -13,7 +14,7 @@ export function validatePlan(raw,script,newId=()=>crypto.randomUUID()) {
 }
 export function imageDirection(project,plan,index,packet=imagePacket(project,plan,index)) {
   const scene=plan.scenes[index];if(!scene)fail('PRODUCTION_PLAN');
-  return `Create one advertisement still, no collage, subtitles or added text.
+  return `Create one ${isCreatorProduct(project.data)?'content-video':'advertisement'} still, no collage, subtitles or added text.
 Current shot controls what appears; references control ONLY their labelled role. Original photos do not define source props or camera. Never invent product mechanisms or hidden geometry.
 Scene ${index+1}/${plan.scenes.length}. Narration (context, not a demand to show every noun): ${scene.text}
 Show: ${scene.visual}

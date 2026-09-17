@@ -233,3 +233,17 @@ test('material collection gate cannot be skipped by inherited approvals or prior
  f.providers.reviewImages=async({plan,images})=>({verdict:'blocked',summary:'Unverified collection',issues:[{...issue({...plan.scenes[0],start:0}),action:'none',visual:'',motion:''}],assetIds:images.map(x=>x.assetId)});
  const r=await processProduction(f.job,f.api,f.providers,{pollMs:0});assert.equal(r.code,'PRODUCTION_IMAGES_BLOCKED');assert.equal(f.counts.clips,0);assert.equal(f.state.renders.length,0);assert.ok(f.steps['material-v1-image-review-0']);
 });
+
+test('brandless creator traverses planning, narration, stills, clips, assembly and final review with durable replay',async()=>{
+ const f=pipelineFixture();
+ f.job.snapshot={brand_id:null,brand_snapshot:{},data:{productProfile:'creator-v1',creatorBrief:{kind:'comedy',targetDuration:15},title:'Moon keys',idea:'Astronaut loses keys',scriptDraft:'Busca las llaves. Estaban en su casco.',scenes:[],narrationAssetId:null,aspectRatio:'9:16'}};
+ f.state.project=structuredClone(f.job.snapshot);f.state.versions=[];
+ let plans=0,voices=0;
+ f.providers.plan=async project=>{plans++;assert.equal(project.brand_id,null);return {continuity:'Same blue astronaut on moon',scenes:[{text:'Busca las llaves.',visual:'Astronaut searching on moon',motion:'Looks under rock'},{text:'Estaban en su casco.',visual:'Astronaut finds keys in helmet',motion:'Pulls keys from helmet'}]};};
+ f.providers.speech=async(project,plan)=>{voices++;return {assetId:crypto.randomUUID(),duration:4,timeline:plan.scenes.map((s,i)=>({...s,planSceneId:s.id,start:i*2,end:(i+1)*2}))};};
+ f.providers.review=async({renderId})=>{f.counts.reviews++;return review(f.state.project.data.scenes,'pass',renderId);};
+ const result=await processProduction(f.job,f.api,f.providers,{pollMs:0});
+ assert.equal(result.ok,true);assert.equal(plans,1);assert.equal(voices,1);assert.equal(f.counts.images,2);assert.equal(f.counts.clips,2);assert.equal(f.counts.reviews,1);assert.equal(f.counts.complete,1);
+ assert.equal(f.state.project.data.productProfile,'creator-v1');assert.equal(f.state.project.data.creatorBrief.kind,'comedy');assert.equal(f.state.project.data.scriptDraft,f.job.snapshot.data.scriptDraft);assert.ok(f.state.project.data.scenes.every(s=>s.selectedVersionId));assert.equal(f.state.renders.length,1);
+ assert.equal((await processProduction(f.job,f.api,f.providers,{pollMs:0})).ok,true);assert.equal(plans,1);assert.equal(voices,1);assert.equal(f.counts.images,2);assert.equal(f.counts.clips,2);assert.equal(f.counts.reviews,1);
+});

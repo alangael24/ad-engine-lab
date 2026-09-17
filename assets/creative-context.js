@@ -1,7 +1,8 @@
+import {isCreatorProduct} from './product-profiles.js';
 // Shared project memory: provider prompts consume the same bounded, persisted facts.
 export function creativeContext(project, plan) {
  const d=project.data||{}, m=d.creativeMemory||{};
- return {product:project.brand_snapshot||{},reference:{url:d.referenceUrl||'',notes:d.referenceNotes||'',assetIds:m.referenceAssetIds||[]},direction:plan?.continuity||d.videoContinuity||'',preferences:m.preferences||[],decisions:m.decisions||[],rejections:m.rejections||[],approvedAssets:m.approvedAssets||[],characterAssetIds:m.characterAssetIds||[],productViews:m.productViews||[],observedStates:m.observedStates||[]};
+ return {...(isCreatorProduct(d)?{productProfile:d.productProfile,creatorBrief:d.creatorBrief}:{}),product:project.brand_snapshot||{},reference:{url:d.referenceUrl||'',notes:d.referenceNotes||'',assetIds:m.referenceAssetIds||[]},direction:plan?.continuity||d.videoContinuity||'',preferences:m.preferences||[],decisions:m.decisions||[],rejections:m.rejections||[],approvedAssets:m.approvedAssets||[],characterAssetIds:m.characterAssetIds||[],productViews:m.productViews||[],observedStates:m.observedStates||[]};
 }
 export function normalizeCreativeMemory(raw={}) {
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('STUDIO_INVALID');

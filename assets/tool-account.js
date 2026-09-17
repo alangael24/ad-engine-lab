@@ -14,6 +14,7 @@ async function applySession(next) {
   try {
     if(sessionStorage.getItem('creative-rush-return')==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
+    if(sessionStorage.getItem('creative-rush-return')==='creator-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/crear/');return;}
     const account = await apiRequest('/api/account');
     if (current !== revision) return;
     const destination = accountDestination(account);

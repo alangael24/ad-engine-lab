@@ -1,3 +1,5 @@
+import {isCreatorProduct} from '../assets/product-profiles.js';
+import {CREATOR_SCRIPT_SYSTEM} from './creator-prompts.js';
 import {isSalesProduct,productProfile} from '../assets/product-profiles.js';
 import {SALES_COPY_SYSTEM} from './sales-copy.js';
 import {openCodeHeaders} from './model-provider.js';
@@ -13,7 +15,7 @@ export async function writeScriptChanges(raw,{project,history,message,env,reques
  const changes=raw.operation==='batch'?raw.changes:[raw];const usages=[];
  for(const change of changes||[]){
   if(!SCRIPT_OPERATIONS.includes(change.operation))continue;
-  const r=await request('https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:openCodeHeaders({authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json','x-opencode-session':'creativerush-script-'+project.id}),signal:AbortSignal.timeout(120000),body:JSON.stringify({model:SCRIPT_MODEL,reasoning_effort:'none',stream:true,stream_options:{include_usage:true},max_tokens:4500,tool_choice:{type:'function',function:{name:'write_script'}},tools:[{type:'function',function:{name:'write_script',parameters:{type:'object',additionalProperties:false,properties:{value:{type:'string'}},required:['value']}}}],messages:[{role:'system',content:isSalesProduct(project.data)?SALES_COPY_SYSTEM:LEGACY_SCRIPT_SYSTEM},{role:'user',content:JSON.stringify({request:message,operation:change.operation,sceneId:change.sceneId,editorialInstruction:change.value,brand:project.brand_snapshot,data:project.data,history:history.slice(-8)})}]})});
+  const r=await request('https://opencode.ai/zen/go/v1/chat/completions',{method:'POST',headers:openCodeHeaders({authorization:`Bearer ${env.REFERENCE_FLASH_KEY}`,'content-type':'application/json','x-opencode-session':'creativerush-script-'+project.id}),signal:AbortSignal.timeout(120000),body:JSON.stringify({model:SCRIPT_MODEL,reasoning_effort:'none',stream:true,stream_options:{include_usage:true},max_tokens:4500,tool_choice:{type:'function',function:{name:'write_script'}},tools:[{type:'function',function:{name:'write_script',parameters:{type:'object',additionalProperties:false,properties:{value:{type:'string'}},required:['value']}}}],messages:[{role:'system',content:isCreatorProduct(project.data)?CREATOR_SCRIPT_SYSTEM:isSalesProduct(project.data)?SALES_COPY_SYSTEM:LEGACY_SCRIPT_SYSTEM},{role:'user',content:JSON.stringify({request:message,operation:change.operation,sceneId:change.sceneId,editorialInstruction:change.value,brand:project.brand_snapshot,data:project.data,history:history.slice(-8)})}]})});
   if(!r.ok)throw Object.assign(Error('CHAT_PROVIDER'),{code:'CHAT_PROVIDER'});
   let model,finish,usage,args='',name='',count=new Set();const preview=previewEmitter(onDelta);
   await readEvents(r,d=>{
@@ -23,7 +25,7 @@ export async function writeScriptChanges(raw,{project,history,message,env,reques
   });
   if(model!==SCRIPT_MODEL||finish!=='tool_calls'||name!=='write_script'||count.size!==1)throw Object.assign(Error('CHAT_INVALID'),{code:'CHAT_INVALID'});
   const result=JSON.parse(args);if(typeof result.value!=='string'||!result.value.trim())throw Object.assign(Error('CHAT_INVALID'),{code:'CHAT_INVALID'});
-  change.value=result.value;usages.push({model:SCRIPT_MODEL,usage:usage||null,...(isSalesProduct(project.data)?{productProfile:productProfile(project.data)}:{})});
+  change.value=result.value;usages.push({model:SCRIPT_MODEL,usage:usage||null,...((isSalesProduct(project.data)||isCreatorProduct(project.data))?{productProfile:productProfile(project.data)}:{})});
  }
  return usages;
 }

@@ -27,6 +27,7 @@ export async function database() {
   await db.exec(await readFile(new URL('../../supabase/migrations/20260915040855_voice_recovery_and_measured_spend.sql', import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/20260915195914_quality_report_v2.sql', import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/20260915205433_editorial_checkpoints.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/20260916235303_content_creator_product.sql', import.meta.url),'utf8'));
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

@@ -1,3 +1,5 @@
+import {isCreatorProduct} from './product-profiles.js';
+import {creatorBrief} from './creator-model.js';
 import {productProfile,CONTINUITY_PRODUCT} from './product-profiles.js';
 import {normalizeShotContract} from './image-continuity.js';
 import {normalizeEditing,normalizeNarrationRevision} from './partial-edit.js';
@@ -13,6 +15,7 @@ export function brandData(input){
  return {sourceUrl,sourceText:string(input.sourceText??'',6000),name:string(input.name,80,true),product:string(input.product,600,true),appearance:string(input.appearance,600),benefits:string(input.benefits,600),claims:string(input.claims,600),avoid:string(input.avoid,600),voiceName:string(input.voiceName??'',100),voiceNotes:string(input.voiceNotes??'',300),productAssetId:id(input.productAssetId),voiceAssetId:id(input.voiceAssetId)};
 }
 export function projectData(input){
+ if(isCreatorProduct(input)&&input.brandId!=null)fail();
  const revisionFields={...(input.editing?{editing:normalizeEditing(input.editing)}:{}),...(input.narrationRevision?{narrationRevision:normalizeNarrationRevision(input.narrationRevision)}:{})};
  const referenceUrl=string(input.referenceUrl,2000);if(referenceUrl){let u;try{u=new URL(referenceUrl);}catch{fail();}if(!['https:','http:'].includes(u.protocol)||u.username||u.password)fail();}
  if(!['9:16','16:9','1:1'].includes(input.aspectRatio)||!Array.isArray(input.scenes)||input.scenes.length>24)fail();
@@ -26,7 +29,7 @@ export function projectData(input){
   if(narrationStart!==null&&(!Number.isFinite(narrationStart)||narrationStart<0||narrationStart+end-start>180))fail('STUDIO_AUDIO_TIMING');
   return {...(narrationStart!==null?{narrationStart}:{}),id:s.id,...(s.shotContract?{shotContract:normalizeShotContract(s.shotContract)}:{}),...(s.motion!=null?{motion:string(s.motion,400)}:{}),text:string(s.text,500,true),visual:string(s.visual,800,true),start:Math.round(start*1000)/1000,end:Math.round(end*1000)/1000,imageAssetId:id(s.imageAssetId),selectedVersionId:id(s.selectedVersionId)};
  });
- return {...(productProfile(input)!==CONTINUITY_PRODUCT?{productProfile:productProfile(input)}:{}),...revisionFields,...(input.creativeMemory?{creativeMemory:normalizeCreativeMemory(input.creativeMemory)}:{}),...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
+ return {...(productProfile(input)!==CONTINUITY_PRODUCT?{productProfile:productProfile(input)}:{}),...(isCreatorProduct(input)?{creatorBrief:creatorBrief(input.creatorBrief)}:{}),...revisionFields,...(input.creativeMemory?{creativeMemory:normalizeCreativeMemory(input.creativeMemory)}:{}),...(input.videoContinuity!=null?{videoContinuity:string(input.videoContinuity,2000)}:{}),scriptDraft:string(input.scriptDraft??'',10000),idea:string(input.idea??'',3000),creative:creativeSettings(input.creative),title:string(input.title,120,true),brandId:id(input.brandId),referenceUrl,referenceNotes:string(input.referenceNotes,1200),referenceAnalysisId:id(input.referenceAnalysisId),aspectRatio:input.aspectRatio,narrationAssetId:id(input.narrationAssetId),timingConfirmed:input.timingConfirmed===true,scenes};
 }
 export function draftScenes(script,duration,newId=()=>crypto.randomUUID()){
  const phrases=script.trim().match(/[^.!?¿]+[.!?]?/g)?.map(s=>s.trim()).filter(Boolean)||[];
@@ -41,6 +44,7 @@ export function scenePrompt(project,sceneId,instruction=''){
  const s=list[idx],b=project.brand_snapshot;
  // Budgets preserve every category; a long brand field cannot erase the correction.
  const cut=(v,n)=>String(v||'').slice(0,n);
+ if(isCreatorProduct(project.data))return [`Creative direction: ${creativeShotRule(project.data.creative,project.data)}`,`Narration: ${cut(s.text,170)}. Offscreen voice; no lipsync or added text.`,`Show: ${cut(s.visual,500)}`,`Previous: ${cut(list[idx-1]?.visual,160)}. Next: ${cut(list[idx+1]?.visual,160)}.`,`Preserve recurring characters, world and approved look. Correction: ${cut(instruction,180)}`].join('\n').slice(0,1600);
  const parts=[`Creative direction: ${creativeShotRule(project.data.creative)}.`, `Product: ${cut(b.name,50)}. ${cut(b.product,150)}`,`Identity: ${cut(b.appearance,160)}`,
   `Brand statements (preserve meaning; do not invent or strengthen): ${cut(b.claims,90)}. Do not show/claim: ${cut(b.avoid,110)}`,
   `Reference style only: ${cut(project.data.referenceNotes,260)}. Product photo defines geometry; style reference does not define product, person or claims.`,

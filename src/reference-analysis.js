@@ -1,3 +1,4 @@
+import {isCreatorProduct} from '../assets/product-profiles.js';
 import {modelFetch} from './model-provider.js';
 import {json} from './backend.js';
 import {authContext,readJson,readBounded,rpc,UUID} from './generations.js';
@@ -25,7 +26,7 @@ export const ANALYSIS_INSTRUCTIONS=`Analiza únicamente esta referencia. Respond
 export function modelRequest(input,transcript){
   const content=[{type:'text',text:`Duration: ${input.source.duration}s. ${transcript.mode==='declared_silent'?'The user declared there is no narration. Only visible text is available.':transcript.text?`Automatic transcript (may contain errors):\n${transcript.text}`:'ASR found no intelligible words; do not invent narration or music.'}`}];
   for(let i=0;i<input.sheets.length;i++){const cells=input.frames.slice(i*input.capacity,(i+1)*input.capacity);content.push({type:'text',text:`Sheet ${i+1}, left to right then top to bottom: ${cells.map(f=>f.id+' at '+f.time+'s').join(', ')}. Remaining cells are blank.`},{type:'image_url',image_url:{url:input.sheets[i]}});}
-  return {model:FLASH_MODEL,reasoning_effort:'none',max_tokens:3600,stream:true,stream_options:{include_usage:true},messages:[{role:'system',content:ANALYSIS_INSTRUCTIONS},{role:'user',content}]};
+  return {model:FLASH_MODEL,reasoning_effort:'none',max_tokens:3600,stream:true,stream_options:{include_usage:true},messages:[{role:'system',content:ANALYSIS_INSTRUCTIONS+(input.creator?' Esta referencia es de contenido general: conserva premisa, desarrollo, tono y desenlace. Una oferta o CTA ausente se indica como ausente, nunca se inventa. No evalúes su capacidad de venta.':'')},{role:'user',content}]};
 }
 export async function transcribeReference(input,env,request=fetch){
   if(input.silent)return {mode:'declared_silent',text:''};
@@ -60,7 +61,7 @@ export async function postReferenceAnalysis(context){try{
     if(!UUID.test(b.id||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1||typeof b.notes!=='string'||!b.notes.trim()||b.notes.length>1200)referenceError();
     return json({project:await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'adopt',p_id:b.id,p_project:b.projectId,p_data:{notes:b.notes,expected:b.expected}})});
   }
-  const input=validateInput(b);await own(db,'studio_projects',user.id,input.projectId);
+  const input=validateInput(b);const project=await own(db,'studio_projects',user.id,input.projectId);input.creator=isCreatorProduct(project.data);
   const payloadHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({version:ANALYSIS_VERSION,source:input.source,sheets:input.sheets,audio:b.audio,silent:input.silent})))),x=>x.toString(16).padStart(2,'0')).join('');
   const row=await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'reserve',p_id:input.requestId,p_project:input.projectId,p_data:{hash:payloadHash,source:input.source,enabled:analysisAvailability(context.env)}});
   if(!row.claimed)return json({analysis:publicAnalysis(row)},row.status==='running'?202:200);
@@ -68,7 +69,7 @@ export async function postReferenceAnalysis(context){try{
     const transcript=await transcribeReference(input,context.env);
     await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'transcript',p_id:row.id,p_project:input.projectId,p_data:{transcript}});
     const output=await callFlash(input,transcript,context.env);
-    const done=await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'complete',p_id:row.id,p_project:input.projectId,p_data:{...output,result:{...output.result,visualEvidence:input.sheets,suggestedDirection:referenceDirection(output.result)}}});
+    const done=await rpc(db,'studio_reference_write',{p_user:user.id,p_action:'complete',p_id:row.id,p_project:input.projectId,p_data:{...output,result:{...output.result,visualEvidence:input.sheets,suggestedDirection:referenceDirection(output.result,project.data)}}});
     return json({analysis:publicAnalysis(done)});
   }catch(e){
     // Unknown provider completion never retries automatically. A new user request is explicit.

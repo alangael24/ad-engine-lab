@@ -1,3 +1,4 @@
+import {isCreatorProduct} from './product-profiles.js';
 // Shared limits and deterministic frame identity. Model output never supplies edit times.
 export const ANALYSIS_VERSION = 'luna-reference-v2';
 export {WORKFLOW_MODEL as FLASH_MODEL} from './model-routing.js';
@@ -30,7 +31,8 @@ export function validateAnalysis(raw,frames){
   const list=(v,max=8)=>{if(!Array.isArray(v)||v.length>max)referenceError('REFERENCE_OUTPUT_INVALID');return v.map(s=>str(s,500));};
   return {version:ANALYSIS_VERSION,topic:str(a.topic,700),hook:str(a.hook,700),style:str(a.style,1000),characters:list(a.characters),beats,cta:str(a.cta,700),sourceClaims:list(a.sourceClaims),uncertainties:list(a.uncertainties),reviewRequired:true};
 }
-export function referenceDirection(a){
+export function referenceDirection(a,data={}){
+  if(isCreatorProduct(data))return `Estilo de la referencia: ${a.style}\nAdaptar ritmo y lenguaje visual a nuestra idea; conservar los personajes y las reglas de nuestro mundo. Crear una historia propia, sin importar ofertas ni afirmaciones ajenas.`.slice(0,1200);
   // Only reviewed visual direction enters production prompts; source claims and CTA do not.
   return `Estilo de la referencia: ${a.style}\nCrear un personaje propio y mantenerlo entre escenas.\nAdaptar a la identidad y afirmaciones respaldadas de nuestra marca; no copiar promesas ni personas de la referencia.`.slice(0,1200);
 }

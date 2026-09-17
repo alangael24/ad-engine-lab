@@ -17,7 +17,7 @@ export function sceneVideoContext(project,sceneId,instruction=''){
  const neighbor=s=>s?{text:s.text,visual:s.visual,motion:s.motion||'',shotContract:s.shotContract||null}:null;
  return {mode:referenceId?'I2VA':'T2VA',referenceId,generatedDuration:Math.min(15,Math.ceil(used/5)*5),usedDuration:used,
   projectMemory:creativeContext(project),brand:project.brand_snapshot,scene:neighbor(scene),continuity:project.data.videoContinuity||'',
-  previous:neighbor(scenes[index-1]),next:neighbor(scenes[index+1]),creativeGuide:creativeGuide(project.data.creative),referenceNotes:project.data.referenceNotes,correction:instruction};
+  previous:neighbor(scenes[index-1]),next:neighbor(scenes[index+1]),creativeGuide:creativeGuide(project.data.creative,project.data),referenceNotes:project.data.referenceNotes,correction:instruction};
 }
 export function formatH3Prompt(raw,hasImage){
  const d=raw?.integrated_multimodal_description;

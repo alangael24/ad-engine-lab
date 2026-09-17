@@ -22,7 +22,7 @@ export function prepareImageContracts(project,plan){
   if(shot?.characterVisible)add('character','character_identity','Preserve the visible character identity and wardrobe specified here: '+(shot.preserve||[]).join('; '),'Identity changes must not break the story.');
   add('opening','action','Show the planned OPENING, not the future motion/end state: '+(shot?.state||scene.visual),'The opening must support this scene’s message and physical action.');
   if(shot?.preserve?.length)add('invariants','product_relation','Preserve only required visible relations/properties: '+shot.preserve.join('; '),'A material change must not contradict the approved scene.');
-  const style=[creativeShotRule(project.data.creative),plan.continuity].filter(Boolean).join('\n');
+  const style=[creativeShotRule(project.data.creative,project.data),plan.continuity].filter(Boolean).join('\n');
   if(style)add('style','style','Follow the explicit material/style and recurring visible identities in the approved direction. Do not require offscreen objects or infer cartoon-only from vague 3D wording. '+style,'The scene must belong to the approved visual world.');
   add('artifacts','artifact','No conspicuous malformed anatomy or broken product geometry that interferes with understanding this shot. Ignore insignificant surface/texture details.','Visible deformation must not undermine the scene.');
   return validateImageContract({version:IMAGE_REVIEW_POLICY_VERSION,sceneId:scene.id,revision:hash({scene,style}).slice(0,20),criteria,unresolved:[]});
