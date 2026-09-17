@@ -2,6 +2,7 @@
 import {json} from './backend.js';
 import {authContext,readJson,readBounded,rpc,imageType} from './generations.js';
 import {studioError} from './studio.js';
+import {isSalesProduct} from '../assets/product-profiles.js';
 const err=(code='STORE_READ')=>{throw Object.assign(new Error(code),{code});};
 export function storeUrl(value,base){
  if(typeof value!=='string'||value.length>2000)err('STORE_URL');
@@ -34,7 +35,27 @@ function attrs(tag){const a={};for(const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"
 const safeUrl=(v,base)=>{try{return storeUrl(v,base).href;}catch{return '';}};
 function pictures(value,base){return [...new Set((Array.isArray(value)?value:[value]).map(x=>safeUrl(typeof x==='object'?x?.url||x?.contentUrl:x,base)).filter(Boolean))].slice(0,6);}
 function product(p,base,brand){const name=plain(p.name,120);if(!name)return null;const url=safeUrl(p.url||base,base);return {name,brand:plain(typeof p.brand==='string'?p.brand:p.brand?.name||brand,80),description:plain(p.description,600),sourceText:plain(p.description,6000),url,images:pictures(p.image,base)};}
-export function parseStore(html,url){
+export function landingSource(html,url,title=''){
+ // Tokenize enough HTML to suppress complete hidden/navigation subtrees. Do
+ // not execute scripts or treat JSON-LD/recommended products as page copy.
+ const cleaned=html.replace(/<!--[\s\S]*?-->/g,'').replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,'');
+ const body=cleaned.match(/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i)?.[1]||cleaned.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1]||cleaned;
+ const stack=[],parts=[],voids=new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+ for(const token of body.match(/<[^>]*>|[^<]+/g)||[]){
+  if(token[0]!=='<'){if(!stack.some(x=>x.skip))parts.push(decode(token));continue;}
+  const tag=token.match(/^<\/?\s*([\w:-]+)/)?.[1]?.toLowerCase();if(!tag)continue;
+  if(/^<\//.test(token)){const index=stack.findLastIndex(x=>x.tag===tag);if(index>=0)stack.splice(index);}
+  else if(!voids.has(tag)&&!token.endsWith('/>')){
+   const a=attrs(token),skip=['head','nav','footer','aside','form','button','select'].includes(tag)||/\shidden(?:\s|=|>)/i.test(token)||a['aria-hidden']==='true'||/display\s*:\s*none|visibility\s*:\s*hidden/i.test(a.style||'')||/(?:product-recommendations|related-products|cookie-banner)/i.test(a.class||'');
+   stack.push({tag,skip});
+  }
+  if(['p','div','section','article','li','h1','h2','h3','h4','br','tr','summary'].includes(tag))parts.push('\n');
+ }
+ const lines=[...new Set(parts.join('').split(/\n+/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean))];
+ const text=lines.join('\n'),truncated=text.length>12000;
+ return {url,title:plain(title,160),text:truncated?text.slice(0,8000)+'\n[…]\n'+text.slice(-3995):text,truncated};
+}
+export function parseStore(html,url,{sales=false}={}){
  const meta={};for(const m of html.matchAll(/<meta\b[^>]*>/gi)){const a=attrs(m[0]);meta[(a.property||a.name||'').toLowerCase()]=a.content||'';}
  const title=plain(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1],120);
  let brand=plain(meta['og:site_name'],80);const products=[],nodes=[];
@@ -42,6 +63,12 @@ export function parseStore(html,url){
  for(let n=0;n<nodes.length&&n<2500;n++){const x=nodes[n];if(!x||typeof x!=='object')continue;if(Array.isArray(x)){nodes.push(...x.slice(0,100));continue;}const types=[x['@type']].flat();if(types.some(t=>['Organization','OnlineStore','WebSite'].includes(t))&&!brand)brand=plain(x.name,80);if(types.includes('Product')){const p=product(x,url,brand);if(p)products.push(p);}for(const v of Object.values(x))if(v&&typeof v==='object')nodes.push(v);}
  if(!products.length&&(meta['og:type']==='product'||/\/(?:products|product|producto)\/[^/]+/.test(new URL(url).pathname))){const p=product({name:meta['og:title']||title,description:meta.description||meta['og:description'],image:meta['og:image']},url,brand);if(p)products.push(p);}
  const links=[];for(const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi)){const a=attrs(m[1]),href=safeUrl(a.href,url);if(href&&new URL(href).origin===new URL(url).origin&&/\/(?:products|product|producto)\/[^/?#]+/.test(new URL(href).pathname)&&!links.some(x=>x.url===href))links.push({name:plain(m[2],120)||decode(new URL(href).pathname.split('/').filter(Boolean).at(-1)).replace(/-/g,' '),url:href,images:[]});if(links.length>=12)break;}
+ const landing=sales?landingSource(html,url,meta['og:title']||title):null;
+ // Service/direct-response landings may not publish a Product schema. A
+ // catalogue still asks the user to pick a product before reading its page.
+ if(sales&&!products.length&&!links.length&&landing.text.length>40&&!/\/(collections|search|blogs)(\/|$)/i.test(new URL(url).pathname)){
+  const p=product({name:meta['og:title']||title,description:meta.description||meta['og:description']||landing.text.slice(0,600),image:meta['og:image']},url,brand);if(p)products.push(p);
+ }
  // JSON-LD often repeats one product for every size and places its photo only
  // on the variants. Merge that page into one usable product, keeping the largest
  // published version of each photo instead of a 100px thumbnail.
@@ -55,14 +82,14 @@ export function parseStore(html,url){
  const unique=[...grouped.values()].slice(0,12).map(p=>{
   const photos=new Map();for(const src of p.images){const u=new URL(src),key=u.origin+u.pathname,old=photos.get(key);
    if(!old||Number(u.searchParams.get('width')||0)>Number(new URL(old).searchParams.get('width')||0))photos.set(key,src);}
-  const isPage=new URL(p.url).pathname===new URL(url).pathname;
+  const isPage=new URL(p.url).origin===new URL(url).origin&&new URL(p.url).pathname===new URL(url).pathname;
   const description=p.description||(isPage?plain(meta.description||meta['og:description'],600):'');
-  return {...p,description,sourceText:p.sourceText||description,images:[...photos.values()].slice(0,6)};
+  return {...p,description,sourceText:p.sourceText||description,...(sales&&isPage?{salesSource:landing}:{}),images:[...photos.values()].slice(0,6)};
  });
  return {url,brand:brand||new URL(url).hostname.replace(/^www\./,''),products:unique,links,shopify:/cdn\.shopify\.com|Shopify\.shop/.test(html)};
 }
-export async function inspectStore(value,request=fetch){
- const page=await publicFetch(value,{request});const result=parseStore(new TextDecoder().decode(page.bytes),page.url);
+export async function inspectStore(value,request=fetch,{sales=false}={}){
+ const page=await publicFetch(value,{request});const result=parseStore(new TextDecoder().decode(page.bytes),page.url,{sales});
  if(!result.products.length&&result.shopify){try{const r=await publicFetch(new URL('/products.json?limit=12',page.url).href,{request,types:['application/json']});const data=JSON.parse(new TextDecoder().decode(r.bytes));result.products=(data.products||[]).slice(0,12).map(p=>product({name:p.title,description:p.body_html,brand:p.vendor,url:new URL('/products/'+encodeURIComponent(p.handle),page.url).href,image:p.images?.map(x=>x.src)},page.url,result.brand)).filter(Boolean);}catch{/* Product links remain available when a storefront disables its catalogue. */}}
  if(!result.products.length)result.products=result.links;
  result.products=result.products.map(p=>({...p,brand:p.brand||result.brand}));delete result.links;delete result.shopify;return result;
@@ -81,7 +108,7 @@ export async function postStoreImport(context){try{
   try{const asset=await rpc(db,'studio_write',{p_user_id:user.id,p_action:'register_asset',p_id:t.assetId,p_data:{kind:'image',name:'Producto de la tienda',bucket,storage_path:path,mime_type:mime,size_bytes:r.bytes.length,duration_seconds:null}});return json({asset});}catch(e){await db.storage.from(bucket).remove([path]);throw e;}
  }
  if(b.action!=='inspect')err('STORE_URL');
- const result=await inspectStore(b.url);
+ const result=await inspectStore(b.url,fetch,{sales:isSalesProduct(b)});
  for(const p of result.products)p.images=await Promise.all((p.images||[]).map(async url=>({url,token:await imageToken(url,user.id,context.env)})));
  return json(result);
  }catch(e){const messages={STORE_URL:'Pega un enlace HTTPS público de tu tienda o producto.',STORE_READ:'No pudimos leer esa página. Prueba el enlace directo del producto o completa la ficha manualmente.',STORE_IMAGE:'No pudimos guardar esa foto. Vuelve a leer la tienda o sube una foto del producto.'};return messages[e.code]?json({code:e.code,error:messages[e.code]},422):studioError(e);}}

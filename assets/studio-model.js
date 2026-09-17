@@ -1,5 +1,6 @@
 import {isCreatorProduct} from './product-profiles.js';
 import {creatorBrief} from './creator-model.js';
+import {salesSource} from './sales-source.js';
 import {productProfile,CONTINUITY_PRODUCT} from './product-profiles.js';
 import {normalizeShotContract} from './image-continuity.js';
 import {normalizeEditing,normalizeNarrationRevision} from './partial-edit.js';
@@ -12,7 +13,7 @@ const string=(v,max,required=false)=>{if(typeof v!=='string'||v.trim().length>ma
 const id=v=>v==null||v===''?null:ID.test(v)?v:fail();
 export function brandData(input){
  const sourceUrl=string(input.sourceUrl??'',2000);if(sourceUrl){let u;try{u=new URL(sourceUrl);}catch{fail();}if(u.protocol!=='https:'||u.username||u.password)fail();}
- return {sourceUrl,sourceText:string(input.sourceText??'',6000),name:string(input.name,80,true),product:string(input.product,600,true),appearance:string(input.appearance,600),benefits:string(input.benefits,600),claims:string(input.claims,600),avoid:string(input.avoid,600),voiceName:string(input.voiceName??'',100),voiceNotes:string(input.voiceNotes??'',300),productAssetId:id(input.productAssetId),voiceAssetId:id(input.voiceAssetId)};
+ return {...(input.salesSource!=null?{salesSource:salesSource(input.salesSource)}:{}),sourceUrl,sourceText:string(input.sourceText??'',6000),name:string(input.name,80,true),product:string(input.product,600,true),appearance:string(input.appearance,600),benefits:string(input.benefits,600),claims:string(input.claims,600),avoid:string(input.avoid,600),voiceName:string(input.voiceName??'',100),voiceNotes:string(input.voiceNotes??'',300),productAssetId:id(input.productAssetId),voiceAssetId:id(input.voiceAssetId)};
 }
 export function projectData(input){
  if(isCreatorProduct(input)&&input.brandId!=null)fail();

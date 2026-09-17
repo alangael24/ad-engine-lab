@@ -9,7 +9,7 @@ import {LEGACY_SCRIPT_SYSTEM,writeScriptChanges} from '../src/script-writer.js';
 import {SALES_COPY_SYSTEM,commercialDirection} from '../src/sales-copy.js';
 import {SCRIPT_MODEL} from '../assets/model-routing.js';
 const data=()=>({title:'Prueba',brandId:null,referenceUrl:'',referenceNotes:'',aspectRatio:'9:16',scenes:[],scriptDraft:'¿Dónde está el cable? Encuéntralo en tu mesa.'});
-const response=value=>new Response('data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_script',arguments:JSON.stringify({value})}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:30,completion_tokens:20}})+'\n\ndata: [DONE]\n\n');
+const response=(value,extra={})=>new Response('data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'write_script',arguments:JSON.stringify({...extra,value})}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:30,completion_tokens:20}})+'\n\ndata: [DONE]\n\n');
 test('original projects keep the frozen writer, model and no sales direction',async()=>{
  const baseline=JSON.parse(await readFile(new URL('./fixtures/continuity-script-baseline.json',import.meta.url)));
  assert.equal(createHash('sha256').update(LEGACY_SCRIPT_SYSTEM).digest('hex'),baseline.scriptSystemSha256);
@@ -24,16 +24,19 @@ test('sales identity survives normalization and chat edits; invalid product ids 
  assert.equal(changed.productProfile,SALES_PRODUCT);assert.equal(productProfile(data()),CONTINUITY_PRODUCT);
  assert.throws(()=>projectData({...data(),productProfile:'sales-typo'}),/STUDIO_INVALID/);
 });
-test('same inputs use one writer call with identical settings; only the sales system changes',async()=>{
+test('sales adds sourced planning inside the same writer call; legacy tool and model settings stay frozen',async()=>{
  const seen=[];
  for(const profile of [undefined,SALES_PRODUCT]){
   const d=data();if(profile)d.productProfile=profile;
   const change={operation:'draft_script',value:'Escribe 90 palabras'};
-  const usage=await writeScriptChanges(change,{project:{id:'same',brand_snapshot:{product:'Organizador de cables'},data:d},history:[],message:'Haz el guion',env:{REFERENCE_FLASH_KEY:'fixture'},request:async(u,init)=>{seen.push(JSON.parse(init.body));return response('Tus cables, donde los necesitas.');}});
+  const usage=await writeScriptChanges(change,{project:{id:'same',brand_snapshot:{product:'Organizador de cables'},data:d},history:[],message:'Haz el guion',env:{REFERENCE_FLASH_KEY:'fixture'},request:async(u,init)=>{seen.push(JSON.parse(init.body));return response('Tus cables, donde los necesitas.',profile?{salesPlan:{angle:'Acceso al cargador',insights:[{kind:'mechanism',text:'Organiza cables.',basis:'source',sourceIds:['brand:product']}]}}:{});}});
   assert.equal(change.value,'Tus cables, donde los necesitas.');assert.equal(usage.length,1);
  }
  assert.equal(seen[0].messages[0].content,LEGACY_SCRIPT_SYSTEM);assert.equal(seen[1].messages[0].content,SALES_COPY_SYSTEM);
- for(const key of ['model','reasoning_effort','max_tokens','tool_choice','tools'])assert.deepEqual(seen[0][key],seen[1][key]);
+ for(const key of ['model','max_tokens'])assert.deepEqual(seen[0][key],seen[1][key]);
+ assert.equal(seen[0].reasoning_effort,'none');assert.equal(seen[1].reasoning_effort,'low');assert.equal(seen[1].tool_choice,'auto');
+ assert.deepEqual(seen[0].tools[0].function.parameters.required,['value']);assert.deepEqual(seen[1].tools[0].function.parameters.required,['salesPlan','value']);
+ assert.equal(JSON.parse(seen[1].messages[1].content).salesResearch.landingIncluded,false);
 });
 test('sales hook rewrite explicitly preserves the rest of scene one and other scenes',async()=>{
  const first={id:crypto.randomUUID(),text:'Hook viejo. Explicación que debe conservarse.',visual:'Mesa y cables',start:0,end:5};
@@ -48,4 +51,10 @@ test('sales hook rewrite explicitly preserves the rest of scene one and other sc
 });
 test('sales writer provider failure does not fall back or produce media',async()=>{
  let count=0;await assert.rejects(writeScriptChanges({operation:'draft_script',value:'Idea'},{project:{id:'p',data:{...data(),productProfile:SALES_PRODUCT}},history:[],message:'Idea',env:{REFERENCE_FLASH_KEY:'fixture'},request:async()=>{count++;return new Response('',{status:503});}}),/CHAT_PROVIDER/);assert.equal(count,1);
+});
+test('sales thinking packets are bounded separately and never appear in script previews',async()=>{
+ const previews=[],change={operation:'draft_script',value:'Escribe'},plan={angle:'Organizar la mesa',insights:[{kind:'mechanism',text:'Sujeta cables',basis:'source',sourceIds:['brand:product']}]};let calls=0;
+ const reasoning='data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{reasoning_content:'x'.repeat(10000)}}]})+'\n\n';
+ await writeScriptChanges(change,{project:{id:'thinking',data:{...data(),productProfile:SALES_PRODUCT},brand_snapshot:{product:'Organizador para sujetar cables'}},history:[],message:'Haz un guion',env:{REFERENCE_FLASH_KEY:'test'},onDelta:d=>previews.push(d),request:async()=>{calls++;return new Response(reasoning.repeat(60)+await response('Encuentra el cargador en tu mesa.',{salesPlan:plan}).text());}});
+ assert.equal(calls,1);assert.equal(change.value,'Encuentra el cargador en tu mesa.');assert.ok(previews.every(p=>!p.text.includes('xxx')));
 });

@@ -1,4 +1,5 @@
 import {isSalesProduct} from './product-profiles.js';
+import {enrichSalesBrand} from './sales-brand.js';
 import {FORMATS,LOOKS,creativeLabel} from './creative-formats.js';
 import {ideaIntent,storeProductData} from './idea-intent.js';
 const $=s=>document.querySelector(s),el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n;};
@@ -13,8 +14,8 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
  function controls(){
   if(!brands().some(b=>b.id===brandId)){let last;try{last=localStorage.getItem('studio-last-product');}catch{}brandId=brands().some(b=>b.id===last)?last:brands().length===1?brands()[0].id:null;}
   const onboarding=waitingForStore||!brands().length;
-  $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':sales?'¿Qué quieres que tu cliente entienda?':'¿Qué anuncio quieres crear?';
-  input.placeholder=onboarding?'Ej. mitienda.com':sales?'Describe el producto, a quién va dirigido y qué quieres destacar…':'Describe tu idea o añade una referencia…';
+  $('.home-heading h1').textContent=onboarding?'¿Qué producto vamos a anunciar?':sales?'¿Qué quieres vender con este anuncio?':'¿Qué anuncio quieres crear?';
+  input.placeholder=onboarding?'Ej. mitienda.com':sales?'Ej. Un anuncio directo de 45 segundos sobre el problema que resuelve. Usa mi landing…':'Describe tu idea o añade una referencia…';
   $('#empty').classList.toggle('needs-product',onboarding);
   $('#idea-label').className=onboarding?'home-input-label':'sr-only';
   $('#idea-label').textContent=onboarding?'Pega el enlace de tu tienda o producto':'Tu idea o referencia';
@@ -37,7 +38,7 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
  function step(name){document.querySelectorAll('[data-step]').forEach(n=>n.hidden=n.dataset.step!==name);document.querySelectorAll('[data-workflow]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.workflow===name)));}
  async function useProduct(p){
   note('Preparando tu producto…');
-  if(p.description===undefined){const details=await api('/api/store-import',{method:'POST',body:{action:'inspect',url:p.url}});p=details.products.find(x=>x.description!==undefined);if(!p)throw Error('No pude leer ese producto. Prueba su enlace directo.');}
+  if(p.description===undefined||(sales&&!p.salesSource)){const details=await api('/api/store-import',{method:'POST',body:{action:'inspect',url:p.url,...(sales?{productProfile:'ads-sales-v1'}:{})}});p=details.products.find(x=>x.description!==undefined);if(!p)throw Error('No pude leer ese producto. Prueba su enlace directo.');}
   // Reuse the same saved asset and brand identity if delivery is interrupted.
   if(imported?.url!==p.url)imported={url:p.url,id:crypto.randomUUID(),data:storeProductData(p),photo:p.images?.[0]?.token};
   if(imported.photo&&!imported.data.productAssetId){const {asset}=await api('/api/store-import',{method:'POST',body:{action:'image',token:imported.photo}});imported.data.productAssetId=asset.id;}
@@ -48,15 +49,19 @@ export function ideaComposer({task,tell,brands,create,openBrand,home,startChat,a
   input.value='';resize();note('');input.focus();
  }
  async function inspect(url){
-  note('Leyendo tu tienda…');
+  note(sales?'Leyendo tu landing: producto, beneficios y oferta…':'Leyendo tu tienda…');
   try{
-   const d=await api('/api/store-import',{method:'POST',body:{action:'inspect',url}});
+   const d=await api('/api/store-import',{method:'POST',body:{action:'inspect',url,...(sales?{productProfile:'ads-sales-v1'}:{})}});
    if(d.products.length===1){await useProduct(d.products[0]);return;}
    if(!d.products.length)throw Error('No encontré productos. Pega el enlace directo de uno.');
    note('');choices('¿Qué producto anunciamos?',d.products.map(p=>({...p,image:p.images?.[0]?.url})),async p=>{try{await useProduct(p);}catch(e){note(e.message);}});
   }catch(e){note(e.message||'No pude abrir tu tienda. Prueba el enlace de un producto.');$('#idea-manual').hidden=false;$('#product-question').textContent='';$('#idea-products').replaceChildren();$('#product-picker').hidden=false;}
  }
  async function launch(idea){
+  if(sales){
+   const brand=brands().find(b=>b.id===brandId);
+   if(brand?.data.sourceUrl&&!brand.data.salesSource){note('Leyendo la landing guardada de tu producto…');try{await enrichSalesBrand(brand,{api,saveBrand});}catch{tell('No pude actualizar la landing. El guion usará la ficha guardada; puedes volver a importar la página.');}}
+  }
   const nextFingerprint=JSON.stringify({idea,creative,brandId,referenceUrl:savedReference});if(nextFingerprint!==fingerprint){requestId=crypto.randomUUID();fingerprint=nextFingerprint;}requestId??=crypto.randomUUID();
   note('Preparando tu anuncio…');
   await create(requestId,{title:idea.slice(0,100),idea,creative,brandId,referenceUrl:savedReference,referenceNotes:'',aspectRatio:'9:16',scenes:[],narrationAssetId:null,timingConfirmed:false});requestId=null;

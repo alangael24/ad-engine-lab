@@ -10,5 +10,5 @@ export function ideaIntent(value){
  }catch{return {text,url:'',kind:'idea'};}
 }
 export function storeProductData(p){
- return {name:(p.brand||p.name).slice(0,80),product:[p.name,p.description].filter(Boolean).join('. ').slice(0,600),appearance:'',benefits:'',claims:'',avoid:'',sourceUrl:p.url,sourceText:(p.sourceText||p.description||'').slice(0,6000),productAssetId:null};
+ return {...(p.salesSource?{salesSource:p.salesSource}:{}),name:(p.brand||p.name).slice(0,80),product:[p.name,p.description].filter(Boolean).join('. ').slice(0,600),appearance:'',benefits:'',claims:'',avoid:'',sourceUrl:p.url,sourceText:(p.sourceText||p.description||'').slice(0,6000),productAssetId:null};
 }
