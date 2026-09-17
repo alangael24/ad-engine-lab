@@ -107,5 +107,6 @@ export async function requestAccess(email, createAccount) {
 
 export function accountDestination(account, next = 'tool') {
   if (next === 'planes') return '/planes/';
+  if (account.seconds?.enabled) return '/anuncios-lab/';
   return account.hasPack || account.balance.video_credits > 0 || account.balance.image_credits > 0 ? '/herramienta/' : '/planes/';
 }

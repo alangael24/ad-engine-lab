@@ -1,8 +1,11 @@
 import {readProductionClipProgress} from './h3-production-status.js';
+import {secondsBalance} from './video-packages.js';
 import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ INSUFFICIENT_VIDEO_SECONDS:[402,'No quedan suficientes segundos disponibles. Tu avance está guardado; puedes añadir otro paquete en Planes.'],
+ VIDEO_DURATION_LIMIT:[422,'La narración supera los 60 segundos por anuncio. Acorta o divide el guion. Conservamos tu avance y liberamos los segundos reservados.'],
  PRODUCTION_TIMEOUT:[409,'No pudimos completar el video dentro del plazo. Tu proyecto y los recursos terminados siguen guardados.'],
  PRODUCTION_GENERATION_OFFLINE:[503,'La animación no está disponible ahora. Conservamos tu avance sin iniciar nuevas imágenes ni voces.'],
  WORKER_OFFLINE:[503,'La animación se detuvo. Las imágenes y la voz están guardadas.'],
@@ -44,15 +47,16 @@ export const PRODUCTION_ERRORS={
 export function productionError(e){const code=Object.keys(PRODUCTION_ERRORS).find(c=>c===e.code||c===e.message);return code?json({code,error:PRODUCTION_ERRORS[code][1]},PRODUCTION_ERRORS[code][0]):studioError(e);}
 export function publicProduction(j){return {id:j.id,projectId:j.project_id,status:j.status,stage:j.stage,error:j.error_code?PRODUCTION_ERRORS[j.error_code]?.[1]||'La producción se detuvo; tu avance está guardado.':null,completedSteps:Object.values(j.steps||{}).filter(s=>s.status==='done').length,renderId:j.status==='succeeded'?Object.values(j.steps||{}).find(s=>s.status==='done'&&s.result?.verdict==='pass')?.result?.renderId||j.steps?.render?.result?.id||null:null,createdAt:j.created_at};}
 export const productionEnabled=(env,userId)=>env.PRODUCTION_ENABLED==='true'&&(!env.PRODUCTION_ALLOWED_USERS||env.PRODUCTION_ALLOWED_USERS.split(',').map(s=>s.trim()).includes(userId));
-export async function productionAvailable(db,env,userId){if(!productionEnabled(env,userId))return false;if(env.PRODUCTION_ENABLED!=='true')return false;const q=await db.from('studio_production_workers').select('id').gt('last_seen_at',new Date(Date.now()-90000).toISOString()).limit(1);return !q.error&&q.data?.length>0;}
+export async function productionAccess(db,env,userId){if(productionEnabled(env,userId))return true;if(env.PRODUCTION_ENABLED!=='true'||!userId)return false;const q=await db.from('credit_balances').select('seconds_plan').eq('user_id',userId).maybeSingle();if(q.error)throw q.error;return q.data?.seconds_plan===true;}
+export async function productionAvailable(db,env,userId){if(!await productionAccess(db,env,userId))return false;if(env.PRODUCTION_ENABLED!=='true')return false;const q=await db.from('studio_production_workers').select('id').gt('last_seen_at',new Date(Date.now()-90000).toISOString()).limit(1);return !q.error&&q.data?.length>0;}
 export async function getProduction(context){try{
  const {db,user}=await authContext(context),id=new URL(context.request.url).searchParams.get('project');await own(db,'studio_projects',user.id,id);
  const q=await db.from('studio_productions').select('*').eq('project_id',id).eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);if(q.error)throw q.error;
- return json({enabled:await productionAvailable(db,context.env,user.id),productions:await Promise.all(q.data.map(async j=>({...publicProduction(j),...(['queued','running'].includes(j.status)&&['clips','repair','waiting_gpu'].includes(j.stage)?{compute:await readProductionClipProgress(db,j)}:{})})))});
+ return json({seconds:await secondsBalance(db,user.id),enabled:await productionAvailable(db,context.env,user.id),productions:await Promise.all(q.data.map(async j=>({...publicProduction(j),...(['queued','running'].includes(j.status)&&['clips','repair','waiting_gpu'].includes(j.stage)?{compute:await readProductionClipProgress(db,j)}:{})})))});
 }catch(e){return productionError(e);}}
 export async function postProduction(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2000);
  if(!UUID.test(b.requestId||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1)throw Error('PRODUCTION_INVALID');
- const j=await rpc(db,'studio_production_start',{p_user:user.id,p_id:b.requestId,p_project:b.projectId,p_expected:b.expected,p_enabled:productionEnabled(context.env,user.id)});
+ const j=await rpc(db,'studio_production_start',{p_user:user.id,p_id:b.requestId,p_project:b.projectId,p_expected:b.expected,p_enabled:await productionAccess(db,context.env,user.id)});
  return json({production:publicProduction(j)},202);
 }catch(e){return productionError(e);}}

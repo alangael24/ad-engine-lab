@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import {VIDEO_PACKAGES} from './video-packages.js';
 
 export const PLAN_BY_PAYMENT_LINK = Object.freeze({
+  ...Object.fromEntries(Object.values(VIDEO_PACKAGES).map(p=>[p.paymentLinkId,p])),
   plink_1U8z8uEudyi7fxH7OsFRKvC9: Object.freeze({
     code: "esencial",
     videoCredits: 12,

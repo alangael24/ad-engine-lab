@@ -38,12 +38,24 @@ async function ensureAccount(supabase, email, redirectTo) {
 }
 
 async function grantPurchase(supabase, event, session, plan, paymentLinkId, env) {
+  if (plan.videoSeconds && (session.payment_status !== 'paid' || session.currency !== 'mxn' || session.amount_total !== plan.amount * 100)) {
+    throw new Error('Package payment does not match the fixed price and currency.');
+  }
   const email = normalizeEmail(session.customer_details?.email || session.customer_email);
   if (!email) throw new Error("La sesión pagada no contiene un correo de cliente.");
 
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || null;
   const appUrl = String(env.APP_URL || "https://creativerushai.com").replace(/\/$/, "");
-  await ensureAccount(supabase, email, `${appUrl}/herramienta/`);
+  await ensureAccount(supabase, email, `${appUrl}${plan.videoSeconds?'/anuncios-lab/':'/herramienta/'}`);
+
+  if(plan.videoSeconds){
+    const {data,error}=await supabase.rpc('apply_video_seconds_purchase',{
+      p_event_id:event.id,p_checkout_session_id:session.id,p_payment_link_id:paymentLinkId,p_email:email,
+      p_stripe_customer_id:customerId,p_plan_code:plan.code,p_amount_total:session.amount_total,
+      p_currency:session.currency,p_payment_status:session.payment_status,
+    });
+    if(error)throw error;return data;
+  }
 
   const { data, error } = await supabase.rpc("apply_saas_purchase", {
     p_event_id: event.id,

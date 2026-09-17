@@ -31,17 +31,17 @@ test('new verified account can exist before buying: zero balance, no errors or f
 });
 test('anonymous and unconfirmed users cannot start checkout',async()=>{
   assert.equal((await account.onRequestGet(ctx('/api/account','bad'))).status,401);
-  assert.equal((await checkout.onRequestPost(ctx('/api/checkout','bad',{plan:'launch'}))).status,401);
+  assert.equal((await checkout.onRequestPost(ctx('/api/checkout','bad',{plan:'minute_1'}))).status,401);
   await freeUser('unconfirmed',false);
-  assert.equal((await checkout.onRequestPost(ctx('/api/checkout','unconfirmed',{plan:'launch'}))).status,403);
+  assert.equal((await checkout.onRequestPost(ctx('/api/checkout','unconfirmed',{plan:'minute_1'}))).status,403);
 });
 test('checkout locks the verified email and rejects invented plans; ignores client amounts and identities',async()=>{
   const u=await freeUser('checkout-user');
-  const response=await checkout.onRequestPost(ctx('/api/checkout','checkout-user',{plan:'launch',email:'other@example.test',amount:1,userId:'other',redirect:'https://evil.test'}));
+  const response=await checkout.onRequestPost(ctx('/api/checkout','checkout-user',{plan:'minute_1',email:'other@example.test',amount:1,userId:'other',redirect:'https://evil.test'}));
   assert.equal(response.status,200);const data=await response.json();const url=new URL(data.url);
-  assert.equal(url.origin,'https://buy.stripe.com');assert.equal(url.pathname,'/3cI7sL7JdelBaWs8hqbwk02');
+  assert.equal(url.origin,'https://buy.stripe.com');assert.equal(url.pathname,'/00wfZhgfJ2CT7Kg69ibwk03');
   assert.equal(url.searchParams.get('locked_prefilled_email'),u.email);assert.equal(url.searchParams.get('client_reference_id'),u.id);
-  assert.equal(data.amount,999);assert.equal(data.currency,'MXN');assert.equal(url.searchParams.has('amount'),false);
+  assert.equal(data.amount,500);assert.equal(data.currency,'MXN');assert.equal(url.searchParams.has('amount'),false);
   assert.equal((await checkout.onRequestPost(ctx('/api/checkout','checkout-user',{plan:'business'}))).status,400);
 });
 test('registered account receives its pack only after signed payment; reference ID cannot divert it',async()=>{
@@ -95,5 +95,5 @@ test('landing CTAs no longer bypass signup to Stripe; plan is prepaid, not an in
   const landing=await readFile(new URL('../ecom-index.html',import.meta.url),'utf8');
   assert.equal(/href="https:\/\/buy\.stripe\.com/.test(landing),false);
   assert.match(landing,/class="cr-generate" href="\/cuenta\/"/);
-  const plans=await readFile(new URL('../planes/index.html',import.meta.url),'utf8');assert.match(plans,/Sin suscripción/);assert.match(plans,/\$999/);assert.match(plans,/aún no está activada/);
+  const plans=await readFile(new URL('../planes/index.html',import.meta.url),'utf8');assert.match(plans,/Sin suscripción/);assert.match(plans,/\$500/);assert.match(plans,/\$1,000/);assert.match(plans,/\$2,000/);assert.match(plans,/4 de 15 s/);
 });

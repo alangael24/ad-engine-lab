@@ -23,10 +23,10 @@ async function routeSession(session) {
     const account = await apiRequest('/api/account');
     if (!isPlans) { location.replace(accountDestination(account, next)); return; }
     $('#account-email').textContent = account.email;
-    $('#choose-plan').disabled = false;
-    $('#choose-plan').textContent = 'Elegir Launch →';
+    document.querySelectorAll('[data-plan]').forEach(button=>{button.disabled=false;button.textContent=button.dataset.label;});
+    $('#seconds-balance').textContent=account.seconds?.enabled?`${account.seconds.available} s disponibles · ${account.seconds.reserved} s en producción`:'';
     $('#signout').hidden = false;
-    $('#open-studio').hidden = accountDestination(account) !== '/herramienta/';
+    $('#open-studio').hidden = !account.hasPack; $('#open-studio').href=accountDestination(account);
     message('');
   } catch (error) {
     if (error.code === 'UNAUTHORIZED') location.replace('/cuenta/?next=planes');
@@ -98,11 +98,11 @@ if (!isPlans) {
   });
 } else {
   $('#signout').addEventListener('click', async () => { if (client) { await client.auth.signOut(); location.replace('/cuenta/'); } });
-  $('#choose-plan').addEventListener('click', async () => {
-    if (waiting || !ready) return; waiting = true; $('#choose-plan').disabled = true;
-    $('#choose-plan').textContent = 'Abriendo pago seguro…'; message('');
+  document.querySelectorAll('[data-plan]').forEach(button=>button.addEventListener('click', async () => {
+    if (waiting || !ready) return; waiting = true; document.querySelectorAll('[data-plan]').forEach(b=>b.disabled=true);
+    button.textContent = 'Abriendo pago seguro…'; message('');
     try {
-      const payment = await apiRequest('/api/checkout', { method: 'POST', body: { plan: 'launch' } });
+      const payment = await apiRequest('/api/checkout', { method: 'POST', body: { plan: button.dataset.plan } });
       const url = new URL(payment.url);
       if (url.origin !== 'https://buy.stripe.com') throw new Error('No pudimos abrir el pago seguro.');
       // Only a real checkout intent is counted, not signup or viewing plans.
@@ -112,9 +112,9 @@ if (!isPlans) {
       location.assign(url.href);
     } catch (error) {
       if (error.code === 'UNAUTHORIZED') { location.replace('/cuenta/?next=planes'); return; }
-      message(error.message, 'error'); waiting = false; $('#choose-plan').disabled = false; $('#choose-plan').textContent = 'Elegir Launch →';
+      message(error.message, 'error'); waiting = false; document.querySelectorAll('[data-plan]').forEach(b=>{b.disabled=false;b.textContent=b.dataset.label;});
     }
-  });
+  }));
 }
 
 async function boot() {

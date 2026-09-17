@@ -9,6 +9,7 @@ const planIncludes = document.querySelector("#plan-includes");
 const planNames = {
   esencial: "CreativeRush AI — Launch",
   pro: "CreativeRush AI — Pro",
+  minute_1:"CreativeRush — 1 minuto", minute_3:"CreativeRush — 3 minutos", minute_8:"CreativeRush — 8 minutos",
 };
 
 function trackPurchase(data) {
@@ -50,7 +51,8 @@ async function checkPurchase(attempt = 0) {
     const data = await response.json();
     if (response.ok && data.ready) {
       if (planNames[data.plan]) planName.textContent = planNames[data.plan];
-      planIncludes.textContent = `${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
+      planIncludes.textContent = data.videoSeconds?`${data.videoSeconds} segundos de anuncios completos. Puedes repartirlos en varios videos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
+      if(toolButton)toolButton.href=data.videoSeconds?"/anuncios-lab/":"/herramienta/";
       if (data.paymentStatus === "paid") {
         document.querySelector('#payment-title').textContent = 'Pago confirmado.';
         document.querySelector('#plan-price').textContent = new Intl.NumberFormat('es-MX', { style:'currency', currency:data.currency || 'MXN' }).format(data.amountTotal / 100);
@@ -58,7 +60,7 @@ async function checkPurchase(attempt = 0) {
       }
       setStatus(
         "Tu cuenta y tu saldo están listos",
-        "Entra con el mismo correo de tu cuenta. Tu pack ya está acreditado; podrás usarlo cuando la generación esté disponible.",
+        "Entra con el mismo correo de tu cuenta. Tu saldo ya está acreditado en CreativeRush.",
         true,
       );
       return;

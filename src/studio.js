@@ -1,4 +1,5 @@
 import {productProfile,CONTINUITY_PRODUCT} from '../assets/product-profiles.js';
+import {secondsBalance,deliverySettled} from './video-packages.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from './h3-prompts.js';
 import {json} from './backend.js';
 import {authContext,readJson,readBounded,rpc,imageType,generationAvailability,ApiError,apiError,UUID} from './generations.js';
@@ -28,14 +29,15 @@ export async function getStudio(context){try{
  const {db,user}=await authContext(context),url=new URL(context.request.url);
  if(url.searchParams.has('asset')){const a=await own(db,'studio_assets',user.id,url.searchParams.get('asset'));return json({url:await signed(db,a.bucket,a.storage_path)});}
  if(url.searchParams.has('version')){const v=await own(db,'studio_scene_versions',user.id,url.searchParams.get('version'));if(v.asset_id){const a=await own(db,'studio_assets',user.id,v.asset_id);return json({url:await signed(db,a.bucket,a.storage_path)});}const j=await own(db,'generation_jobs',user.id,v.job_id);if(j.status!=='succeeded')fail('STUDIO_NOT_READY');return json({url:await signed(db,'generation-results',j.result_path)});}
- if(url.searchParams.has('render')){const r=await own(db,'studio_renders',user.id,url.searchParams.get('render'));if(r.status!=='succeeded'||r.quality_status&&r.quality_status!=='passed')fail('STUDIO_NOT_READY');return json({url:await signed(db,'studio-media',r.result_path,url.searchParams.has('download'))});}
+ if(url.searchParams.has('render')){const r=await own(db,'studio_renders',user.id,url.searchParams.get('render'));if(r.status!=='succeeded'||r.quality_status&&r.quality_status!=='passed'||!await deliverySettled(db,r))fail('STUDIO_NOT_READY');return json({url:await signed(db,'studio-media',r.result_path,url.searchParams.has('download'))});}
  const project=url.searchParams.get('project');if(project&&!UUID.test(project))fail('STUDIO_NOT_FOUND');
  const data=await rpc(db,'studio_read',{p_user_id:user.id,p_project_id:project||null});
  if(!project){const profiles=await db.from('studio_projects').select('id,data').eq('user_id',user.id);if(profiles.error)throw profiles.error;const byId=new Map(profiles.data.map(p=>[p.id,productProfile(p.data)]));for(const p of data.projects||[])if(byId.get(p.id)!==CONTINUITY_PRODUCT)p.productProfile=byId.get(p.id);}
  for(const r of data.renders||[])if(r.quality_status&&r.quality_status!=='passed')r.status=r.quality_status==='rejected'?'quality_failed':'reviewing';
+ for(const r of data.renders||[])if(r.status==='succeeded'&&!await deliverySettled(db,r))r.status='reviewing';
  const [availability,balance]=await Promise.all([studioAvailability(db,context.env),db.from('credit_balances').select('video_credits,image_credits').eq('user_id',user.id).maybeSingle()]);
  if(balance.error)throw balance.error;
- return json({...data,availability,balance:balance.data||{video_credits:0,image_credits:0},email:user.email});
+ return json({...data,availability,balance:balance.data||{video_credits:0,image_credits:0},seconds:await secondsBalance(db,user.id),email:user.email});
  }catch(error){return studioError(error);}}
 export async function postStudio(context){try{
  const {db,user}=await authContext(context),url=new URL(context.request.url);

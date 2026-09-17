@@ -1,5 +1,6 @@
 import { json } from '../../src/backend.js';
 import { apiError, authContext } from '../../src/generations.js';
+import { secondsBalance } from '../../src/video-packages.js';
 
 export async function onRequestGet(context) {
   try {
@@ -10,7 +11,7 @@ export async function onRequestGet(context) {
     ]);
     if (balance.error) throw balance.error;
     if (purchases.error) throw purchases.error;
-    return json({ email: user.email, hasPack: Boolean(purchases.data?.length),
+    return json({ email: user.email, hasPack: Boolean(purchases.data?.length), seconds:await secondsBalance(db,user.id),
       balance: balance.data || { video_credits: 0, image_credits: 0 } });
   } catch (error) { return apiError(error); }
 }

@@ -1,17 +1,22 @@
 const stages={queued:'Tu anuncio está en cola.',planning:'Preparando las escenas de tu guion…',narration:'Preparando la narración…',timing:'Sincronizando las escenas con la voz…',images:'Preparando las imágenes…',clips:'Preparando las tomas…',assembly:'Montando tu video y sus subtítulos…',quality:'Revisando las escenas y la narración…',repair:'Ajustando las escenas que lo necesitan…',completed:'Tu video está listo.'};
-export function productionPanel({api,task,getProject,isDirty,tell,refresh,getRenders=()=>[]}){
+export function productionPanel({api,task,getProject,isDirty,tell,refresh,getRenders=()=>[],onBalance=()=>{}}){
  const creator=document.body?.dataset?.productProfile==='creator-v1';
  const root=document.createElement('section');root.className='production-panel';root.setAttribute('aria-label',creator?'Producción del video':'Producción del anuncio');
  const status=document.createElement('p');status.setAttribute('role','status');
  const button=document.createElement('button');button.type='button';button.className='primary';button.textContent='Aprobar guion y crear video';
+ const balance=document.createElement('p');balance.className='muted';balance.hidden=true;
+ const plans=document.createElement('a');plans.href='/planes/';plans.textContent='Añadir minutos';plans.hidden=true;
  const video=document.createElement('video');video.controls=true;video.playsInline=true;video.hidden=true;video.preload='metadata';
  const download=document.createElement('a');download.textContent='Descargar video';download.className='text-button';download.hidden=true;download.download='CreativeRush.mp4';
  const versionLabel=document.createElement('p');versionLabel.className='muted';versionLabel.hidden=true;versionLabel.textContent='Versión anterior';
- root.append(status,button,versionLabel,video,download);document.querySelector('.chat-composer').before(root);
+ root.append(status,button,versionLabel,video,download,balance,plans);document.querySelector('.chat-composer').before(root);
  let timer,currentId,lastRender,lastCompletedJob,lastSyncedJob,polling=false;
  async function open(p){
   clearTimeout(timer);currentId=p.id;
   const r=await api('/api/studio-production?project='+p.id);if(getProject()?.id!==p.id)return;
+  onBalance(r.seconds);
+  balance.hidden=plans.hidden=!r.seconds?.enabled;
+  if(r.seconds?.enabled)balance.textContent=`${r.seconds.available} s disponibles · ${r.seconds.reserved} s en producción. Se reserva hasta 60 s al empezar y se descuenta la duración entregada, redondeada al segundo superior. Si falla, se libera la reserva.`;
   const j=r.productions[0],active=j&&['queued','running'].includes(j.status),render=getRenders().find(x=>x.project_revision===p.revision);
   const syncKey=j&&!active?j.id+':'+j.status:null;
   if(syncKey&&lastSyncedJob!==syncKey&&!isDirty()){lastSyncedJob=syncKey;await refresh(p.id);return;}

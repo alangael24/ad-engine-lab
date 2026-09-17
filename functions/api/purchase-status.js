@@ -12,7 +12,7 @@ export async function onRequestGet({ request, env }) {
     const supabase = getSupabaseAdmin(env);
     const { data, error } = await supabase
       .from("purchases")
-      .select("plan_code,payment_status,video_credits,image_credits,granted_at,amount_total,currency")
+      .select("plan_code,payment_status,video_credits,image_credits,video_seconds,granted_at,amount_total,currency")
       .eq("checkout_session_id", sessionId)
       .maybeSingle();
 
@@ -24,6 +24,7 @@ export async function onRequestGet({ request, env }) {
       plan: data.plan_code,
       paymentStatus: data.payment_status,
       videoCredits: data.video_credits,
+      videoSeconds: data.video_seconds,
       imageCredits: data.image_credits,
       amountTotal: data.amount_total,
       currency: data.currency,
