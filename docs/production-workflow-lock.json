@@ -77,7 +77,7 @@
     "scripts/build-static.mjs": "c2bb884edcd64d4ec0a52736b9b5a1beafb1cdf030788d6e77dde817b34eb3e5",
     "scripts/freeze-production-workflow.mjs": "93b392ec56100c169b222ac32d5a799fb3b78eeedb68cebbfd4dfcb14a353e80",
     "src/backend.js": "a4373659b4ddbb72e5cf82d14244dc4a1bf9a617754ef543f80da9dda232ed7b",
-    "src/chat-database.js": "fb7f81e3fce0b2b4dc604ea85dedde0fce4eea0d2884426d41d9f2d49546e7ae",
+    "src/chat-database.js": "212a1d67d8a2a813b6f3594c95241cbc93a68f74fd721022cc0b93d389a5fef6",
     "src/chat-runtime-client.js": "f12de9c2baecbc9f549063ede7f638baec18307ec57f43d036d3a88c31750df1",
     "src/chat-stream.js": "bf177413506f250be4e83430e1909a157a129bd523e754cc85bdd0fb71f64012",
     "src/chat-visuals.js": "6b3365e16870115a028aec4b3a58ef7c1affdcdd994bb1a39b5792f7fa72ba77",

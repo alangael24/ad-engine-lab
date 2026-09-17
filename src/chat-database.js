@@ -9,7 +9,8 @@ export function chatDatabase(env,fetchImpl=fetch){
  const base=new URL(env.SUPABASE_URL),key=env.SUPABASE_SERVICE_ROLE_KEY;
  if(!key||base.username||base.password||base.search||base.hash||base.pathname!=='/'||!(base.protocol==='https:'||(base.protocol==='http:'&&['supabase.test','localhost','127.0.0.1'].includes(base.hostname))))throw Error('CHAT_DB_CONFIG');
  async function request(path,{body,token=key}={}){
-  const response=await fetchImpl(new URL(path,base).href,{method:body===undefined?'GET':'POST',headers:{apikey:key,authorization:`Bearer ${token}`,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:'error'});
+  const response=await fetchImpl(new URL(path,base).href,{method:body===undefined?'GET':'POST',headers:{apikey:key,authorization:`Bearer ${token}`,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:'manual'});
+  if(response.status>=300&&response.status<400){await response.body?.cancel();throw Error('CHAT_DB_REDIRECT');}
   const data=await response.json();
   return response.ok?{data,error:null}:{data:null,error:{code:data?.code||'CHAT_DB_UNAVAILABLE',message:data?.message||data?.msg||'Database request failed'}};
  }

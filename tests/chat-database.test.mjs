@@ -9,7 +9,7 @@ test('chat transport isolates user validation from privileged RPCs across concur
  assert.deepEqual(users.map(u=>u.id),['Bearer alice','Bearer bob']);
  await db.rpc('studio_read',{p_user_id:'alice',p_project_id:'project'});
  assert.equal(seen[2].options.headers.authorization,'Bearer server-only');
- assert.ok(seen.every(x=>x.options.redirect==='error'&&x.options.headers.apikey==='server-only'));
+ assert.ok(seen.every(x=>x.options.redirect==='manual'&&x.options.headers.apikey==='server-only'));
  assert.throws(()=>db.rpc('unapproved',{}));assert.throws(()=>db.from('auth.users'));
 });
 test('chat reads preserve owner filters and zero/one/multiple-row semantics',async()=>{
@@ -29,4 +29,9 @@ test('chat transport never retries writes, redirects or failed authorization',as
  await assert.rejects(chatAuthContext({env,request:new Request('https://app.test')}),/UNAUTHORIZED/);
  assert.equal(count,2);
  for(const url of ['http://database.test','https://user:password@database.test','https://database.test/other'])assert.throws(()=>chatDatabase({...env,SUPABASE_URL:url}));
+});
+
+test('database redirects are rejected without forwarding credentials',async()=>{
+ let calls=0;const db=chatDatabase(env,async()=>{calls++;return new Response('',{status:302,headers:{location:'https://untrusted.test'}});});
+ await assert.rejects(db.user('alice'),/CHAT_DB_REDIRECT/);assert.equal(calls,1);
 });
