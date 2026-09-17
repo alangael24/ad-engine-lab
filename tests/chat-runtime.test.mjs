@@ -66,6 +66,6 @@ test('remote work preserves ownership, disconnect recovery and request idempoten
   assert.equal((await postStudioChat(ctx('invalid'))).status,401);assert.equal(modelCalls,0);
   const response=await postStudioChat(ctx()),reader=response.body.getReader();await reader.read();await reader.cancel();release();await Promise.all(pending);
   const replay=await postStudioChat(ctx());assert.equal((await replay.json()).edit.status,'succeeded');assert.equal(modelCalls,1);
-  assert.equal(queries.length,1);assert.equal(queries[0].searchParams.get('limit'),'8');assert.equal(queries[0].searchParams.get('select'),'id,status,request_payload,result,applied_revision,created_at');
+  assert.equal(queries.length,0); // History comes from the same atomic prepare RPC.
  }finally{release();globalThis.fetch=original;await h.close();await db.close();}
 });

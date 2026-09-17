@@ -43,12 +43,13 @@ export async function postStudioChat(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,2400000);
  if(!UUID.test(b.requestId||'')||!UUID.test(b.projectId||'')||!Number.isInteger(b.expected)||b.expected<1||typeof b.message!=='string'||!b.message.trim()||b.message.length>3000)fail('CHAT_INVALID');
  if(b.scriptChoice&&(!UUID.test(b.scriptChoice.setId||'')||!Number.isInteger(b.scriptChoice.index)||b.scriptChoice.index<1||b.scriptChoice.index>3))fail('CHAT_INVALID');
- const record=await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'reserve',p_id:b.requestId,p_project:b.projectId,p_data:{expected:b.expected,message:b.message.trim(),...(b.scriptChoice?{scriptChoice:b.scriptChoice}:{}),enabled:enabled(context.env)}});
+ const prepared=await rpc(db,'studio_chat_prepare',{p_user:user.id,p_id:b.requestId,p_project:b.projectId,p_data:{expected:b.expected,message:b.message.trim(),...(b.scriptChoice?{scriptChoice:b.scriptChoice}:{}),enabled:enabled(context.env)}});
+ const record=prepared.record;
  if(!record.claimed)return json({edit:publicRow(record)},record.status==='running'?202:200);
  const execute=async onDelta=>{try{
-  const contextData=await rpc(db,'studio_read',{p_user_id:user.id,p_project_id:b.projectId});
+  const contextData=prepared.context;
   if(contextData.project.revision!==b.expected)fail('STUDIO_CONFLICT');
-  const output=b.scriptChoice?{edit:validateEdit(selectScriptVariant(contextData.project,b.scriptChoice.index,b.scriptChoice.setId)),usage:{calls:[]},visualReview:{scenes:0,total:0}}:await callEditor(contextData.project,contextData.versions,await rows(db,user.id,b.projectId,8),b.message,{...context.env,PRODUCTION_ENABLED:await productionAccess(db,context.env,user.id)?'true':'false'},fetch,onDelta,b.visuals||[]);
+  const output=b.scriptChoice?{edit:validateEdit(selectScriptVariant(contextData.project,b.scriptChoice.index,b.scriptChoice.setId)),usage:{calls:[]},visualReview:{scenes:0,total:0}}:await callEditor(contextData.project,contextData.versions,prepared.history,b.message,{...context.env,PRODUCTION_ENABLED:await productionAccess(db,context.env,user.id)?'true':'false'},fetch,onDelta,b.visuals||[]);
   if([...LOCAL_EDIT_OPS,'finish_edit'].includes(output.edit.operation))output.edit={operation:'batch',message:output.edit.message,changes:[output.edit]};
   let nextData=applyEdit(contextData.project,output.edit,contextData.versions);
   if(nextData&&contextData.project.data.scenes.length){
@@ -68,9 +69,9 @@ export async function postStudioChat(context){try{
    nextData.editing={...normalizeEditing(nextData.editing||{}),...scope,scoped:!!base&&scope.scoped,...(base?{baseRenderId:base.id}:{})};
   }
   if(nextData)nextData=remember({...contextData.project,data:nextData},{decision:`Customer request: ${b.message}. Applied: ${output.edit.message}`}).data;
-  const done=await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'complete',p_id:b.requestId,p_project:b.projectId,p_data:{...output,nextData,followup:editFollowup(contextData.project,output.edit,nextData),productionEnabled:await productionAccess(db,context.env,user.id)}});
+  const done=await rpc(db,'studio_chat_commit',{p_user:user.id,p_action:'complete',p_id:b.requestId,p_project:b.projectId,p_data:{...output,nextData,followup:editFollowup(contextData.project,output.edit,nextData),productionEnabled:await productionAccess(db,context.env,user.id)}});
   return {edit:publicRow(done)};
- }catch(e){await rpc(db,'studio_chat_write',{p_user:user.id,p_action:'fail',p_id:b.requestId,p_project:b.projectId,p_data:{message:errors[Object.keys(errors).find(k=>k===e.code||k===e.message)]?.[1]||'No se aplicó el cambio. Recupera el proyecto antes de continuar.',code:e.code||'CHAT_PROVIDER'}}).catch(()=>{});throw e.code?e:Object.assign(e,{code:errors[e.message]?e.message:'CHAT_PROVIDER'});}};
+ }catch(e){await rpc(db,'studio_chat_commit',{p_user:user.id,p_action:'fail',p_id:b.requestId,p_project:b.projectId,p_data:{message:errors[Object.keys(errors).find(k=>k===e.code||k===e.message)]?.[1]||'No se aplicó el cambio. Recupera el proyecto antes de continuar.',code:e.code||'CHAT_PROVIDER'}}).catch(()=>{});throw e.code?e:Object.assign(e,{code:errors[e.message]?e.message:'CHAT_PROVIDER'});}};
  if(!context.request.headers.get('accept')?.includes('text/event-stream'))return json(await execute());
  const encoder=new TextEncoder();let disconnected=false;
  const stream=new ReadableStream({start(controller){

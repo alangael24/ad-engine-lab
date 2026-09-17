@@ -175,3 +175,12 @@ snapshots remain in PostgreSQL for undo and are no longer copied into the model
 transport. Local workerd sampling (mock upstreams, not billing CPU) improved cold
 active time from 37.535 ms to 13.204 ms and warm average from 1.314 to 1.006 ms.
 Production CPU must be measured separately after rollout.
+
+Chat preparation is now one `studio_chat_prepare` RPC: the existing reservation
+and owner/revision checks plus project and eight-entry history reads, in one
+transaction. `studio_chat_commit` delegates to the original completion/failure
+procedure. Both wrappers strip only the returned undo snapshot and are invoker
+functions executable only by service_role. Snapshots, accounting, undo and
+idempotency remain in the original database procedures. Apply migration
+20260917124959 before deploying this edge version; it is additive and compatible
+with the preceding edge deployment.

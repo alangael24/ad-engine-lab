@@ -3,7 +3,7 @@
 import {getBearerToken} from './backend.js';
 import {ApiError} from './generations.js';
 const tables=new Set(['studio_projects','studio_chat_edits','studio_renders','credit_balances']);
-const procedures=new Set(['studio_read','studio_chat_write']);
+const procedures=new Set(['studio_read','studio_chat_write','studio_chat_prepare','studio_chat_commit']);
 const identifier=value=>{if(!/^[a-z_][a-z0-9_]*$/.test(value))throw Error('CHAT_DB_QUERY');return value;};
 export function chatDatabase(env,fetchImpl=fetch){
  const base=new URL(env.SUPABASE_URL),key=env.SUPABASE_SERVICE_ROLE_KEY;
