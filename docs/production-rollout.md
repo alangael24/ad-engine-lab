@@ -217,3 +217,10 @@ still checks the user's bearer token on every request.
 This removes model response length and preview packet count from edge JavaScript
 work. A finite benchmark is not a hard latency/CPU guarantee from Cloudflare;
 record cold and warm production samples before claiming the 10 ms target.
+
+The advanced-mode Pages build now generates a static method/path dispatch table
+from the existing function modules. Auth/business handlers are unchanged; the
+single dynamic generation-ID route retains decoded params, and unknown routes
+fall back to ASSETS. The build fails if middleware or a new dynamic pattern is
+introduced, rather than bypassing it silently. This eliminates request-time
+`path-to-regexp` construction in Wrangler's default Pages router.

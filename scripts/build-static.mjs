@@ -86,3 +86,7 @@ const bundledStyles = (
 await writeFile(resolve(output, "assets/site.css"), bundledStyles, "utf8");
 
 await versionStaticAssets(output);
+
+// Native route table avoids Pages' request-time path-to-regexp work.
+const {buildPagesWorker}=await import('./build-pages-worker.mjs');
+await buildPagesWorker(root,output);
