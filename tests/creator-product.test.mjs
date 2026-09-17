@@ -77,7 +77,7 @@ test('first creator still uses generations; subsequent approved identity uses ed
 
 test('creator writer retries an oversized draft once, meters both calls and never silently truncates',async()=>{
  const project={id:crypto.randomUUID(),data:data({targetDuration:15}),brand_snapshot:{}},edit={operation:'draft_script',value:'Comedia'};let calls=0;const deltas=[];
- const usage=await writeScriptChanges(edit,{project,history:[],message:'Guion',env:{REFERENCE_FLASH_KEY:'fixture'},onDelta:d=>deltas.push(d),request:async(url,options)=>{calls++;assert.match(JSON.parse(options.body).messages[0].content,/máximo 39 palabras/);return sse(SCRIPT_MODEL,'write_script',{value:calls===1?'Palabra '.repeat(100):'El astronauta buscó sus llaves en toda la Luna. Las llevaba dentro del casco.'});}});
+ const usage=await writeScriptChanges(edit,{project,history:[],message:'Guion',env:{REFERENCE_FLASH_KEY:'fixture'},onDelta:d=>deltas.push(d),request:async(url,options)=>{calls++;assert.match(JSON.parse(options.body).messages[0].content,/NUNCA más de 39/);return sse(SCRIPT_MODEL,'write_script',{value:calls===1?'Palabra '.repeat(100):'El astronauta buscó sus llaves en toda la Luna. Las llevaba dentro del casco.'});}});
  assert.equal(calls,2);assert.equal(usage.length,2);assert.ok(edit.value.endsWith('casco.'));assert.ok(!JSON.stringify(deltas).includes('Palabra'));
  calls=0;await assert.rejects(writeScriptChanges({operation:'draft_script',value:'Comedia'},{project,history:[],message:'Guion',env:{REFERENCE_FLASH_KEY:'fixture'},request:async()=>{calls++;return sse(SCRIPT_MODEL,'write_script',{value:'Palabra '.repeat(100)});}}),/CHAT_SCRIPT_DURATION/);assert.equal(calls,2);
 });
