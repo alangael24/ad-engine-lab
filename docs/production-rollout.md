@@ -184,3 +184,17 @@ functions executable only by service_role. Snapshots, accounting, undo and
 idempotency remain in the original database procedures. Apply migration
 20260917124959 before deploying this edge version; it is additive and compatible
 with the preceding edge deployment.
+
+### Targeted variant metadata repair
+
+A captured failed DeepSeek draft had a 348-character angle (limit 300) and
+6–8 source citations in several insights (limit 5). Retrying the entire response
+could also break otherwise valid JSON. Valid JSON with invalid sales metadata now
+gets one `repair_sales_plans` call with all field-level errors and source evidence.
+The three original titles and narrations stay immutable in code and are not sent
+to that repair tool. Invalid JSON retains the previous exact-text format repair;
+no path adds a second repair or repeats Astra. Targets of 120–180 characters and
+1–3 citations leave margin below unchanged validation limits. Full schema and
+source validation still run after repair; failures cannot replace the draft.
+The captured failing response was repaired with the real provider, with all
+three titles and narrations verified identical to the original.

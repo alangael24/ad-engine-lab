@@ -19,15 +19,27 @@ export const SALES_PLAN_SCHEMA={type:'object',additionalProperties:false,propert
   kind:{type:'string',enum:kinds},text:{type:'string',maxLength:300},basis:{type:'string',enum:['source','creative_hypothesis']},sourceIds:{type:'array',maxItems:5,items:{type:'string'}}
  },required:['kind','text','basis','sourceIds']}}
 },required:['angle','insights']};
-export function validateSalesPlan(plan,research){
- const invalid=()=>{throw Object.assign(Error('CHAT_INVALID'),{code:'CHAT_INVALID'});};
- if(!plan||typeof plan.angle!=='string'||!plan.angle.trim()||plan.angle.length>300||!Array.isArray(plan.insights)||!plan.insights.length||plan.insights.length>8)invalid();
+export function salesPlanIssues(plan,research){
+ const issues=[],add=(path,rule)=>issues.push({path,rule});
+ if(!plan||typeof plan!=='object')return [{path:'salesPlan',rule:'object required'}];
+ if(typeof plan.angle!=='string'||!plan.angle.trim()||plan.angle.length>300)add('angle','nonempty string, maximum 300 characters');
+ if(!Array.isArray(plan.insights)||!plan.insights.length||plan.insights.length>8){add('insights','array of 1 to 8 insights');if(!Array.isArray(plan.insights))return issues;}
  const ids=new Set(research.sources.map(s=>s.id)),seen=new Set();
- const insights=plan.insights.map(x=>{
-  if(!x||!kinds.includes(x.kind)||seen.has(x.kind)||typeof x.text!=='string'||!x.text.trim()||x.text.length>300||!['source','creative_hypothesis'].includes(x.basis)||!Array.isArray(x.sourceIds)||x.sourceIds.length>5||x.sourceIds.some(id=>!ids.has(id)))invalid();
-  if(x.basis==='source'&&!x.sourceIds.length)invalid();
-  if(x.basis==='creative_hypothesis'&&['mechanism','difference','proof','offer'].includes(x.kind))invalid();
-  seen.add(x.kind);return {kind:x.kind,text:x.text,basis:x.basis,sourceIds:[...new Set(x.sourceIds)]};
- });
- return {angle:plan.angle,insights};
+ for(const [i,x] of plan.insights.entries()){
+  const path='insights['+i+']';
+  if(!x||!kinds.includes(x.kind)){add(path+'.kind','use an allowed insight kind');continue;}
+  if(seen.has(x.kind))add(path+'.kind','at most one insight per kind');seen.add(x.kind);
+  if(typeof x.text!=='string'||!x.text.trim()||x.text.length>300)add(path+'.text','nonempty string, maximum 300 characters');
+  if(!['source','creative_hypothesis'].includes(x.basis))add(path+'.basis','source or creative_hypothesis');
+  if(!Array.isArray(x.sourceIds)||x.sourceIds.length>5)add(path+'.sourceIds','array of at most 5 source IDs');
+  if(Array.isArray(x.sourceIds)&&x.sourceIds.some(id=>!ids.has(id)))add(path+'.sourceIds','every source ID must exist in the supplied sources');
+  if(x.basis==='source'&&(!Array.isArray(x.sourceIds)||!x.sourceIds.length))add(path+'.sourceIds','a sourced insight needs at least one source');
+  if(x.basis==='creative_hypothesis'&&['mechanism','difference','proof','offer'].includes(x.kind))add(path+'.basis','this kind requires source evidence, not a creative hypothesis');
+ }
+ return issues;
+}
+export function validateSalesPlan(plan,research){
+ const issues=salesPlanIssues(plan,research);
+ if(issues.length)throw Object.assign(Error('CHAT_INVALID'),{code:'CHAT_INVALID',validationReason:issues[0].path,validationIssues:issues});
+ return {angle:plan.angle,insights:plan.insights.map(x=>({kind:x.kind,text:x.text,basis:x.basis,sourceIds:[...new Set(x.sourceIds)]}))};
 }

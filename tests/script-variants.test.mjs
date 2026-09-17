@@ -98,3 +98,20 @@ test('format repair cannot silently rewrite scripts and stops after one repair',
  }
  let n=0;await assert.rejects(callEditor(project(),[],[],'Dame tres variantes',env,async()=>{n++;return n===1?stream(coordinator):new Response('Unavailable',{status:503});}),/CHAT_PROVIDER/);assert.equal(n,2);
 });
+test('metadata repair fixes length and source-count failures without asking the model to rewrite narration',async()=>{
+ const p=project();p.brand_snapshot.salesSource={text:'Source A\nSource B\nSource C\nSource D\nSource E\nSource F'};
+ const bad=result();bad.variants[0].salesPlan.angle='x'.repeat(348);
+ bad.variants[1].salesPlan.insights[0].sourceIds=['lp:1','lp:2','lp:3','lp:4','lp:5','lp:6'];
+ let n=0,repairRequest;
+ const output=await callEditor(p,[],[],'Dame tres variantes',env,async(_,opts)=>{
+  n++;if(n===1)return stream(coordinator);if(n===2)return stream(bad,SCRIPT_MODEL);
+  repairRequest=JSON.parse(opts.body);
+  return new Response('data: '+JSON.stringify({model:SCRIPT_MODEL,choices:[{delta:{tool_calls:[{index:0,function:{name:'repair_sales_plans',arguments:JSON.stringify({salesPlans:result().variants.map(v=>v.salesPlan)})}}]},finish_reason:'tool_calls'}],usage:{prompt_tokens:20,completion_tokens:30}})+'\n\n');
+ });
+ assert.equal(n,3);assert.equal(repairRequest.tools[0].function.name,'repair_sales_plans');
+ const input=JSON.parse(repairRequest.messages[1].content);
+ assert.equal(input.issues.length,2);assert.ok(input.issues.some(i=>i.path.endsWith('.angle')));assert.ok(input.issues.some(i=>i.path.endsWith('.sourceIds')));
+ assert.ok(values.every(v=>!JSON.stringify(repairRequest).includes(v)));
+ assert.deepEqual(output.edit.variants.options.map(v=>v.script),values);assert.deepEqual(output.edit.variants.options.map(v=>v.title),titles);
+ assert.equal(output.usage.calls[1].attempts[1].stage,'metadata_repair');assert.equal(output.usage.calls[1].usage.completion_tokens,90);
+});
