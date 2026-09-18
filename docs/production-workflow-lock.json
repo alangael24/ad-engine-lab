@@ -89,7 +89,7 @@
     "src/h3-lifecycle.js": "954c1b77c4515318928fd24481d55e8e76112c45e9eca8a0438716c8abb29020",
     "src/h3-pod-policy.js": "2d1334c1647e8d8b89d0b9b4d0caf82f406363da8b0c02f32cd85a78175392d5",
     "src/h3-production-status.js": "6be316b445b20e9f51f0243afbc261b3ba6c2cab593703dd4692c1146259486e",
-    "src/h3-prompts.js": "398e481136866df351cc7db46b56ac86fb4f4e54a473a3f988e4efbe05468001",
+    "src/h3-prompts.js": "5d9dfa1055a7384cb7500a3dab553afafc92532690207f199a0957e28d11bdcd",
     "src/media-cost.js": "153f6585e696de72aa07e00c75cb993b6940f58b7eda756126ccbe5b9b0e00df",
     "src/model-provider.js": "a1bb2dc4d0a1e9d4821a649bb127fcbb85ca2bbebe9bfd70224dd4d1b4a0479c",
     "src/pages-dispatch.js": "84e5c6cb7e211d6dcc891b4d323bf8996f826152fe753b47c46f681cf14f096c",

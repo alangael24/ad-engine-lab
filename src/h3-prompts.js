@@ -26,7 +26,10 @@ export function formatH3Prompt(raw,hasImage){
  if(d.length>1100||d.length<40)invalid('DESCRIPTION_LENGTH');
  if(!/^\[Shot 1\]\s+\S/.test(d))invalid('SHOT_PREFIX');
  if((d.match(/\[Shot\s+\d+\]/gi)||[]).length!==1)invalid('MULTIPLE_SHOTS');
- if(/\d{1,2}:\d{2}|<\/?d>|overall_soundscape|non_diegetic_music|integrated_multimodal_description/i.test(d))invalid('FORBIDDEN_FIELDS');
+ // Standard aspect ratios are framing instructions, not shot timestamps.
+ const withoutRatios=d.replace(/\b(?:9:16|16:9|4:3|3:4|4:5|5:4|1:1|21:9)\b/g,'');
+ if(/\d{1,2}:\d{2}/.test(withoutRatios))invalid('TIMESTAMP');
+ if(/<\/?d>|overall_soundscape|non_diegetic_music|integrated_multimodal_description/i.test(d))invalid('FORBIDDEN_FIELDS');
  if(/(?:<\/?(?:d|scenetrans|cutoff)\b[^>]*>|\(S\d+(?:,S\d+)*\)|<(?:Picture|Video|Audio)\s*\d+>)/i.test(d.replaceAll('<Picture 1>',hasImage?'':'<Picture 1>')))invalid('REFERENCE_OR_DIALOGUE_TAG');
  const prompt=(hasImage?H3_FIRST_FRAME+'\n\n':'')+'integrated_multimodal_description: '+d+'\n\noverall_soundscape: N/A\n\nnon_diegetic_music: N/A';
  if(prompt.length>1600)invalid('SERIALIZED_LENGTH');return prompt;

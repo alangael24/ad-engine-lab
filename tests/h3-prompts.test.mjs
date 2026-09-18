@@ -108,3 +108,9 @@ test('H3 rejects actual violations with specific non-sensitive diagnostics',()=>
   assert.throws(()=>formatH3Prompt({integrated_multimodal_description:value},true),e=>e.code==='H3_PROMPT_INVALID'&&e.reason===reason);
  }
 });
+test('vertical framing ratios are not mistaken for timestamps or sent for paid repair',async()=>{
+ const raw={integrated_multimodal_description:description+' Vertical 9:16 framing.'};let calls=0;
+ const result=await writeH3Prompt(sceneVideoContext(project,scene.id),{OPENCODE_API_KEY:'test'},{referenceUrl:'https://owned.test/frame.png',fetchImpl:async()=>{calls++;return deepseekH3Response(raw);}});
+ assert.equal(calls,1);assert.match(result,/9:16/);
+ assert.throws(()=>formatH3Prompt({integrated_multimodal_description:description+' At 00:03 cut away.'},true),e=>e.reason==='TIMESTAMP');
+});
