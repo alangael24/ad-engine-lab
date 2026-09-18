@@ -9,7 +9,7 @@ function retryData(data,ignoreObserved=false,ignoreSelection=false){
  if(copy?.creativeMemory?.decisions){let found=false;copy.creativeMemory.decisions=copy.creativeMemory.decisions.filter(d=>{if(d!==approvalDecision)return true;if(found)return false;found=true;return true;});}
  return canonical(copy);
 }
-export function recoveredStillApprovals(project,productions,visited=new Set()){
+export function recoveredStillApprovals(project,productions,visited=new Set(),reviewVersion=''){
  for(const p of productions){
   if(visited.has(p.id))continue;
   if(p.user_id!==project.user_id||p.project_id!==project.id||p.status!=='failed'||p.expected_revision!==project.revision)continue;
@@ -22,14 +22,15 @@ export function recoveredStillApprovals(project,productions,visited=new Set()){
   const saved=write[1].result,selected=write[0].startsWith('select-');
   const plan=p.steps?.plan?.result?.scenes,timing=p.steps?.timing?.result;
   if(!Array.isArray(plan)||!Array.isArray(timing))continue;
-  const approvals={};
+  const approvals={},prefix=reviewVersion?`${reviewVersion}-`:'';
+  const collection=Object.entries(p.steps||{}).find(([key,step])=>[0,1,2].some(n=>key===`${prefix}image-review-${n}`)&&step.status==='done'&&step.result?.verdict==='pass'&&Array.isArray(step.result.issues)&&!step.result.issues.length&&canonical(step.result.assetIds)===canonical((project.data.scenes||[]).map(s=>s.imageAssetId)))?.[1].result;
   for(const scene of project.data.scenes||[]){
    const sourceId=timing.find(t=>t.id===scene.id)?.planSceneId,index=plan.findIndex(s=>s.id===sourceId);
    if(index<0||!scene.imageAssetId)continue;
    for(let attempt=2;attempt>=0;attempt--){
-    const check=p.steps[`still-check-${index}-${attempt}`],report=check?.result;
+    const check=p.steps[`${prefix}still-check-${index}-${attempt}`],report=check?.result;
     if(check?.status==='done'&&report?.verdict==='pass'&&Array.isArray(report.issues)&&!report.issues.length&&report.assetIds?.[index]===scene.imageAssetId){
-     approvals[scene.id]={assetId:scene.imageAssetId,report,productionId:p.id};break;
+     approvals[scene.id]={assetId:scene.imageAssetId,report,productionId:p.id,reviewVersion,collectionReport:collection||null};break;
     }
    }
   }
@@ -39,7 +40,7 @@ export function recoveredStillApprovals(project,productions,visited=new Set()){
   const snapshot=p.snapshot;
   if(snapshot?.id===project.id&&snapshot.user_id===project.user_id&&snapshot.revision<project.revision
    &&retryData(snapshot.data,true,selected)===retryData(saved.data,true,selected)&&canonical(snapshot.brand_snapshot)===canonical(saved.brand_snapshot)){
-   const inherited=recoveredStillApprovals(snapshot,productions,new Set([...visited,p.id]));
+   const inherited=recoveredStillApprovals(snapshot,productions,new Set([...visited,p.id]),reviewVersion);
    // Recovery rehydrates observations from immutable passing reports. Accept
    // that derived change only when every saved observation is report-backed.
    const observed=saved.data?.creativeMemory?.observedStates;

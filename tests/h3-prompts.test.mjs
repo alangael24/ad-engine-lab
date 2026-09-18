@@ -98,3 +98,13 @@ test('a metered invalid H3 description gets one format repair and accounts for b
  const prompt=await writeH3Prompt(context,env,{referenceUrl:'https://owned.test/frame.png',fetchImpl});
  assert.equal(count,2);assert.match(prompt,/Fine water streams/);assert.ok(Math.abs(lastUsage.total-.0003)<1e-12);assert.equal(lastUsage.calls.length,2);assert.equal(lastUsage.unknown,false);
 });
+test('harmless outer whitespace is normalized without another paid prompt call',async()=>{
+ let calls=0;
+ const prompt=await writeH3Prompt(sceneVideoContext(project,scene.id),{OPENCODE_API_KEY:'test'}, {referenceUrl:'https://owned.test/frame.png',fetchImpl:async()=>{calls++;return deepseekH3Response({integrated_multimodal_description:'\n '+description+' \n'});}});
+ assert.equal(calls,1);assert.equal(prompt,formatH3Prompt({integrated_multimodal_description:description},true));
+});
+test('H3 rejects actual violations with specific non-sensitive diagnostics',()=>{
+ for(const [value,reason] of [['x'.repeat(1200),'DESCRIPTION_LENGTH'],['No shot prefix but a sufficiently long camera description.','SHOT_PREFIX'],[description+' [Shot 2] New scene.','MULTIPLE_SHOTS'],[description+' <Picture 2>','REFERENCE_OR_DIALOGUE_TAG']]){
+  assert.throws(()=>formatH3Prompt({integrated_multimodal_description:value},true),e=>e.code==='H3_PROMPT_INVALID'&&e.reason===reason);
+ }
+});

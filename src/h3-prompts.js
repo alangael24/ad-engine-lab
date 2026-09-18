@@ -19,13 +19,17 @@ export function sceneVideoContext(project,sceneId,instruction=''){
   projectMemory:creativeContext(project),brand:project.brand_snapshot,scene:neighbor(scene),continuity:project.data.videoContinuity||'',
   previous:neighbor(scenes[index-1]),next:neighbor(scenes[index+1]),creativeGuide:creativeGuide(project.data.creative,project.data),referenceNotes:project.data.referenceNotes,correction:instruction};
 }
+const invalid=reason=>{throw Object.assign(Error('H3_PROMPT_INVALID'),{code:'H3_PROMPT_INVALID',reason});};
 export function formatH3Prompt(raw,hasImage){
- const d=raw?.integrated_multimodal_description;
- if(!raw||Object.keys(raw).length!==1||typeof d!=='string'||d.length>1100||!/^\[Shot 1\]\s+\S/.test(d)||d.length<40
-  ||(d.match(/\[Shot\s+\d+\]/gi)||[]).length!==1||/\d{1,2}:\d{2}|<\/?d>|overall_soundscape|non_diegetic_music|integrated_multimodal_description/i.test(d)
-  ||/(?:<\/?(?:d|scenetrans|cutoff)\b[^>]*>|\(S\d+(?:,S\d+)*\)|<(?:Picture|Video|Audio)\s*\d+>)/i.test(d.replaceAll('<Picture 1>',hasImage?'':'<Picture 1>')))fail('H3_PROMPT_INVALID');
- const prompt=(hasImage?H3_FIRST_FRAME+'\n\n':'')+'integrated_multimodal_description: '+d.trim()+'\n\noverall_soundscape: N/A\n\nnon_diegetic_music: N/A';
- if(prompt.length>1600)fail('H3_PROMPT_INVALID');return prompt;
+ const value=raw?.integrated_multimodal_description,d=typeof value==='string'?value.trim():value;
+ if(!raw||Object.keys(raw).length!==1||typeof d!=='string')invalid('OBJECT_SHAPE');
+ if(d.length>1100||d.length<40)invalid('DESCRIPTION_LENGTH');
+ if(!/^\[Shot 1\]\s+\S/.test(d))invalid('SHOT_PREFIX');
+ if((d.match(/\[Shot\s+\d+\]/gi)||[]).length!==1)invalid('MULTIPLE_SHOTS');
+ if(/\d{1,2}:\d{2}|<\/?d>|overall_soundscape|non_diegetic_music|integrated_multimodal_description/i.test(d))invalid('FORBIDDEN_FIELDS');
+ if(/(?:<\/?(?:d|scenetrans|cutoff)\b[^>]*>|\(S\d+(?:,S\d+)*\)|<(?:Picture|Video|Audio)\s*\d+>)/i.test(d.replaceAll('<Picture 1>',hasImage?'':'<Picture 1>')))invalid('REFERENCE_OR_DIALOGUE_TAG');
+ const prompt=(hasImage?H3_FIRST_FRAME+'\n\n':'')+'integrated_multimodal_description: '+d+'\n\noverall_soundscape: N/A\n\nnon_diegetic_music: N/A';
+ if(prompt.length>1600)invalid('SERIALIZED_LENGTH');return prompt;
 }
 export async function writeH3Prompt(context,env,options={}){
  const calls=new Map();let known=false;
@@ -39,7 +43,7 @@ export async function writeH3Prompt(context,env,options={}){
   const raw=await h3Candidate(current,metered,options);
   try{return formatH3Prompt(raw,!!options.referenceUrl);}catch(e){
    const d=raw?.integrated_multimodal_description;
-   const detail={length:typeof d==='string'?d.length:null,keys:Object.keys(raw||{}),startsWithShot:typeof d==='string'&&/^\[Shot 1\]\s+\S/.test(d)};
+   const detail={reason:e.reason||'UNKNOWN',length:typeof d==='string'?d.length:null,keys:Object.keys(raw||{}),startsWithShot:typeof d==='string'&&/^\[Shot 1\]\s+\S/.test(d)};
    console.error(JSON.stringify({event:'h3_prompt_invalid',attempt,...detail}));
    if(attempt||!known)throw e;
    current={...context,formatCorrection:{previous:raw,validation:detail,instruction:'Preserve this same scene and action. Return only integrated_multimodal_description, between 40 and 950 characters, starting exactly [Shot 1] followed by a space. One shot only. No timestamps, dialogue tags, sound field names or extra reference assets.'}};
@@ -48,7 +52,7 @@ export async function writeH3Prompt(context,env,options={}){
 }
 async function h3Candidate(context,env,{referenceUrl=null,fetchImpl=fetch}={}){
  if(!(env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY))fail('H3_PROMPT_OFFLINE');
- if(Boolean(referenceUrl)!==Boolean(context.referenceId))fail('H3_PROMPT_INVALID');
+ if(Boolean(referenceUrl)!==Boolean(context.referenceId))invalid('REFERENCE_MISMATCH');
  const {referenceId,...details}=context;
  const content=[{type:'text',text:JSON.stringify(details)},...(referenceUrl?[{type:'image_url',image_url:{url:referenceUrl}}]:[])];
  const request={model:productionPromptModel(env),reasoning_effort:'none',stream:true,max_tokens:1600,tool_choice:{type:'function',function:{name:'write_h3_prompt'}},tools:[{type:'function',function:{name:'write_h3_prompt',parameters:{type:'object',additionalProperties:false,properties:{integrated_multimodal_description:{type:'string',maxLength:1100}},required:['integrated_multimodal_description']}}}],messages:[{role:'system',content:H3_PROMPT_SYSTEM},{role:'user',content}]};
@@ -56,8 +60,8 @@ async function h3Candidate(context,env,{referenceUrl=null,fetchImpl=fetch}={}){
  if(!r.ok)fail('H3_PROMPT_PROVIDER');
  const calls=new Map();let model,finish;
  try{await readEvents(r,d=>{if(d.error)fail('H3_PROMPT_PROVIDER');if(d.model)model=d.model;for(const c of d.choices||[]){finish=c.finish_reason||finish;for(const t of c.delta?.tool_calls||[]){const v=calls.get(t.index)||{name:'',args:''};v.name+=t.function?.name||'';v.args+=t.function?.arguments||'';calls.set(t.index,v);}}},50000);}catch{fail('H3_PROMPT_PROVIDER');}
- if(model!==productionPromptModel(env)||finish!=='tool_calls'||calls.size!==1)fail('H3_PROMPT_INVALID');
- const call=[...calls.values()][0];if(call.name!=='write_h3_prompt')fail('H3_PROMPT_INVALID');let raw;try{raw=JSON.parse(call.args);}catch{fail('H3_PROMPT_INVALID');}
+ if(model!==productionPromptModel(env)||finish!=='tool_calls'||calls.size!==1){console.error(JSON.stringify({event:'h3_prompt_invalid_envelope',model,finish,toolCount:calls.size}));invalid('TOOL_ENVELOPE');}
+ const call=[...calls.values()][0];if(call.name!=='write_h3_prompt')invalid('TOOL_NAME');let raw;try{raw=JSON.parse(call.args);}catch{invalid('TOOL_JSON');}
  return raw;
 }
 export async function prepareSceneVideoPrompt(db,userId,project,sceneId,instruction,env){

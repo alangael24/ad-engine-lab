@@ -74,7 +74,8 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   for(let round=0;round<=2;round++){
    const unchanged=reuseApprovedStills&&images.every((im,i)=>im.assetId===existing.find(s=>s.id===plan.scenes[i].id)?.imageAssetId);
    const checked=plan.scenes.every((s,i)=>imageApprovals.get(s.id)?.assetId===images[i].assetId);
-   const report=!providers.imageReviewVersion&&checked?{verdict:'pass',summary:'Every immutable still already passed its own contextual review.',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[...imageApprovals.values()].flatMap(x=>x.report.observedStates||[]),reusedReviews:true}:!providers.imageReviewVersion&&unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`${reviewPrefix}image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke}));
+   const recoveredCollection=checked&&round===0?[...imageApprovals.values()].map(a=>a.collectionReport).find(r=>r?.verdict==='pass'&&r.issues?.length===0&&JSON.stringify(r.assetIds)===JSON.stringify(images.map(x=>x.assetId))):null;
+   const report=recoveredCollection||(!providers.imageReviewVersion&&checked?{verdict:'pass',summary:'Every immutable still already passed its own contextual review.',issues:[],assetIds:images.map(x=>x.assetId),observedStates:[...imageApprovals.values()].flatMap(x=>x.report.observedStates||[]),reusedReviews:true}:!providers.imageReviewVersion&&unchanged?{verdict:'pass',summary:'Conservadas las imágenes existentes.',issues:[],assetIds:images.map(x=>x.assetId)}:await once(`${reviewPrefix}image-review-${round}`,'images',()=>providers.reviewImages({project,plan,images,invoke})));
    const reviewScenes=plan.scenes.map((s,i)=>({...s,start:i,end:i+1}));
    validateReview(report,reviewScenes);
    if(JSON.stringify(report.assetIds)!==JSON.stringify(images.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGE_REVIEW_INVALID');

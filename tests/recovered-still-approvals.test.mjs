@@ -77,3 +77,16 @@ test('failed retry follows a verified unchanged snapshot chain, not changed crea
   assert.deepEqual(recoveredStillApprovals(modified,[{...retry,steps:{...retry.steps,prepare:{status:'done',result:modified}}},prior]),{});
  }
 });
+test('material v3 recovery preserves both gates only for the exact server-held assets and policy',()=>{
+ const {project,prior}=fixture();
+ prior.steps['material-v3-still-check-0-1']=prior.steps['still-check-0-1'];delete prior.steps['still-check-0-1'];
+ prior.steps['material-v3-image-review-0']={status:'done',result:{verdict:'pass',issues:[],assetIds:['corrected'],collectionGate:true}};
+ const recovered=()=>recoveredStillApprovals(project,[prior],new Set(),'material-v3');
+ assert.equal(recovered().s.assetId,'corrected');assert.equal(recovered().s.collectionReport.collectionGate,true);
+ assert.deepEqual(recoveredStillApprovals(project,[prior],new Set(),'material-v4'),{});
+ for(const change of [r=>r.assetIds=['other'],r=>r.issues=[{}],r=>r.verdict='repair']){
+  const saved=structuredClone(prior.steps['material-v3-image-review-0']);change(prior.steps['material-v3-image-review-0'].result);
+  assert.equal(recovered().s.collectionReport,null);prior.steps['material-v3-image-review-0']=saved;
+ }
+ prior.steps['material-v3-still-check-0-1'].result.assetIds=['other'];assert.deepEqual(recovered(),{});
+});

@@ -58,7 +58,7 @@ export async function onRequestPost(context){try{
   // Its own prepare/select writes advance the current revision; using that
   // revision here loses inherited approvals after a coordinator restart.
   // The heartbeat above still fences user edits and obsolete leases.
-  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(j.snapshot,prior.data||[])}});
+  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(j.snapshot,prior.data||[],new Set(),b.data?.imageReviewVersion||'')}});
  }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);
