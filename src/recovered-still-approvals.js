@@ -56,12 +56,17 @@ export function recoveredStillApprovals(project,productions,visited=new Set(),re
 }
 // Enqueued clips survive a later prompt failure. Reuse only a version recorded
 // by an exact server-held project write, never a client-supplied version ID.
-export function recoveredClipVersions(project,productions){
+export function recoveredClipVersions(project,productions,visited=new Set()){
  const result={};
  for(const p of productions){
+  if(visited.has(p.id))continue;
   if(p.user_id!==project.user_id||p.project_id!==project.id||p.status!=='failed'||p.expected_revision!==project.revision)continue;
   const proven=Object.entries(p.steps||{}).some(([key,s])=>(key==='prepare'||/^select-\d+$/.test(key))&&s.status==='done'&&s.result?.revision===project.revision&&canonical(s.result.data)===canonical(project.data)&&canonical(s.result.brand_snapshot)===canonical(project.brand_snapshot));
   if(!proven)continue;
+  const snapshot=p.snapshot;
+  if(snapshot?.id===project.id&&snapshot.user_id===project.user_id&&snapshot.revision<project.revision&&retryData(snapshot.data,false,true)===retryData(project.data,false,true)&&canonical(snapshot.brand_snapshot)===canonical(project.brand_snapshot)){
+   Object.assign(result,recoveredClipVersions(snapshot,productions,new Set([...visited,p.id])));
+  }
   for(const [key,step] of Object.entries(p.steps||{})){
    const v=step.result;if(!/^clip-\d+$/.test(key)||step.status!=='done'||v?.user_id!==project.user_id||v.project_id!==project.id||!v.id||!v.job_id)continue;
    const scene=project.data.scenes.find(s=>s.id===v.scene_id);if(!scene||scene.selectedVersionId)continue;

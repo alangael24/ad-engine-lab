@@ -100,3 +100,10 @@ test('a later prompt failure reuses enqueued clips, but changed scenes and unpro
  }
  prior.steps.prepare.status='started';assert.deepEqual(recoveredClipVersions(project,[prior]),{});
 });
+test('enqueued clip recovery follows unchanged retry snapshots without replacing the original version',async()=>{
+ const {recoveredClipVersions}=await import('../src/recovered-still-approvals.js');const {project,prior}=fixture();
+ prior.steps['clip-0']={status:'done',result:{id:'original',job_id:'job',user_id:'u',project_id:'p',scene_id:'s',snapshot:{scene:structuredClone(project.data.scenes[0])}}};
+ const current={...structuredClone(project),revision:8};const retry={id:'retry',user_id:'u',project_id:'p',status:'failed',expected_revision:8,snapshot:project,steps:{prepare:{status:'done',result:current},'clip-0':{...prior.steps['clip-0'],result:{...prior.steps['clip-0'].result,id:'duplicate'}}}};
+ assert.equal(recoveredClipVersions(current,[retry,prior]).s.id,'original');
+ const changed=structuredClone(current);changed.data.scriptDraft='New script';const other=structuredClone(retry);other.steps.prepare.result=changed;delete other.steps['clip-0'];assert.deepEqual(recoveredClipVersions(changed,[other,prior]),{});
+});
