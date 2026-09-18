@@ -1,5 +1,5 @@
 """Pinned H3 bootstrap. No RunPod account key or public ports inside the GPU."""
-import json, os, shutil, subprocess, time, urllib.request
+import json, os, shutil, subprocess, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -26,6 +26,9 @@ def main():
         print(json.dumps({'event':'h3_boot','stage':stage}), flush=True)
         # Notify before heavy imports/downloads, distinguishing container startup.
         report('boot_progress', stage=stage)
+        stage = 'cuda'
+        report('boot_progress', stage=stage)
+        subprocess.run([sys.executable,'-c','import os,torch; assert torch.cuda.get_device_name(0)==os.environ.get("H3_EXPECTED_GPU","NVIDIA GeForce RTX 5090"); assert torch.cuda.get_device_properties(0).total_memory>=float(os.environ.get("H3_MIN_VRAM_GB","31"))*1024**3; assert (torch.ones(1,device="cuda")+1).item()==2'],check=True)
         os.environ.update(HF_HUB_OFFLINE='0',HF_HUB_CACHE='/workspace/.cache/huggingface',
             HF_XET_CACHE='/workspace/.cache/xet',HF_XET_HIGH_PERFORMANCE='1',
             HF_XET_NUM_CONCURRENT_RANGE_GETS='32')
@@ -56,12 +59,9 @@ def main():
         print(json.dumps({'event':'h3_models_ready','seconds':time.time()-started,
                          'bytes':sum(f['bytes'] for f in manifest['files'].values())}), flush=True)
         os.environ['HF_HUB_OFFLINE'] = '1'
-        stage = 'cuda'
-        report('boot_progress', stage=stage)
-        subprocess.run(['python','-c','import os,torch; assert torch.cuda.get_device_name(0)==os.environ.get("H3_EXPECTED_GPU","NVIDIA GeForce RTX 5090"); assert torch.cuda.get_device_properties(0).total_memory>=float(os.environ.get("H3_MIN_VRAM_GB","31"))*1024**3; assert (torch.ones(1,device="cuda")+1).item()==2'],check=True)
         stage = 'comfy'
         report('boot_progress', stage=stage)
-        comfy = subprocess.Popen(['python','main.py','--listen','127.0.0.1','--port','8188',
+        comfy = subprocess.Popen([sys.executable,'main.py','--listen','127.0.0.1','--port','8188',
             '--disable-pinned-memory','--fp16-intermediates','--cache-none'], cwd=root)
         for _ in range(120):
             if comfy.poll() is not None:
