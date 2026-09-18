@@ -69,3 +69,15 @@ test('DeepSeek inspector transport actually sends image inputs and counts provid
  assert.equal(request.messages[1].content[1].type,'image_url');assert.deepEqual(result,{assessments:[]});assert(usage.total>0);
  await assert.rejects(editorialCall({role:'editor',name:'edit',schema:{},system:'',context:{},images:['image'],usage:{total:0,calls:[]},env:{OPENCODE_API_KEY:'fixture'}}),/ROLE_INVALID/);
 });
+
+test('reference presence does not mandate product visibility; explicit shot requirements remain',()=>{
+ const f=fixture();
+ delete f.plan.scenes[0].shotContract.productVisible;
+ const optional=prepareImageContracts(f.project,f.plan)[0].criteria.find(c=>c.id==='product');
+ assert.match(optional.requirement,/only IF/);assert.match(optional.requirement,/report met/);
+ f.plan.scenes[0].shotContract.productVisible=true;
+ const required=prepareImageContracts(f.project,f.plan)[0].criteria.find(c=>c.id==='product');
+ assert.match(required.requirement,/explicitly requires/);assert.doesNotMatch(required.requirement,/only IF/);
+ f.plan.scenes[0].shotContract.productVisible=false;
+ assert(!prepareImageContracts(f.project,f.plan)[0].criteria.some(c=>c.id==='product'));
+});

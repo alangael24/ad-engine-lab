@@ -18,14 +18,14 @@ export function prepareImageContracts(project,plan){
  return plan.scenes.map(scene=>{
   const shot=scene.shotContract,criteria=[];
   const add=(id,kind,requirement,impact,risk='normal')=>criteria.push({id,kind,requirement:requirement.slice(0,1500),blocking:true,impact,risk});
-  if(shot?.productVisible!==false&&project.brand_snapshot?.productAssetId)add('product','product_identity','Keep the recognizable product identity and visible physical parts from the real product references. '+(project.brand_snapshot.appearance||''),'The viewer must recognize the advertised product.');
+  if(shot?.productVisible!==false&&project.brand_snapshot?.productAssetId)add('product','product_identity',(shot?.productVisible===true?'The approved shot explicitly requires the referenced product/brand to be visible. Preserve its recognizable identity and visible physical parts. ':'Identity check only IF the referenced product or brand is visible. Attaching a reference does not require showing it in every shot. If absent and not explicitly required by the shot, report met with difference none; do not report unverifiable. ')+(project.brand_snapshot.appearance||''),'The viewer must recognize the advertised product.');
   if(shot?.characterVisible)add('character','character_identity','Preserve the visible character identity and wardrobe specified here: '+(shot.preserve||[]).join('; '),'Identity changes must not break the story.');
   add('opening','action','Show the planned OPENING, not the future motion/end state: '+(shot?.state||scene.visual),'The opening must support this scene’s message and physical action.');
   if(shot?.preserve?.length)add('invariants','product_relation','Preserve only required visible relations/properties: '+shot.preserve.join('; '),'A material change must not contradict the approved scene.');
   const style=[creativeShotRule(project.data.creative,project.data),plan.continuity].filter(Boolean).join('\n');
   if(style)add('style','style','Follow the explicit material/style and recurring visible identities in the approved direction. Do not require offscreen objects or infer cartoon-only from vague 3D wording. '+style,'The scene must belong to the approved visual world.');
   add('artifacts','artifact','No conspicuous malformed anatomy or broken product geometry that interferes with understanding this shot. Ignore insignificant surface/texture details.','Visible deformation must not undermine the scene.');
-  return validateImageContract({version:IMAGE_REVIEW_POLICY_VERSION,sceneId:scene.id,revision:hash({scene,style}).slice(0,20),criteria,unresolved:[]});
+  return validateImageContract({version:IMAGE_REVIEW_POLICY_VERSION,sceneId:scene.id,revision:hash({scene,style,criteria}).slice(0,20),criteria,unresolved:[]});
  });
 }
 // Every paid call owns a durable, lease-fenced checkpoint and budget entry.

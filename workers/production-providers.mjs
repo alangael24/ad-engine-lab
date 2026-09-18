@@ -65,8 +65,9 @@ function meteredVisionEnv(env,invoke){
 export function createProductionProviders(env,{fetchImpl=fetch}={}){
  const material=materialImageReviewEnabled(env);
  return {
-  imageReviewVersion:material?'material-v2':null,
+  imageReviewVersion:material?'material-v3':null,
   prepareImageReview:material?prepareImageContracts:undefined,
+  imageContractVersion:material?'material-contracts-v2':undefined,
   context:(_project,invoke)=>invoke('creative_context'),
   review:args=>reviewProduction({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),
   async ready(){if(!(env.OPENCODE_API_KEY||env.REFERENCE_FLASH_KEY)||!env.OPENAI_API_KEY||!(env.MINIMAX_API_KEY||(env.ELEVENLABS_API_KEY&&env.PRODUCTION_VOICE_ID)))fail('PRODUCTION_OFFLINE');},
