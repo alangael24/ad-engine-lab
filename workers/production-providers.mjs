@@ -100,7 +100,8 @@ export function createProductionProviders(env,{fetchImpl=fetch}={}){
     if(!match)fail('PRODUCTION_REFERENCE_REQUIRED');
     form.append('image[]',new Blob([Buffer.from(match[2],'base64')],{type:match[1]}),'style-reference.jpg');
    }
-   const fresh=isCreatorProduct(project.data)&&!form.getAll('image[]').length;
+   // Any scene without attached references is a generation, including service ads.
+   const fresh=!form.getAll('image[]').length;
    const payload=fresh?JSON.stringify({model,prompt:form.get('prompt'),quality,size:form.get('size'),output_format:'png',n:1}):form;
    const r=await fetchImpl('https://api.openai.com/v1/images/'+(fresh?'generations':'edits'),{method:'POST',headers:{authorization:`Bearer ${env.OPENAI_API_KEY}`,...(fresh?{'content-type':'application/json'}:{})},body:payload,signal:AbortSignal.timeout(300000)});
    if(!r.ok)await providerFailure(r,'openai_image');const d=JSON.parse(new TextDecoder().decode(await readBounded(r,12000000)));if(!d.data?.[0]?.b64_json)fail('PRODUCTION_PROVIDER');

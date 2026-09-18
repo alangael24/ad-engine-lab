@@ -42,7 +42,7 @@ test('explicit GPT Image 2 medium reaches the provider without legacy fidelity p
  let captured;
  const providers=createProductionProviders({OPENAI_API_KEY:'fixture',PRODUCTION_IMAGE_MODEL:'gpt-image-2',PRODUCTION_IMAGE_QUALITY:'medium'},{fetchImpl:async(url,options)=>{captured=options.body;return new Response(null,{status:503});}});
  await assert.rejects(providers.image({project:{brand_snapshot:{},data:{aspectRatio:'9:16'}},plan:{continuity:'Same',scenes:[{text:'Hi',visual:'Product'}]},index:0}));
- assert.equal(captured.get('model'),'gpt-image-2');assert.equal(captured.get('quality'),'medium');assert.equal(captured.has('input_fidelity'),false);
+ const payload=JSON.parse(captured);assert.equal(payload.model,'gpt-image-2');assert.equal(payload.quality,'medium');assert.equal('input_fidelity' in payload,false);
 });
 
 test('director receives the actual product and reference images, bounded to four visual inputs',async()=>{
@@ -55,4 +55,21 @@ test('director receives the actual product and reference images, bounded to four
   return productionResponse(CHAT_MODEL,'direct_ad',{continuity:'Large eyes',scenes:[{text:'Hello.',visual:'Wave',motion:'Raise hand',shotContract:{productVisible:false,characterVisible:true,transition:'cut',camera:'Medium',state:'Hand raised',endState:'Hand lowered after waving',preserve:['Large eyes'],change:['Wave'],productViewAssetIds:[]}}]});
  }});
  const content=request.input[1].content;assert.equal(content.filter(x=>x.type==='input_image').length,4);assert.match(JSON.stringify(content),/Actual product, authoritative geometry/);assert.match(JSON.stringify(content),/Large eyes/);
+});
+
+test('sales scenes without references use generations and subsequent anchored scenes use edits',async()=>{
+ const requests=[];
+ const png=Buffer.from([137,80,78,71,13,10,26,10]);
+ const providers=createProductionProviders({OPENAI_API_KEY:'fixture'},{fetchImpl:async(url,options)=>{
+  if(String(url).startsWith('https://api.openai.com/')){requests.push({url,options});return new Response(null,{status:503});}
+  return new Response(png,{headers:{'content-type':'image/png'}});
+ }});
+ const project={brand_snapshot:{},data:{productProfile:'ads-sales-v1',aspectRatio:'9:16',creativeMemory:{approvedAssets:['11111111-1111-4111-8111-111111111111']}}};
+ const plan={continuity:'Same toy character',scenes:[{text:'Hello',visual:'Founder at desk'},{text:'Next',visual:'Founder moves'}]};
+ await assert.rejects(providers.image({project,plan,index:0}));
+ assert.equal(requests[0].url,'https://api.openai.com/v1/images/generations');
+ assert.equal(JSON.parse(requests[0].options.body).quality,'medium');
+ await assert.rejects(providers.image({project,plan,index:1,anchor:{assetId:'11111111-1111-4111-8111-111111111111'},previous:{assetId:'11111111-1111-4111-8111-111111111111'},invoke:async()=>({url:'https://storage.test/anchor.png'})}));
+ assert.equal(requests[1].url,'https://api.openai.com/v1/images/edits');
+ assert.equal(requests[1].options.body.getAll('image[]').length,1);
 });

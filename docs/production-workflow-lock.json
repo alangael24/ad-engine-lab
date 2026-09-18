@@ -127,7 +127,7 @@
     "workers/pod/Dockerfile": "ff1c7e94aa4d31e1e63f466fefb8b1644bcf62c162877e779132e59f790d6199",
     "workers/pod/entry.py": "0c0efef2cbeeaa53ea91269c1e297c60ef96df222380319d8acbfe2ce2aad2ef",
     "workers/production-clip-buffer.mjs": "1a97b324d770bdbadd85f1953096358e0c3a170a25082db89aab129dd831177e",
-    "workers/production-providers.mjs": "2cb7105941a2265308fa884a4de4837b785f8af0b215b39ac2b2c1490d485d30",
+    "workers/production-providers.mjs": "33e8e27c768c6d3da9e30859a190e3f641613e953cff4064eefe973965648b0a",
     "workers/production-quality.mjs": "6ba3677023fce482cdaa2f41668ca4df78e4ef0518864388533d4f3baaa196bc",
     "workers/production-worker.mjs": "9fc0713131f3e981ef17eabe7a9db9667ffb93cdefefb33026ed5144c6c4c892",
     "workers/recoverable-speech.mjs": "5b1bd90cc069114dc80baa397b87d6d872e343182fbec004ab89f2a66a4e21ad",
