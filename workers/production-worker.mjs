@@ -105,11 +105,13 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   await write('prepare','images','save_project',{...savedData,videoContinuity:plan.continuity,narrationAssetId:narration.assetId,timingConfirmed:true,scenes});
   const generateClips=async(entries,clipProject,clipPlan)=>runClipBuffer(entries,{
    prepare:async({scene,index,key,sourceKey,stage})=>{
+    const recovered=clipProject.recoveredClipVersions?.[scene.id];
+    if(recovered)return {recoveredVersion:recovered};
     const source=await once(sourceKey,stage,()=>providers.clip?.({project:clipProject,plan:clipPlan,scene,index,invoke})||{});
     const data={requestId:await stableId(job.id,key),sceneId:scene.id,assetId:source.assetId||null};
     await invoke('prepare_clip',{key,stage,data});return data;
    },
-   submit:({key,stage},data)=>write(key,stage,'version',data),
+   submit:({key,stage},data)=>data.recoveredVersion||write(key,stage,'version',data),
    inspect:()=>invoke('inspect'),
    select:({selectKey,stage},version)=>write(selectKey,stage,'select_version',{versionId:version.id}),
    check,pollMs

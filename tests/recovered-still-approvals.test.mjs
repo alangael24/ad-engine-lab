@@ -90,3 +90,13 @@ test('material v3 recovery preserves both gates only for the exact server-held a
  }
  prior.steps['material-v3-still-check-0-1'].result.assetIds=['other'];assert.deepEqual(recovered(),{});
 });
+test('a later prompt failure reuses enqueued clips, but changed scenes and unproven writes cannot',async()=>{
+ const {recoveredClipVersions}=await import('../src/recovered-still-approvals.js');
+ const {project,prior}=fixture();
+ prior.steps['clip-0']={status:'done',result:{id:'version',job_id:'job',user_id:'u',project_id:'p',scene_id:'s',snapshot:{scene:structuredClone(project.data.scenes[0])}}};
+ assert.equal(recoveredClipVersions(project,[prior]).s.id,'version');
+ for(const mutate of [v=>v.snapshot.scene.imageAssetId='wrong',v=>v.user_id='other',v=>v.snapshot.scene.motion='different']){
+  const changed=structuredClone(prior);mutate(changed.steps['clip-0'].result);assert.deepEqual(recoveredClipVersions(project,[changed]),{});
+ }
+ prior.steps.prepare.status='started';assert.deepEqual(recoveredClipVersions(project,[prior]),{});
+});

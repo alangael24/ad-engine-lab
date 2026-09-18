@@ -1,6 +1,6 @@
 import {readProductionClipProgress} from '../../src/h3-production-status.js';
 import {paidStep,measuredStepCost} from '../../src/production-spend.js';
-import {recoveredStillApprovals} from '../../src/recovered-still-approvals.js';
+import {recoveredStillApprovals,recoveredClipVersions} from '../../src/recovered-still-approvals.js';
 import {narrationAlignment,approvedBase} from '../../src/partial-edit.js';
 import {validateReview,QUALITY_VERSION} from '../../assets/quality-model.js';
 import {prepareSceneVideoPrompt,previousVideoRequest} from '../../src/h3-prompts.js';
@@ -58,7 +58,7 @@ export async function onRequestPost(context){try{
   // Its own prepare/select writes advance the current revision; using that
   // revision here loses inherited approvals after a coordinator restart.
   // The heartbeat above still fences user edits and obsolete leases.
-  return json({value:{referenceEvidence,recoveredStillApprovals:recoveredStillApprovals(j.snapshot,prior.data||[],new Set(),b.data?.imageReviewVersion||'')}});
+  return json({value:{referenceEvidence,recoveredClipVersions:recoveredClipVersions(j.snapshot,prior.data||[]),recoveredStillApprovals:recoveredStillApprovals(j.snapshot,prior.data||[],new Set(),b.data?.imageReviewVersion||'')}});
  }
  if(b.action==='review_media'){
   const r=await own(db,'studio_renders',j.user_id,b.data?.renderId);

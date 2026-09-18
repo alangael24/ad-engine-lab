@@ -54,3 +54,21 @@ export function recoveredStillApprovals(project,productions,visited=new Set(),re
  }
  return {};
 }
+// Enqueued clips survive a later prompt failure. Reuse only a version recorded
+// by an exact server-held project write, never a client-supplied version ID.
+export function recoveredClipVersions(project,productions){
+ const result={};
+ for(const p of productions){
+  if(p.user_id!==project.user_id||p.project_id!==project.id||p.status!=='failed'||p.expected_revision!==project.revision)continue;
+  const proven=Object.entries(p.steps||{}).some(([key,s])=>(key==='prepare'||/^select-\d+$/.test(key))&&s.status==='done'&&s.result?.revision===project.revision&&canonical(s.result.data)===canonical(project.data)&&canonical(s.result.brand_snapshot)===canonical(project.brand_snapshot));
+  if(!proven)continue;
+  for(const [key,step] of Object.entries(p.steps||{})){
+   const v=step.result;if(!/^clip-\d+$/.test(key)||step.status!=='done'||v?.user_id!==project.user_id||v.project_id!==project.id||!v.id||!v.job_id)continue;
+   const scene=project.data.scenes.find(s=>s.id===v.scene_id);if(!scene||scene.selectedVersionId)continue;
+   const actual={...scene};delete actual.selectedVersionId;
+   const saved={...v.snapshot?.scene};delete saved.selectedVersionId;
+   if(canonical(actual)===canonical(saved))result[scene.id]??=v;
+  }
+ }
+ return result;
+}
