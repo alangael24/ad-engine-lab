@@ -44,6 +44,13 @@ export async function runImageReviewPilot({packets,review,save,load,auditRate,au
  const secondaryPackets=states.map(s=>({...s.packet,scope:[...s.escalation.criteria,...s.escalation.styleCriteria]})).filter(p=>p.scope.length);
  // Bound each transport while still covering every mandatory collection criterion.
  let secondary=[];for(let offset=0;offset<secondaryPackets.length;offset+=6)try{secondary.push(...await call('secondary','collection_gate',secondaryPackets.slice(offset,offset+6)));}catch(error){if(error.fatal)throw error;}
+ // A malformed/absent confirmation is a review failure, not an image defect.
+ // Retry only the failed scene's frozen scope once, with the SAME image. The
+ // distinct checkpoint preserves both costs and prevents repeated paid retries.
+ for(const packet of secondaryPackets.filter(p=>!secondary.some(a=>a.sceneId===p.contract.sceneId))){
+  try{secondary.push(...await call('secondary','confirmation_retry',[packet]));}
+  catch(error){if(error.fatal)throw error;}
+ }
  const style=[];
  for(const s of states){
   const checks=secondary.find(x=>x.sceneId===s.packet.contract.sceneId)?.checks||[];

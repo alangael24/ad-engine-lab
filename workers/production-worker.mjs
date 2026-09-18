@@ -36,7 +36,7 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
   // A retry may replay an older cached plan created before this normalization.
   if(revision)plan.continuity=project.data.videoContinuity||'Preserve the existing product, characters, setting and visual style.';
   if(providers.prepareImageReview)plan.imageContracts=await once('material-contracts-v1','planning',()=>providers.prepareImageReview(project,plan));
-  const reviewPrefix=providers.imageReviewVersion?'material-v1-':'';
+  const reviewPrefix=providers.imageReviewVersion?`${providers.imageReviewVersion}-`:'';
   const reuseNarration=revision&&project.data.narrationAssetId&&project.data.timingConfirmed;
   const narration=reuseNarration?{assetId:project.data.narrationAssetId}:project.data.narrationRevision?await patchNarration(project,plan,providers,invoke,once,job.id):await once('narration','narration',()=>providers.speech(project,plan,invoke,job.id));
   const timeline=await once('timing','timing',()=>reuseNarration?existing.map(s=>({...s,planSceneId:s.id})):narration.timeline||alignScenes(plan,narration.alignment,narration.duration).map(({narrationStart,...s})=>s));

@@ -65,7 +65,7 @@ function meteredVisionEnv(env,invoke){
 export function createProductionProviders(env,{fetchImpl=fetch}={}){
  const material=materialImageReviewEnabled(env);
  return {
-  imageReviewVersion:material?'material-v1':null,
+  imageReviewVersion:material?'material-v2':null,
   prepareImageReview:material?prepareImageContracts:undefined,
   context:(_project,invoke)=>invoke('creative_context'),
   review:args=>reviewProduction({...args,env:meteredVisionEnv(env,args.invoke),fetchImpl}),

@@ -56,7 +56,7 @@ test('sample audit examines passes without showing the primary verdict to Astra'
 });
 test('invalid answers preserve usage, stop, and are not paid again on resume',async()=>{
  const h=harness([packet(contract())],()=>({assessments:[],usage:{tokens:100},costUsd:.12}));const r=await runImageReviewPilot(h.options);assert.equal(r.decisions[0].decision,'consult');assert.equal([...h.store.values()][0].costUsd,.12);
- await runImageReviewPilot(h.options);assert.equal(h.requests.length,2); // One primary, one fallback; both cached.
+ await runImageReviewPilot(h.options);assert.equal(h.requests.length,3); // Primary, fallback and bounded confirmation retry; all cached.
 });
 test('unknown transport cost is retained as unknown, not zero',async()=>{
  const h=harness([packet(contract())],()=>{throw Error('offline');});const r=await runImageReviewPilot(h.options);assert.equal(r.animationReady,false);assert.equal([...h.store.values()][0].costUsd,null);
@@ -78,4 +78,14 @@ test('syntax-only recovery closes delimiters without inventing missing criteria'
  const incomplete=parseImageReviewJSON('{"sceneId":"s1","checks":[');assert.throws(()=>validateImageAssessment(incomplete.value,c));
  assert.throws(()=>parseImageReviewJSON('{"sceneId":"unfinished'));
  assert.throws(()=>parseImageReviewJSON('{"sceneId":}'));
+});
+
+test('incomplete confirmation retries the same evidence once and retains both costs',async()=>{
+ const h=harness([packet(contract())],req=>({assessments:req.stage==='collection_gate'?[]:req.packets.map(p=>assessment(p.contract,p.scope.map(id=>check(id,req.stage==='inspect'?'violated':'met')))),costUsd:.01}));
+ const r=await runImageReviewPilot(h.options);
+ assert.equal(r.animationReady,true);assert.equal(h.requests.length,3);
+ assert.deepEqual(h.requests[1].packets,h.requests[2].packets);
+ assert.equal(h.requests[2].stage,'confirmation_retry');
+ assert.equal(r.calls.reduce((n,c)=>n+c.costUsd,0),.03);
+ await runImageReviewPilot(h.options);assert.equal(h.requests.length,3);
 });
