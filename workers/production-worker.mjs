@@ -1,3 +1,4 @@
+import {canReuseRepairImages} from '../src/repair-image-reuse.js';
 import {runClipBuffer} from './production-clip-buffer.mjs';
 import {repairOnOriginalTimeline} from '../assets/editorial-timeline.js';
 import {measuredEditorialCost} from '../src/production-spend.js';
@@ -155,10 +156,12 @@ export async function processProduction(job,api,providers,{pollMs=3000,deadlineM
    }
    if(plan.imageContracts)repairPlan.imageContracts=repairPlan.scenes.map(s=>{const source=timeline.find(t=>t.id===s.id)?.planSceneId||s.id;const c=plan.imageContracts.find(c=>c.sceneId===source);if(!c)throw Error('PRODUCTION_IMAGE_CONTRACT_MISSING');return {...c,sceneId:s.id};});
    const repairedImages=repaired.scenes.map(s=>({assetId:s.imageAssetId}));
+   if(!canReuseRepairImages(current.project.data.scenes,repaired.scenes,review.issues)){
    const stillReview=await once(`${reviewPrefix}repair-still-review-${round}`,'images',()=>providers.reviewImages({project:{...current.project,referenceEvidence:project.referenceEvidence,data:repaired},plan:repairPlan,images:repairedImages,invoke}));
    validateReview(stillReview,repairPlan.scenes.map((s,i)=>({...s,start:i,end:i+1})));
    if(stillReview.verdict!=='pass'||JSON.stringify(stillReview.assetIds)!==JSON.stringify(repairedImages.map(x=>x.assetId)))throw Error('PRODUCTION_IMAGES_BLOCKED');
    Object.assign(repaired,remember({data:repaired},{approvedAssets:repairedImages.map(x=>x.assetId),observedStates:stillReview.observedStates||[]}).data);
+   }
    await write(`repair-save-${round}`,'repair','save_project',repaired);
    await generateClips(review.issues.slice(0,3).map(issue=>{
     const index=repaired.scenes.findIndex(s=>s.id===issue.sceneId);
