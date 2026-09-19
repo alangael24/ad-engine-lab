@@ -1,3 +1,4 @@
+import {checkpointMediaUrls} from '../../src/checkpoint-media.js';
 import {editorialRecoveryProject} from '../../assets/editorial-recovery.js';
 import {editorialReviewModelMatches} from '../../assets/production-workflow.js';
 import {editorialRevisionContext,approvedBase,projectFingerprint} from '../../src/partial-edit.js';
@@ -50,8 +51,7 @@ export async function onRequestPost(context){try{
  if(b.action==='checkpoint_media'){
   if(!/^[a-f0-9]{64}$/.test(b.key||''))throw Error('EDITORIAL_CHECKPOINT_INVALID');
   const checkpointPath=`${r.user_id}/editorial-checkpoints/${r.project_id}/${b.key}.mp4`;
-  const s=await db.storage.from('studio-media').createSignedUploadUrl(checkpointPath);if(s.error)throw s.error;
-  return json({uploadUrl:s.data.signedUrl,downloadUrl:await signed(db,'studio-media',checkpointPath)});
+  return json(await checkpointMediaUrls(db.storage.from('studio-media'),checkpointPath));
  }
  const path=`${r.user_id}/renders/${r.id}.mp4`;
  if(b.action==='upload'){
