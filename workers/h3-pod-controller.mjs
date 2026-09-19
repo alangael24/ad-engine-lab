@@ -52,6 +52,12 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
   // Name + stored ID identify only this controller's own resource.
   if(pod.id!==run.pod_id||pod.name!==run.name)throw Error('POD_OWNERSHIP_MISMATCH');
   const profile=run.profile||(s.profiles||[]).find(p=>p.id===run.profile_id)||DEFAULT_H3_PROFILE;
+  // Try to keep the existing warm machine, never increase a customer ceiling.
+  // No request if disabled, unhealthy, busy, expired or the queue is empty.
+  if(s.enabled&&s.pending&&!s.running&&run.phase==='running'&&run.ready_at&&!run.boot_error&&now()<Date.parse(run.deadline_at)
+   &&(!managedStopReason(run,pod,s,now(),profile)||['budget_deadline','insufficient_run_window'].includes(managedStopReason(run,pod,s,now(),profile)))){
+   s=await state('retain');run=s.run;
+  }
   const reason=managedStopReason(run,pod,s,now(),profile);
   if(!reason)return {status:run.phase,podId:pod.id};
   await state('drain',{reason}); // Atomic drain prevents a new claim racing shutdown.

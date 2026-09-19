@@ -81,3 +81,22 @@ test('reference presence does not mandate product visibility; explicit shot requ
  f.plan.scenes[0].shotContract.productVisible=false;
  assert(!prepareImageContracts(f.project,f.plan)[0].criteria.some(c=>c.id==='product'));
 });
+
+test('escalation reasons persist before Astra dispatch and reuse without new calls',async()=>{
+ const f=fixture(),base=f.callModel;
+ f.callModel=async args=>{
+  if(args.role==='director')assert([...f.steps.values()].some(s=>s.result?.escalation?.to==='gpt-6-astra'));
+  return base(args);
+ };
+ const first=await reviewMaterialImages(f);
+ assert.equal(first.escalations.length,2);
+ for(const e of first.escalations){
+  assert.equal(e.from,'deepseek-flash');assert.equal(e.to,'gpt-6-astra');
+  assert.match(e.imageSha256,/^[a-f0-9]{64}$/);assert(e.contractRevision);
+  assert(e.reasons.some(r=>r.reason==='style_gate'));
+ }
+ const count=f.calls.length,steps=f.steps.size;
+ const second=await reviewMaterialImages(f);
+ assert.deepEqual(second.escalations,first.escalations);
+ assert.equal(f.calls.length,count);assert.equal(f.steps.size,steps);
+});

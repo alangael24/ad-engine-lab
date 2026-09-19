@@ -131,7 +131,7 @@ export async function reviewProduction({renderId,invoke,env,fetchImpl=fetch}){
    const actual=sha(await readFile(path));
    if(review?.version!==QUALITY_VERSION||!Number.isFinite(review.duration)||review.editorialVersion!=='sol-luna-v1'||!editorialReviewModelMatches(review)||review.sha256!==actual||editorial.sha256!==actual||JSON.stringify(review.coverage)!==JSON.stringify(media.manifest.scenes.map(s=>s.id)))throw Error('PRODUCTION_QUALITY_INVALID');
    const meta=await probe(path);if(Math.abs(Number(meta.format.duration)-review.duration)>.06)throw Error('PRODUCTION_QUALITY_MEDIA');
-   return {...review,renderId,usage:editorial.usage};
+   return {...review,renderId,reusedEditorialReview:true,costUsd:0,usage:editorial.usage};
   }
   return await reviewVideo({path,renderId,scenes:media.manifest.scenes,project:media.project,env,fetchImpl,directory:dir});
  }finally{await rm(dir,{recursive:true,force:true});}

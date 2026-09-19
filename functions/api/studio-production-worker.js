@@ -1,3 +1,5 @@
+import {editorialReviewModelMatches} from '../../assets/production-workflow.js';
+import {recoverableProductionStep} from '../../src/production-step-recovery.js';
 import {readProductionClipProgress} from '../../src/h3-production-status.js';
 import {paidStep,measuredStepCost} from '../../src/production-spend.js';
 import {recoveredStillApprovals,recoveredClipVersions} from '../../src/recovered-still-approvals.js';
@@ -23,7 +25,12 @@ export async function onRequestPost(context){try{
  if(b.action==='inspect'){
   const value=await rpc(db,'studio_production_work',args);
   const production=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
-  return json({value:{...value,compute:await readProductionClipProgress(db,production)}});
+  // studio_read intentionally omits manifests for the browser. The worker
+  // needs actual editorial receipts to settle spend before the final gate.
+  const receipts=await db.from('studio_renders').select('id,manifest').eq('project_id',production.project_id).eq('production_id',production.id);
+  if(receipts.error)throw receipts.error;
+  const manifests=new Map((receipts.data||[]).map(r=>[r.id,{scenes:r.manifest?.scenes,editorial:{usage:r.manifest?.editorial?.usage}}]));
+  return json({value:{...value,renders:value.renders.map(r=>({...r,...(manifests.has(r.id)?{manifest:manifests.get(r.id)}:{})})),compute:await readProductionClipProgress(db,production)}});
  }
  if(['heartbeat','yield_gpu','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
@@ -35,7 +42,20 @@ export async function onRequestPost(context){try{
  }
  if(b.action==='begin_step'){
   const key=b.data?.key,kind=paidStep(key);
-  if(kind&&!(key==='narration'&&j.snapshot?.data?.narrationRevision)&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
+  if(!j.steps?.[key]&&recoverableProductionStep(key)){
+   const recovered=await rpc(db,'recover_production_step',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_stage:b.data.stage});
+   if(recovered)return json({value:recovered});
+  }
+
+  let existingEditorialReview=false;
+  if(/^quality-\d+$/.test(key)){
+   const round=Number(key.split('-')[1]),renderId=j.steps?.[round?'render-'+round:'render']?.result?.id;
+   if(renderId){
+    const r=await own(db,'studio_renders',j.user_id,renderId),e=r.manifest?.editorial,v=e?.review;
+    existingEditorialReview=r.production_id===j.id&&r.project_revision===j.expected_revision&&r.status==='succeeded'&&e?.version==='sol-luna-v1'&&v?.version===QUALITY_VERSION&&editorialReviewModelMatches(v)&&/^[a-f0-9]{64}$/.test(e.sha256||'')&&v.sha256===e.sha256;
+   }
+  }
+  if(kind&&!existingEditorialReview&&!(key==='narration'&&j.snapshot?.data?.narrationRevision)&&!(kind==='planning'&&j.snapshot?.data?.scenes?.length)&&j.steps?.[key]?.status!=='done')await reserve(key,kind,/^(image-review-|repair-still-review-)/.test(key)?Math.max(1,j.steps?.plan?.result?.scenes?.length||j.snapshot?.data?.scenes?.length||1):1);
   return json({value:await rpc(db,'studio_production_work',args)});
  }
  if(b.action==='creative_context'){
@@ -67,7 +87,13 @@ export async function onRequestPost(context){try{
  }
  if(b.action==='finish_step'){
   const cost=measuredStepCost(b.data?.result);
-  if(paidStep(b.data?.key)&&cost!=null)await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:b.data.key,p_action:'settle',p_amount:Math.ceil(cost*1000000)});
+  if(paidStep(b.data?.key)&&cost!=null){
+   // A reused editorial review has no new reservation; an older retry may
+   // still have one. Settle that reservation only if it actually exists.
+   let settle=cost>0;
+   if(!settle){const prior=await db.from('production_spend_reservations').select('step_key').eq('job_id',j.id).eq('step_key',b.data.key).maybeSingle();if(prior.error)throw prior.error;settle=!!prior.data;}
+   if(settle)await rpc(db,'account_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:b.data.key,p_action:'settle',p_amount:Math.ceil(cost*1000000)});
+  }
 
   if(b.data?.stage==='quality'){
    const r=await own(db,'studio_renders',j.user_id,b.data?.result?.renderId),report=b.data.result;

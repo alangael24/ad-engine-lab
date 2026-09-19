@@ -7,6 +7,7 @@ import {validatePlan,alignScenes,alignmentFromWords,imageDirection} from '../ass
 import {processProduction} from '../workers/production-worker.mjs';
 import {postProduction,getProduction,productionEnabled} from '../src/studio-production.js';
 import {mockSupabase} from './helpers/supabase-http.mjs';
+import {measuredEditorialCost,measuredStepCost} from '../src/production-spend.js';
 let db;before(async()=>{db=await database();});after(async()=>{await db.close();});
 async function fixture(){const u=await user(db),photo=crypto.randomUUID();const write=(action,id,data,expected=null)=>call(db,'studio_write',[u.id,action,id,JSON.stringify(data),expected]);
  await write('register_asset',photo,{kind:'image',name:'Product',bucket:'generation-references',storage_path:`${u.id}/${photo}.png`,mime_type:'image/png',size_bytes:100});
@@ -241,5 +242,47 @@ test('material inspector subcalls persist and settle without charging their oute
   await invoke('finish_step',{key:'material-v1-image-review-0',stage:'images',result:{costUsd:0}});
   const rows=(await db.query('select step_key,measured_microusd from production_spend_reservations where job_id=$1',[j.id])).rows;
   assert.equal(rows.length,1);assert.equal(rows[0].step_key,key);assert.equal(Number(rows[0].measured_microusd),35000);
+ }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
+});
+
+test('new unchanged production restores review checkpoints without another reservation',async()=>{
+ const f=await fixture();await ready(db);let initial=await start(f),j;
+ const claim=async()=>{let x;do{x=await call(db,'studio_production_work',['test-producer','claim']);if(x.id!==initial.id)await work(x,'fail',{code:'TEST_SKIP'});}while(x.id!==initial.id);return x;};
+ j=await claim();
+ const key='material-call-'+'b'.repeat(64),result={assessments:[],costUsd:.04};
+ await work(j,'begin_step',{key,stage:'images'});await work(j,'finish_step',{key,stage:'images',result});
+ await work(j,'fail',{code:'PRODUCTION_PROVIDER'});
+ initial=await start(f);j=await claim();
+ const stub=mockSupabase(db),network=globalThis.fetch;globalThis.fetch=stub.fetch;
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters'};
+ try{
+  const response=await productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'begin_step',data:{key,stage:'images'}})})});
+  assert.equal(response.status,200,await response.clone().text());
+  assert.deepEqual((await response.json()).value.result,result);
+  assert.deepEqual((await work(j,'begin_step',{key,stage:'images'})).result,result);
+  assert.equal((await db.query('select count(*)::int n from production_spend_reservations where job_id=$1',[j.id])).rows[0].n,0);
+ }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
+});
+
+test('already paid final review begins without another budget reservation',async()=>{
+ const f=await fixture();await ready(db);const initial=await start(f);let j;
+ do{j=await call(db,'studio_production_work',['test-producer','claim']);if(j.id!==initial.id)await work(j,'fail',{code:'TEST_SKIP'});}while(j.id!==initial.id);
+ const id=crypto.randomUUID(),sha256='a'.repeat(64),review={version:2,model:'gpt-6-astra',workflowProfile:'astra-deepseek-v1',sha256,verdict:'pass',summary:'Reviewed',issues:[],sampleTimes:[]};
+ const usage={unknown:false,total:.27,calls:[{status:'completed',cost:.27}]};
+ await db.query("insert into studio_renders(id,user_id,project_id,project_revision,request_id,manifest,status,result_path,production_id,quality_status) values($1,$2,$3,$4,$1,$5,'succeeded',$6,$7,'pending')",[id,f.u.id,f.p.id,j.expected_revision,JSON.stringify({scenes:[],editorial:{version:'sol-luna-v1',sha256,review,usage}}),f.u.id+'/render.mp4',j.id]);
+ await work(j,'begin_step',{key:'render',stage:'assembly'});await work(j,'finish_step',{key:'render',stage:'assembly',result:{id}});
+ const stub=mockSupabase(db),network=globalThis.fetch;globalThis.fetch=stub.fetch;
+ const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test',PRODUCTION_WORKER_TOKEN:'test-production-worker-token-32-characters'};
+ try{
+  const response=await productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'begin_step',data:{key:'quality-0',stage:'quality'}})})});
+  assert.equal(response.status,200,await response.clone().text());
+  assert.equal((await db.query("select count(*)::int n from production_spend_reservations where job_id=$1 and step_key='quality-0'",[j.id])).rows[0].n,0);
+  const finish=await productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'finish_step',data:{key:'quality-0',stage:'quality',result:{...review,renderId:id,costUsd:0,reusedEditorialReview:true}}})})});
+  assert.equal(finish.status,200,await finish.clone().text());
+  const inspected=await productionWorkerRoute({env,request:new Request('https://app.test/api/studio-production-worker',{method:'POST',headers:{authorization:'Bearer '+env.PRODUCTION_WORKER_TOKEN,'content-type':'application/json'},body:JSON.stringify({workerId:'test-producer',jobId:j.id,leaseToken:j.lease_token,action:'inspect'})})});
+  assert.equal(inspected.status,200,await inspected.clone().text());
+  const rendered=(await inspected.json()).value.renders.find(r=>r.id===id);
+  assert.equal(measuredEditorialCost(rendered.manifest.editorial.usage),.27);
+  assert.equal(measuredStepCost({reusedEditorialReview:true,usage:{costUsd:.27}}),0);
  }finally{globalThis.fetch=network;await work(j,'fail',{code:'TEST_DONE'});}
 });

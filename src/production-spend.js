@@ -10,7 +10,7 @@ export function paidStep(key){
 }
 
 export function measuredStepCost(result){
- if(result?.reusedAudio)return 0;
+ if(result?.reusedAudio||result?.reusedEditorialReview)return 0;
  const cost=result?.providerUsage?.cost??result?.usage?.costUsd??result?.costUsd;
  return Number.isFinite(cost)&&cost>=0?cost:null;
 }

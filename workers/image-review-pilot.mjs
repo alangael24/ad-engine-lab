@@ -11,7 +11,7 @@ export async function runImageReviewPilot({packets,review,save,load,auditRate,au
  for(const p of packets){validateImageContract(p.contract);if(!digest(p.imageSha256)||!Array.isArray(p.references)||p.references.some(r=>!digest(r.sha256)))throw Error('IMAGE_REVIEW_PILOT_EVIDENCE');}
  const unresolved=packets.flatMap(p=>p.contract.unresolved.map(reason=>({sceneId:p.contract.sceneId,reason})));
  if(unresolved.length)return {version:IMAGE_REVIEW_POLICY_VERSION,status:'contract_blocked',unresolved,animationReady:false,calls:[],decisions:[]};
- const calls=[];
+ const calls=[],escalations=[];
  async function call(role,stage,subset){
   const model=modelIds[role],request=freeze({version:IMAGE_REVIEW_POLICY_VERSION,model,stage,system:IMAGE_INSPECTOR_RULES,packets:subset});
   const key=`image-review-pilot:${hash(request)}`;let record=await load(key),reused=Boolean(record);
@@ -37,6 +37,12 @@ export async function runImageReviewPilot({packets,review,save,load,auditRate,au
   // Stable selection per scene+asset+contract. Reruns cannot redraw an easier audit.
   const audit=parseInt(hash({auditSeed,scene:p.contract.sceneId,image:p.imageSha256,contract:p.contract}).slice(0,8),16)/2**32<auditRate;
   const escalation=imageEscalation(p.contract,primary,{audit,deferStyle});
+  if(escalation.criteria.length||escalation.styleCriteria.length){
+   const event={sceneId:p.contract.sceneId,imageSha256:p.imageSha256,contractRevision:p.contract.revision,from:modelIds.primary,to:modelIds.secondary,primaryUnavailable,reasons:[...escalation.reasons,...escalation.styleCriteria.map(criterionId=>({criterionId,reason:'style_gate'}))],criteria:[...escalation.criteria,...escalation.styleCriteria]};
+   const key='image-escalation:'+hash(event);
+   if(!await load(key))await save(key,{escalation:event,costUsd:0});
+   escalations.push({...event,key});
+  }
   states.push({packet:p,primary,primaryUnavailable,confirmed:[],audit,escalation});
  }
  // Bundle known-risk checks, rejection confirmations, sampled audits and style
@@ -58,5 +64,5 @@ export async function runImageReviewPilot({packets,review,save,load,auditRate,au
   style.push({sceneId:s.packet.contract.sceneId,checks:checks.filter(c=>s.escalation.styleCriteria.includes(c.criterionId))});
  }
  const decisions=states.map(s=>decideImage(s.packet.contract,s.primary,{confirmed:s.confirmed,style:style.find(x=>x.sceneId===s.packet.contract.sceneId)?.checks||[],audit:s.audit,deferStyle}));
- return {version:IMAGE_REVIEW_POLICY_VERSION,status:'reviewed',animationReady:decisions.every(d=>d.decision==='approve'),decisions,calls,records:states.map(s=>({sceneId:s.packet.contract.sceneId,audit:s.audit,primaryUnavailable:s.primaryUnavailable,primary:s.primary,confirmed:s.confirmed,escalation:s.escalation})),style};
+ return {version:IMAGE_REVIEW_POLICY_VERSION,status:'reviewed',animationReady:decisions.every(d=>d.decision==='approve'),decisions,calls,escalations,records:states.map(s=>({sceneId:s.packet.contract.sceneId,audit:s.audit,primaryUnavailable:s.primaryUnavailable,primary:s.primary,confirmed:s.confirmed,escalation:s.escalation})),style};
 }
