@@ -13,7 +13,7 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
  const control=async(path,method='GET',body)=>{
    const r=await fetchImpl('https://api.runpod.io/v2'+path,{method,headers:{authorization:`Bearer ${env.RUNPOD_CONTROL_API_KEY}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(r.status===404)return null;
-  if(!r.ok)throw Error('POD_CONTROL_UNCONFIRMED');
+  if(!r.ok){const error=Error('POD_CONTROL_UNCONFIRMED');error.httpStatus=r.status;throw error;}
   return r.status===204?{}:r.json();
  };
  let s=await state('acquire');if(s.busy)return {status:'busy'};token=s.token;
@@ -37,7 +37,7 @@ export async function tickManagedPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}
      startSsh:false,startJupyter:false,env:{CREATIVE_RUSH_URL:origin.origin,GENERATION_WORKER_TOKEN:env.GENERATION_WORKER_TOKEN,
       H3_POD_RUN_ID:run.id,H3_WORKER_ID:run.worker_prefix,H3_POD_DEADLINE:run.deadline_at,H3_EXPECTED_GPU:chosen.gpu,H3_MIN_VRAM_GB:String(chosen.min_vram_gb)}});
     if(pod?.id)await state('attach',{podId:pod.id});
-   }catch{return {status:'create_ack_unknown'};}
+   }catch(error){return {status:'create_ack_unknown',httpStatus:error.httpStatus||null,errorType:error.name==='TimeoutError'?'timeout':'provider_request'};}
    return {status:'preparing',runId:run.id};
   }
   if(!run.pod_id){
