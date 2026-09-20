@@ -5,11 +5,11 @@ export async function tickQwenPod(env,{fetchImpl=fetch,now=()=>Date.now()}={}){
  if(origin.protocol!=='https:'||!env.RUNPOD_CONTROL_API_KEY||!env.PRODUCTION_WORKER_TOKEN||!env.GENERATION_WORKER_TOKEN||!/^ghcr\.io\/alangael24\/creativerush-qwen-pod@sha256:[a-f0-9]{64}$/.test(env.QWEN_POD_IMAGE||''))throw Error('QWEN_CONFIG');
  const owner='qwenctl_'+crypto.randomUUID();let token;
  const state=async(action,data={})=>{
-  const r=await fetchImpl(origin.origin+'/api/qwen-image-worker',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json','user-agent':'CreativeRush-Worker/1.0'},body:JSON.stringify({action,owner,token,data}),redirect:'error',signal:AbortSignal.timeout(20000)});
+  const r=await fetchImpl(origin.origin+'/api/qwen-image-worker',{method:'POST',headers:{authorization:`Bearer ${env.PRODUCTION_WORKER_TOKEN}`,'content-type':'application/json','user-agent':'CreativeRush-Worker/1.0'},body:JSON.stringify({action,owner,token,data}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(!r.ok)throw Error('QWEN_STATE_UNAVAILABLE');return r.json();
  };
  const control=async(path,method='GET',body)=>{
-  const r=await fetchImpl('https://api.runpod.io/v2'+path,{method,headers:{authorization:`Bearer ${env.RUNPOD_CONTROL_API_KEY}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
+  const r=await fetchImpl('https://api.runpod.io/v2'+path,{method,headers:{authorization:`Bearer ${env.RUNPOD_CONTROL_API_KEY}`,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'manual',signal:AbortSignal.timeout(20000)});
   if(r.status===404)return null;if(!r.ok)throw Error('QWEN_CONTROL_UNCONFIRMED');return r.status===204?{}:r.json();
  };
  let s=await state('acquire');if(s.busy)return {status:'busy'};token=s.token;

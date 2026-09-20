@@ -136,7 +136,7 @@
     "workers/production-quality.mjs": "96e2f928c5d6238081bc89ce36ea071e46cc52e93fe0a527e18e6f951e98eab0",
     "workers/production-worker.mjs": "e33c2db6bd707b4f43970c03fc5665f3205590898d971f475565ec33298a85a7",
     "workers/qwen-image-provider.mjs": "f715b895f4adb2c2d7c86b4c0e4a29efa7ea8dbfbf54206487a7101cbbde9faa",
-    "workers/qwen-pod-controller.mjs": "988f6aafa35e736c3a0882ed663ec4917b930e97eed55efdb2a459cf00c38448",
+    "workers/qwen-pod-controller.mjs": "4191991f9e96d88872f21a029668afd2a97095f65cec51dcebd840ef3eef1947",
     "workers/qwen/Dockerfile": "c1dbcca118a7b37cf687ce89b955d3a2b0c9536eb4cd3b7697dcdc1f8fcfa73d",
     "workers/qwen/config.json": "dc9112438e7209071b40e6801bf328246160dda25f8748b6296302db0b2de92f",
     "workers/qwen/official/pe_core.py": "fd9732bbba71468fb24bd81de5c209f0db2941f01d1e556d52b5a6deba0f1fe5",
