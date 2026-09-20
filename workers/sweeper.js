@@ -1,3 +1,4 @@
+import {tickQwenPod} from './qwen-pod-controller.mjs';
 import {tickManagedPod} from './h3-pod-controller.mjs';
 // Deploy separately with a minute cron. Runs even when no GPU is online.
 export default {
@@ -9,7 +10,7 @@ export default {
         body:JSON.stringify({ action:'sweep' }), signal:AbortSignal.timeout(25000),
       }).catch(()=>({ok:false}));
       if (!response.ok) console.error('Generation reconciliation failed',response.status||'network');
-      console.log(JSON.stringify({managedPod:await tickManagedPod(env)}));
+      for(const [name,tick] of [['h3',tickManagedPod],['qwen',tickQwenPod]]){try{console.log(JSON.stringify({controller:name,result:await tick(env)}));}catch(e){console.error(JSON.stringify({controller:name,error:e.message}));}}
     })());
   },
 };

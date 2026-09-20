@@ -6,7 +6,8 @@ export const PRODUCTION_WORKFLOWS=Object.freeze({
 export function productionWorkflow(env={}){
  const version=env.PRODUCTION_WORKFLOW_PROFILE||DEFAULT_PRODUCTION_WORKFLOW;
  if(!Object.hasOwn(PRODUCTION_WORKFLOWS,version))throw Error('PRODUCTION_WORKFLOW_CONFIG');
- return {version,...PRODUCTION_WORKFLOWS[version]};
+ if(env.PRODUCTION_IMAGE_PROVIDER&&!['openai','qwen'].includes(env.PRODUCTION_IMAGE_PROVIDER))throw Error('PRODUCTION_IMAGE_PROVIDER_CONFIG');
+ return {version,...PRODUCTION_WORKFLOWS[version],...(env.PRODUCTION_IMAGE_PROVIDER==='qwen'?{imageModel:'Qwen/Qwen-Image-2.1'}:{})};
 }
 export function editorialReviewModelMatches(review){
  const profile=review?.workflowProfile||'sol-luna-v1';

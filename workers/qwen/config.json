@@ -1,0 +1,11 @@
+{
+  "version": "qwen21-batch-v1",
+  "imageModel": "Qwen/Qwen-Image-2.1",
+  "imageRevision": "b3179ad355be050328e483a9dfdd9e60cd62adfa",
+  "rewriteModel": "Qwen/Qwen-Image-2.1-PE-I2I",
+  "rewriteRevision": "72927bc08afc99b7888ceb7d7d51a12db3700bbd",
+  "steps": 40,
+  "cfg": 1.0,
+  "seed": 42,
+  "kvCache": true
+}

@@ -1,3 +1,4 @@
+import {qwenProductionAction} from '../../src/qwen-images.js';
 import {editorialReviewModelMatches} from '../../assets/production-workflow.js';
 import {recoverableProductionStep} from '../../src/production-step-recovery.js';
 import {readProductionClipProgress} from '../../src/h3-production-status.js';
@@ -35,6 +36,7 @@ export async function onRequestPost(context){try{
  if(['heartbeat','yield_gpu','complete','fail'].includes(b.action))return json({value:await rpc(db,'studio_production_work',args)});
  const j=await rpc(db,'studio_production_work',{...args,p_action:'heartbeat'});
  const reserve=async(key,kind,units=1)=>rpc(db,'reserve_production_spend',{p_worker:b.workerId,p_job:j.id,p_lease:b.leaseToken,p_key:key,p_kind:kind,p_units:units});
+ if(['qwen_enqueue','qwen_status'].includes(b.action))return json({value:await qwenProductionAction(db,j,b.action,b.data)});
  if(b.action==='record_cost'||b.action==='reserve_cost'){
   const amount=b.data?.costUsd;
   if(!Number.isFinite(amount)||amount<0||amount>100)throw Error('PRODUCTION_INVALID');

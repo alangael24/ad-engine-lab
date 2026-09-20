@@ -1,3 +1,4 @@
+import {qwenImage} from './qwen-image-provider.mjs';
 import {isCreatorProduct} from '../assets/product-profiles.js';
 import {CREATOR_DIRECTOR_SYSTEM} from '../src/creator-prompts.js';
 import {commercialDirection} from '../src/sales-copy.js';
@@ -93,6 +94,9 @@ export function createProductionProviders(env,{fetchImpl=fetch}={}){
   async image({project,plan,index,anchor,previous,invoke,jobId}){
    if(!['9:16','16:9','1:1'].includes(project.data.aspectRatio))fail('PRODUCTION_INVALID');
    const packet=imagePacket(project,plan,index,{anchor,previous}),ids=packet.references.map(x=>x.assetId);
+   if(env.PRODUCTION_IMAGE_PROVIDER==='qwen'){
+    return qwenImage({prompt:imageDirection(project,plan,index,packet)+(packet.includeFilmstrip&&project.referenceEvidence?.[0]?'\nThe final attached filmstrip is STYLE/PROGRESSION ONLY for visible entities; exclude source identities, claims and offscreen objects.':''),size:{'9:16':'1024x1536','16:9':'1536x1024','1:1':'1024x1024'}[project.data.aspectRatio],references:ids,includeFilmstrip:packet.includeFilmstrip&&!!project.referenceEvidence?.[0],invoke});
+   }
    const form=new FormData();const model=env.PRODUCTION_IMAGE_MODEL||productionWorkflow(env).imageModel;form.set('model',model);if(model==='gpt-image-1.5')form.set('input_fidelity','high');form.set('prompt',imageDirection(project,plan,index,packet)+(packet.includeFilmstrip&&project.referenceEvidence?.[0]?'\nThe final attached filmstrip is STYLE/PROGRESSION ONLY for visible entities; exclude source identities, claims and offscreen objects.':''));const quality=env.PRODUCTION_IMAGE_QUALITY||'medium';if(!['low','medium','high'].includes(quality))fail('PRODUCTION_INVALID');form.set('quality',quality);form.set('output_format','png');form.set('n','1');
    form.set('size',{'9:16':'1024x1536','16:9':'1536x1024','1:1':'1024x1024'}[project.data.aspectRatio]);
    for(const [i,id] of ids.entries()){const f=await loadImage(id,invoke,fetchImpl);form.append('image[]',new Blob([f.bytes],{type:f.mime}),`reference-${i}.${f.ext}`);}
