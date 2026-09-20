@@ -15,6 +15,17 @@ export async function qwenProductionAction(db,production,action,data){
   const request={version:QWEN_IMAGE_VERSION,prompt:r.prompt,size:r.size,references:r.references,filmstrip};
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(request)));
   const fingerprint=Array.from(new Uint8Array(bytes),x=>x.toString(16).padStart(2,'0')).join('');
+  const old=await db.from('qwen_image_jobs').select('id').eq('production_id',production.id).eq('step_key',key).maybeSingle();if(old.error)throw old.error;
+  if(!old.data){
+   const control=await db.from('qwen_image_control').select('current_run,enabled,commercial_authorized').eq('id',true).single();if(control.error)throw control.error;
+   if(!control.data.enabled||!control.data.commercial_authorized)throw Error('QWEN_DISABLED');
+   const run=control.data.current_run?await db.from('qwen_image_runs').select('phase,ready_at').eq('id',control.data.current_run).single():null;
+   if(run?.error)throw run.error;
+   if(!run?.data?.ready_at||run.data.phase!=='running'){
+    const reservation=await db.from('production_spend_reservations').select('estimated_microusd').eq('job_id',production.id).eq('step_key',key).single();if(reservation.error)throw reservation.error;
+    await rpc(db,'account_production_spend',{p_worker:production.worker_id,p_job:production.id,p_lease:production.lease_token,p_key:key,p_action:'reserve',p_amount:Math.max(400000,reservation.data.estimated_microusd)});
+   }
+  }
   return rpc(db,'qwen_image_work',{p_action:'enqueue',p_data:{productionId:production.id,key,fingerprint,request}});
  }
  const {data:q,error}=await db.from('qwen_image_jobs').select('*').eq('id',data?.id).eq('production_id',production.id).single();

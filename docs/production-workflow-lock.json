@@ -100,7 +100,7 @@
     "src/production-step-recovery.js": "378c04b103e007cca755c4824ed8278bd2e8cafd0d8ae1113f2d6786e0dbf299",
     "src/production-vision.js": "092596ceed4bb8b731c3ba179abad181adf84f478c1413a17f98f4a190074e07",
     "src/provided-script.js": "03dc4e3a1ad5d79d994b732fc6ae676f2d11afec79e6683f0f723a4ab22633ed",
-    "src/qwen-images.js": "52be4baf5c06e25b341197949fb0b66003b3ffdbe2fa6d07bc4ae1d0622dd5c0",
+    "src/qwen-images.js": "2d337993507a81a5c9e8b321f849b1543043c6f9f97fb04b999a5aeeb55a4e9b",
     "src/recovered-still-approvals.js": "6d1e8edc63701be16614bef9fb64ca177c98a3a9a87b90f991e391869775a64f",
     "src/reference-analysis.js": "13fb36ae177e8da5dcaaedcdeaa4944ae2ae616ecc9991e22f3e507030c84aec",
     "src/repair-image-reuse.js": "d221f7c2433d9575e44352b46fc20afe236139b52538d72706539bcd3267fa3b",

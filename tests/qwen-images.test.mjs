@@ -88,3 +88,17 @@ test('controller verifies ownership and deletion, idle held while images reviewe
  assert.equal((await tickQwenPod(env,{fetchImpl})).status,'running');assert.equal(deleted,false);
  holding=false;assert.equal((await tickQwenPod(env,{fetchImpl})).status,'deleted');assert.ok(actions.includes('close'));
 });
+
+test('cold enqueue reserves startup allowance; warm and existing jobs do not',async()=>{
+ const {qwenProductionAction}=await import('../src/qwen-images.js');
+ for(const mode of ['cold','warm','existing','disabled']){
+  const calls=[];
+  const rows={qwen_image_jobs:mode==='existing'?{id}:null,qwen_image_control:{enabled:mode!=='disabled',commercial_authorized:true,current_run:mode==='warm'?id:null},qwen_image_runs:{phase:'running',ready_at:'now'},production_spend_reservations:{estimated_microusd:150000}};
+  const db={from(table){const chain={select(){return chain},eq(){return chain},single:async()=>({data:rows[table]}),maybeSingle:async()=>({data:rows[table]})};return chain},async rpc(name,args){calls.push({name,args});return {data:{id}}}};
+  const action=qwenProductionAction(db,{id,worker_id:'test',lease_token:id},'qwen_enqueue',{key:'image-0',request:{prompt:'product',size:'1024x1536',references:[]}});
+  if(mode==='disabled'){await assert.rejects(action,/QWEN_DISABLED/);assert.equal(calls.length,0);continue}
+  await action;
+  const reserve=calls.filter(c=>c.name==='account_production_spend');assert.equal(reserve.length,mode==='cold'?1:0);
+  if(reserve.length)assert.equal(reserve[0].args.p_amount,400000);
+ }
+});
