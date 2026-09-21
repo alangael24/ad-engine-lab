@@ -9,6 +9,8 @@ const fields=()=>Object.fromEntries(new FormData(form));
 function status(t,error=false){$('#gift-status').textContent=t;$('#gift-status').dataset.error=String(error);}
 function saveDraft(){try{store(DRAFT,{fields:fields(),step,version:3});}catch{status('No pudimos guardar el borrador en este navegador. No cierres esta pestaña.',true);}}
 const restored=read(DRAFT);if(restored?.fields)for(const [k,v]of Object.entries(restored.fields)){const input=form.elements.namedItem(k);if(input&&typeof v==='string')input.value=v;}
+// Restore older drafts without carrying a retired visual style into new orders.
+form.elements.namedItem('look').value='3d';
 const purchasedPackage=new URLSearchParams(location.search).get('package');
 if(['gift_60','gift_120'].includes(purchasedPackage))form.elements.namedItem('package').value=purchasedPackage;
 function paintPackage(){const code=form.elements.namedItem('package').value;$('#gift-duration').hidden=step!==3;$('#gift-duration').textContent=code==='gift_120'?'2 minutos · $499 MXN':'1 minuto · $299 MXN';for(const link of document.querySelectorAll('[data-gift-buy]'))link.hidden=link.dataset.giftBuy!==code;saveDraft();}
@@ -20,7 +22,7 @@ function paintQuestions(){const q=giftQuestions(fields());$('#memory1-question')
 for(const name of ['relationship','occasion'])form.elements.namedItem(name).addEventListener('change',paintQuestions);
 paintQuestions();
 const stepTitles=['¿A quién quieres sorprender?','Los detalles que solo ustedes conocen.','Dale vida a sus protagonistas.','Elige cuánto de su historia quieres contar'];
-function show(n){step=n;document.body.dataset.giftStep=String(n);panels.forEach((p,i)=>p.hidden=i!==n);document.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.step)===n?'step':'false'));$('#form-title').textContent=stepTitles[n];$('#gift-back').hidden=n===0;$('#gift-next').hidden=n===3;$('#gift-purchase').hidden=n!==3;$('#gift-next').textContent=['Recordar juntos →','Elegir el estilo →','Elegir la duración →'][n]||'Continuar →';$('#gift-duration').hidden=n!==3;const f=fields();$('#gift-summary').textContent=`Para ${f.recipient||'esa persona especial'} · ${GIFT_OCCASIONS[f.occasion]||'Su historia'} · ${GIFT_EMOTIONS[f.emotion]||'Amor'} · ${f.look==='clay'?'Plastilina':'Animación 3D'}.`;saveDraft();}
+function show(n){step=n;document.body.dataset.giftStep=String(n);panels.forEach((p,i)=>p.hidden=i!==n);document.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.step)===n?'step':'false'));$('#form-title').textContent=stepTitles[n];$('#gift-back').hidden=n===0;$('#gift-next').hidden=n===3;$('#gift-purchase').hidden=n!==3;$('#gift-next').textContent=['Recordar juntos →','Añadir sus fotos →','Elegir la duración →'][n]||'Continuar →';$('#gift-duration').hidden=n!==3;const f=fields();$('#gift-summary').textContent=`Para ${f.recipient||'esa persona especial'} · ${GIFT_OCCASIONS[f.occasion]||'Su historia'} · ${GIFT_EMOTIONS[f.emotion]||'Amor'} · Animación 3D tipo Pixar.`;saveDraft();}
 function go(n){if(busy)return;if(n>step)for(let i=0;i<n;i++)if(!validatePanel(i))return;show(n);const heading=$('#form-title');heading.tabIndex=-1;heading.focus({preventScroll:true});heading.closest('.workbench').scrollIntoView({block:'start',behavior:'instant'});}
 for(const b of document.querySelectorAll('[data-step]'))b.onclick=()=>go(Number(b.dataset.step));
 $('#gift-next').onclick=()=>go(step+1);$('#gift-back').onclick=()=>go(step-1);form.addEventListener('input',saveDraft);

@@ -37,3 +37,7 @@ La API `/api/gift-admin` verifica la sesión con Auth antes de consultar datos. 
 - El plazo inicia cuando están confirmados el pago, la aprobación del guion y las referencias completas si el cliente decidió incluir fotos. Sin fotos se pueden usar personajes inventados.
 - El operador debe atender primero los pedidos prioritarios que ya estén listos para producir, respetando los compromisos de 24 horas de pedidos estándar. El panel identifica la modalidad en la lista y el detalle.
 - Esto sigue siendo cumplimiento manual: no hay un planificador ni alertas automáticas para estos plazos. No prometer una hora hasta validar capacidad y tiempos reales.
+
+## Estilo único de nuevos pedidos
+
+Regalos ofrece solamente animación 3D tipo Pixar. El formulario fija `look: 3d`, normaliza los borradores antiguos y el brief incluye la dirección visual expresiva y cinematográfica. Los pedidos históricos conservan su estilo registrado; esta actualización no los reescribe. Mantener esta dirección al producir desde Codex.

@@ -18,7 +18,7 @@ test('gift project preserves memories and owned photos through save and idempote
 test('maximum form lengths and three labeled references fit the existing production contract',()=>{
  const raw={...input,relationship:'family',emotion:'gratitude',occasion:'pregnancy',recipient:'a'.repeat(80),names:'b'.repeat(120),memory1:'c'.repeat(300),memory2:'d'.repeat(300),memory3:'e'.repeat(300),message:'f'.repeat(300),avoid:'g'.repeat(160)};
  const data=projectData(giftRequest(raw,Array.from({length:3},()=>({id:crypto.randomUUID(),label:'h'.repeat(100)}))));assert.ok(data.idea.length<=3000);assert.equal(data.creativeMemory.characterAssetIds.length,3);
- assert.throws(()=>giftRequest({...input,memory1:''}));assert.throws(()=>giftRequest(input,[{id:crypto.randomUUID(),label:''}]));assert.throws(()=>giftRequest({...input,look:'unknown'}));
+ assert.throws(()=>giftRequest({...input,memory1:''}));assert.throws(()=>giftRequest(input,[{id:crypto.randomUUID(),label:''}]));assert.throws(()=>giftRequest({...input,look:'unknown'}));assert.throws(()=>giftRequest({...input,look:'clay'}));assert.match(giftRequest(input).idea,/Estilo visual único: animación 3D tipo Pixar/);
  assert.match(GIFT_SCRIPT_REQUEST,/no inicies imágenes, voz ni video todavía/);
 });
 
