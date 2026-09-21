@@ -10,12 +10,12 @@ async function refresh(){clearTimeout(timer);try{
  $('#order-balance').textContent=order.status==='script_ready'?`Tienes ${r.seconds.available} segundos disponibles. Al aprobar se reservan ${order.targetSeconds}.`:'';
  needsPayment=['received','script_ready'].includes(order.status)&&r.seconds.available<order.targetSeconds;
  $('#order-buy').hidden=!needsPayment;$('#order-buy').textContent=order.targetSeconds===120?'Comprar película de 2 minutos · $499 MXN':'Comprar película de 1 minuto · $299 MXN';
- // The server creates Checkout with the verified account identity; never trust query params as payment proof.
- $('#order-buy').onclick=async e=>{e.preventDefault();await task(async()=>{const r=await apiRequest('/api/checkout',{method:'POST',body:{plan:order.targetSeconds===120?'gift_120':'gift_60'}});sessionStorage.setItem('gift-checkout-order',order.id);location.assign(r.url);});};
+ // The server selects a payment link with the verified account identity; never trust query params as payment proof.
+ $('#order-buy').onclick=async e=>{e.preventDefault();await task(async()=>{const r=await apiRequest('/api/checkout',{method:'POST',body:{plan:order.targetSeconds===120?'gift_120':'gift_60'}});location.assign(r.url);});};
  $('#order-approve').disabled=needsPayment;$('#order-download').hidden=order.status!=='ready';
  $('#order-download').onclick=async e=>{e.preventDefault();await task(async()=>{const d=await apiRequest('/api/gift-orders?id='+id+'&download=1');location.assign(d.url);});};
  if(!['ready','cancelled'].includes(order.status))timer=setTimeout(()=>{if(!busy)refresh();},30000);
- }catch(e){say(e.message||'No pudimos conectar. Puedes actualizar para intentarlo de nuevo.');if(e.code==='UNAUTHORIZED'){const a=document.createElement('a');if(id)sessionStorage.setItem('gift-checkout-order',id);a.href='/cuenta/?mode=login&next=gift-orders';a.textContent='Iniciar sesión';$('#order-list').replaceChildren(a);}}}
+ }catch(e){say(e.message||'No pudimos conectar. Puedes actualizar para intentarlo de nuevo.');if(e.code==='UNAUTHORIZED'){const a=document.createElement('a');a.href='/cuenta/?mode=login&next=gift-orders';a.textContent='Iniciar sesión';$('#order-list').replaceChildren(a);}}}
 async function task(fn){if(busy)return;busy=true;for(const b of document.querySelectorAll('button'))b.disabled=true;try{await fn();await refresh();}catch(e){say(e.message);}finally{busy=false;$('#order-refresh').disabled=false;$('#order-changes').disabled=false;$('#order-approve').disabled=needsPayment||order?.status!=='script_ready';}}
 $('#order-approve').onclick=()=>task(()=>apiRequest('/api/gift-orders',{method:'POST',body:{action:'approve',id,expected:order.revision}}));
 $('#order-changes').onclick=()=>task(async()=>{const note=$('#order-note').value.trim();if(!note)throw Error('Escribe el cambio que quieres pedir.');await apiRequest('/api/gift-orders',{method:'POST',body:{action:'changes',id,expected:order.revision,note}});$('#order-note').value='';});
