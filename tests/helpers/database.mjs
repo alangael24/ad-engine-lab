@@ -33,6 +33,7 @@ export async function database({seconds=true}={}) {
   const recovery=await readFile(new URL('../../supabase/migrations/20260919064717_production_cost_recovery.sql', import.meta.url),'utf8');
   await db.exec(recovery.slice(recovery.indexOf('create or replace function public.recover_production_step')).replace(/commit;\s*$/, ''));
   if(seconds)await db.exec(await readFile(new URL('../../supabase/migrations/20260921203307_gift_movie_packages.sql', import.meta.url),'utf8'));
+  if(seconds)await db.exec(await readFile(new URL('../../supabase/migrations/20260921220324_manual_gift_fulfillment.sql',import.meta.url),'utf8'));
   return db;
 }
 export async function user(db, credits = 12, images = 20) {

@@ -15,6 +15,7 @@ async function applySession(next) {
     if(sessionStorage.getItem('creative-rush-return')==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='creator-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/crear/');return;}
+    if(sessionStorage.getItem('creative-rush-return')==='gift-orders'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/pedido/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='regalos'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/');return;}
     const account = await apiRequest('/api/account');
     if (current !== revision) return;

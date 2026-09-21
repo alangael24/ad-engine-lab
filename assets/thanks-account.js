@@ -54,7 +54,7 @@ async function checkPurchase(attempt = 0) {
       if (planNames[data.plan]) planName.textContent = planNames[data.plan];
       const gift=['gift_60','gift_120'].includes(data.plan);
       planIncludes.textContent = gift?`Tu película personalizada de ${data.videoSeconds===120?'2 minutos':'1 minuto'}, con guion, animación, narración, subtítulos, dedicatoria y descarga.`:data.videoSeconds?`Hasta 1 minuto por anuncio, con imágenes, voz, animación, edición y subtítulos. También puedes repartir la duración incluida en videos más cortos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
-      if(toolButton){toolButton.href=gift?"/regalos/?package="+data.plan:data.videoSeconds?"/anuncios-lab/":"/herramienta/";if(gift)toolButton.textContent="Preparar mi película →";}
+      if(toolButton){toolButton.href=gift?"/regalos/pedido/":data.videoSeconds?"/anuncios-lab/":"/herramienta/";if(gift)toolButton.textContent="Ver mis películas →";}
       if (data.paymentStatus === "paid") {
         document.querySelector('#payment-title').textContent = 'Pago confirmado.';
         document.querySelector('#plan-price').textContent = new Intl.NumberFormat('es-MX', { style:'currency', currency:data.currency || 'MXN' }).format(data.amountTotal / 100);

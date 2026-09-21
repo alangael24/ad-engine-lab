@@ -4,6 +4,7 @@ import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
+ GIFT_MANUAL:[409,'Esta película se prepara con nuestro equipo. Revisa el guion y la entrega en Mis películas.'],
  INSUFFICIENT_VIDEO_SECONDS:[402,'No quedan suficientes segundos disponibles. Tu avance está guardado; puedes añadir otro paquete en Planes.'],
  VIDEO_DURATION_LIMIT:[422,'La narración supera la duración máxima de esta película. Acorta o divide el guion. Conservamos tu avance y liberamos los segundos reservados.'],
  PRODUCTION_TIMEOUT:[409,'No pudimos completar el video dentro del plazo. Tu proyecto y los recursos terminados siguen guardados.'],
