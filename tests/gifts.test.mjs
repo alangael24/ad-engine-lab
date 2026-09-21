@@ -1,6 +1,6 @@
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
-import {giftRequest,GIFT_SCRIPT_REQUEST} from '../assets/gift-model.js';
+import {giftRequest,GIFT_SCRIPT_REQUEST,giftDraftStep,giftQuestions,GIFT_OCCASIONS} from '../assets/gift-model.js';
 import {projectData} from '../assets/studio-model.js';
 import {database,user,call} from './helpers/database.mjs';
 const input={recipient:'Ana',names:'Ana y Luis',occasion:'anniversary',memory1:'Nos conocimos en Puebla. Luis olvidó su paraguas rojo.',memory2:'',memory3:'',message:'Gracias por ser mi casa.',avoid:'No añadir hijos.',look:'3d',tone:'warm',ratio:'16:9'};
@@ -16,10 +16,39 @@ test('gift project preserves memories and owned photos through save and idempote
  const stranger=await user(db);await assert.rejects(call(db,'studio_write',[stranger.id,'create_project',crypto.randomUUID(),JSON.stringify(data),null]),/STUDIO_ASSET_NOT_FOUND/);
 });
 test('maximum form lengths and three labeled references fit the existing production contract',()=>{
- const raw={...input,recipient:'a'.repeat(80),names:'b'.repeat(120),memory1:'c'.repeat(300),memory2:'d'.repeat(300),memory3:'e'.repeat(300),message:'f'.repeat(300),avoid:'g'.repeat(160)};
+ const raw={...input,relationship:'family',emotion:'gratitude',occasion:'pregnancy',recipient:'a'.repeat(80),names:'b'.repeat(120),memory1:'c'.repeat(300),memory2:'d'.repeat(300),memory3:'e'.repeat(300),message:'f'.repeat(300),avoid:'g'.repeat(160)};
  const data=projectData(giftRequest(raw,Array.from({length:3},()=>({id:crypto.randomUUID(),label:'h'.repeat(100)}))));assert.ok(data.idea.length<=3000);assert.equal(data.creativeMemory.characterAssetIds.length,3);
  assert.throws(()=>giftRequest({...input,memory1:''}));assert.throws(()=>giftRequest(input,[{id:crypto.randomUUID(),label:''}]));assert.throws(()=>giftRequest({...input,look:'unknown'}));
  assert.match(GIFT_SCRIPT_REQUEST,/no inicies imágenes, voz ni video todavía/);
+});
+
+test('guided answers reach the stored director brief for every occasion without starting production',async()=>{
+ const u=await user(db);
+ for(const occasion of Object.keys(GIFT_OCCASIONS)){
+  const data=projectData(giftRequest({...input,occasion,relationship:'mother',emotion:'gratitude',package:'gift_120',memory1:'Quiero decirle a Ana que será abuela.',memory2:'Siempre dice: aquí hay sitio para uno más.'}));
+  const p=await call(db,'studio_write',[u.id,'create_project',crypto.randomUUID(),JSON.stringify(data),null]);
+  assert.match(p.data.idea,/Relación con quien regala: Mi mamá/);
+  assert.match(p.data.idea,/Emoción que debe transmitir: Gratitud/);
+  assert.match(p.data.idea,/aquí hay sitio para uno más/);
+  assert.match(p.data.idea,/será abuela/);
+  assert.equal(p.data.creatorBrief.targetDuration,120);
+ }
+ assert.equal((await db.query('select count(*)::int n from studio_productions where user_id=$1',[u.id])).rows[0].n,0);
+ assert.throws(()=>giftRequest({...input,emotion:'invalid'}));
+ assert.throws(()=>giftRequest({...input,relationship:'invalid'}));
+});
+
+test('old drafts return to their matching panel after duration moves to the end',()=>{
+ assert.deepEqual([0,1,2,3].map(step=>giftDraftStep({version:2,step})),[3,0,1,2]);
+ assert.deepEqual([0,1,2].map(step=>giftDraftStep({step})),[0,1,2]);
+ assert.equal(giftDraftStep({version:3,step:3}),3);
+ assert.equal(giftDraftStep(null),0);
+});
+
+test('occasion-specific prompts take precedence over the relationship',()=>{
+ assert.match(giftQuestions({relationship:'mother',occasion:'pregnancy'}).memory,/noticia/);
+ assert.match(giftQuestions({relationship:'mother',occasion:'thanks'}).memory,/hizo por ti/);
+ assert.match(giftQuestions({relationship:'father',occasion:'memorial'}).hint,/No necesitas explicar la pérdida/);
 });
 
 test('selected gift duration reaches the validated brief and story instructions',()=>{
