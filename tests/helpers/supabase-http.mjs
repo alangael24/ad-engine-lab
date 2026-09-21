@@ -15,6 +15,7 @@ export function mockSupabase(db) {
       const u=users.get(request.headers.get('authorization')?.replace('Bearer ',''));
       return u ? respond(u) : respond({message:'Invalid token'},401);
     }
+    if(path.startsWith('/auth/v1/admin/users/')){const u=users.get(path.split('/').at(-1));return u?respond({user:u}):respond({message:'Not found'},404);}
     if (path==='/auth/v1/invite') {
       const body=await request.json(); invites.push({email:body.email,redirectTo:url.searchParams.get('redirect_to')});
       const found=await db.query('select id,email from auth.users where email=$1',[body.email]);
@@ -40,7 +41,7 @@ export function mockSupabase(db) {
       }
       const args=[],conditions=[];
       for (const [key,value] of url.searchParams) {
-        if(['select','order','limit'].includes(key)) continue;
+        if(['select','order','limit','offset'].includes(key)) continue;
         if(value==='not.is.null'){conditions.push(`${safe(key)} is not null`);continue;}
         const dot=value.indexOf('.'),op=value.slice(0,dot),rhs=value.slice(dot+1);
         if(op==='in'){args.push(rhs.slice(1,-1).split(',').map(v=>v.replace(/^"|"$/g,'')));conditions.push(`${safe(key)} = any($${args.length})`);continue;}
@@ -49,8 +50,9 @@ export function mockSupabase(db) {
       }
       const columns=(url.searchParams.get('select') || '*').split(',').map(x=>x==='*'?'*':safe(x));
       let query=`select ${columns.join(',')} from public.${safe(name)}${conditions.length?' where '+conditions.join(' and '):''}`;
-      if(url.searchParams.get('order')){const [col,direction]=url.searchParams.get('order').split('.'); query+=` order by ${safe(col)} ${direction==='desc'?'desc':'asc'}`;}
+      if(url.searchParams.get('order'))query+=' order by '+url.searchParams.get('order').split(',').map(part=>{const [col,direction]=part.split('.');return safe(col)+' '+(direction==='desc'?'desc':'asc');}).join(',');
       if(url.searchParams.get('limit')){args.push(Number(url.searchParams.get('limit')));query+=` limit $${args.length}`;}
+      if(url.searchParams.get('offset')){args.push(Number(url.searchParams.get('offset')));query+=` offset $${args.length}`;}
       const result=await db.query(query,args); const singular=request.headers.get('accept')?.includes('vnd.pgrst.object');
       if(singular && result.rows.length!==1) return respond({message:'JSON object requested, multiple (or no) rows returned',code:'PGRST116'},406);
       return respond(request.method==='HEAD'?null:singular?result.rows[0]:result.rows,200,{'content-range':`0-${Math.max(result.rows.length-1,0)}/${result.rows.length}`});

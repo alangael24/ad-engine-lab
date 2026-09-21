@@ -1,3 +1,4 @@
+import {isGiftAdmin} from './gift-admin.js';
 import {json} from './backend.js';
 import {authContext,readJson,rpc,UUID,apiError} from './generations.js';
 import {own,signed} from './studio.js';
@@ -7,10 +8,10 @@ const publicOrder=o=>({id:o.id,status:o.status,script:o.script,revision:o.revisi
 function error(e){if(e.message==='STUDIO_NOT_FOUND'||e.code==='STUDIO_NOT_FOUND')return json({code:'GIFT_NOT_FOUND',error:errors.GIFT_NOT_FOUND[1]},404);const k=Object.keys(errors).find(k=>e.code===k||e.message?.includes(k));return k?json({code:k,error:errors[k][1]},errors[k][0]):apiError(e);}
 export async function getGiftOrder(context){try{
  const {db,user}=await authContext(context),url=new URL(context.request.url),id=url.searchParams.get('id');
- if(!id){const q=await db.from('gift_orders').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);if(q.error)throw q.error;return json({orders:q.data.map(publicOrder)});}
+ if(!id){const q=await db.from('gift_orders').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);if(q.error)throw q.error;return json({orders:q.data.map(publicOrder),canAdmin:isGiftAdmin(user,context.env)});}
  const o=await own(db,'gift_orders',user.id,id);
  if(url.searchParams.has('download')){if(o.status!=='ready'||!o.asset_id)throw Error('GIFT_INVALID');const a=await own(db,'studio_assets',user.id,o.asset_id);return json({url:await signed(db,a.bucket,a.storage_path,true)});}
- return json({order:publicOrder(o),seconds:await secondsBalance(db,user.id)});
+ return json({order:publicOrder(o),seconds:await secondsBalance(db,user.id),canAdmin:isGiftAdmin(user,context.env)});
 }catch(e){return error(e);}}
 export async function postGiftOrder(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,4000);

@@ -4,6 +4,7 @@ const states={received:'Recibimos tu historia. Prepararemos el guion para que lo
 function say(t){$('#order-status').textContent=t;}
 async function refresh(){clearTimeout(timer);try{
  const r=await apiRequest('/api/gift-orders'+(id?'?id='+encodeURIComponent(id):''));
+ $('#admin-link').hidden=!r.canAdmin;
  if(!id){say(r.orders.length?'Abre una película para ver su avance.':'Todavía no has enviado una historia.');const list=$('#order-list');list.replaceChildren();for(const o of r.orders){const a=document.createElement('a');a.className='order-list-item';a.href='/regalos/pedido/?id='+o.id;a.textContent=`${o.title} — ${states[o.status]}`;list.append(a);}return;}
  order=r.order;$('#order-title').textContent=order.title;$('#order-details').hidden=false;say(states[order.status]);$('#order-reference').textContent='Pedido '+order.id.slice(0,8);$('#order-progress').textContent=`Película de ${order.targetSeconds/60} minuto${order.targetSeconds>60?'s':''}`;
  $('#order-script').hidden=!order.script;$('#order-script').textContent=order.script;$('#order-review').hidden=order.status!=='script_ready';

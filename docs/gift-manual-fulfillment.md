@@ -23,3 +23,9 @@ node --env-file=/ruta/privada.env scripts/gift-operator.mjs deliver ORDER_ID /ca
 La nota de revisión debe describir la comprobación de historia, referencias, continuidad, narración, subtítulos y reproducción del MP4. El comando comprueba pistas de audio/video y duración; no sustituye la revisión humana. Conserva cada resultado intermedio y no vuelve a generar recursos al reintentar una subida. La misma película produce el mismo asset ID, para recuperar una entrega interrumpida.
 
 No encender GPU ni generar voz sin presupuesto autorizado. Apagar/eliminar el cómputo al finalizar o fallar y registrar el costo real por separado del uso de la suscripción de Codex.
+
+## Panel administrador
+
+`/regalos/admin/` permite consultar todos los pedidos, filtrar por estado, abrir la historia, fotos privadas, correo del cliente, guion, cambios y revisión de entrega. La descarga exige un pedido ya entregado. El panel es de consulta: no inicia generaciones ni modifica pedidos.
+
+La API `/api/gift-admin` verifica la sesión con Auth antes de consultar datos. Requiere `app_metadata.creativerush_gift_admin === true` administrado en servidor, o un correo **verificado** incluido en el secreto de Pages `GIFT_ADMIN_EMAILS`. Nunca acepta `user_metadata`, correos enviados por el navegador ni parámetros como autorización. La configuración por correo también funciona para una cuenta creada posteriormente, una vez verificada. Para revocar, quitar el correo de la configuración y cualquier rol de app_metadata; publicar la configuración nueva. Las referencias se firman solo si pertenecen al cliente del pedido. Los enlaces caducan a los 15 minutos; Actualizar obtiene enlaces nuevos.

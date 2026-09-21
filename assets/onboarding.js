@@ -3,10 +3,11 @@ const $ = selector => document.querySelector(selector);
 const isPlans = document.body.dataset.onboarding === 'plans';
 const params = new URLSearchParams(location.search);
 const login = params.get('mode') === 'login';
-const next = ['editor','planes','ads-sales-v1','creator-v1','regalos','gift-orders'].includes(params.get('next')) ? params.get('next') : 'tool';
+const next = ['editor','planes','ads-sales-v1','creator-v1','regalos','gift-orders','gift-admin'].includes(params.get('next')) ? params.get('next') : 'tool';
 if(next==='editor')sessionStorage.setItem('creative-rush-return','editor');
 if(next==='ads-sales-v1')sessionStorage.setItem('creative-rush-return','ads-sales-v1');
 if(next==='creator-v1')sessionStorage.setItem('creative-rush-return','creator-v1');
+if(next==='gift-admin')sessionStorage.setItem('creative-rush-return','gift-admin');
 if(next==='gift-orders')sessionStorage.setItem('creative-rush-return','gift-orders');
 if(next==='regalos')sessionStorage.setItem('creative-rush-return','regalos');
 let client, ready = false, routing = false, waiting = false, googleEnabled = false, googlePending = false;
@@ -22,6 +23,7 @@ async function routeSession(session) {
     if(!isPlans&&next==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     if(!isPlans&&next==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
     if(!isPlans&&next==='creator-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/crear/');return;}
+    if(!isPlans&&next==='gift-admin'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/admin/');return;}
     if(!isPlans&&next==='gift-orders'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/pedido/');return;}
     if(!isPlans&&next==='regalos'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/');return;}
     const account = await apiRequest('/api/account');
@@ -81,6 +83,11 @@ if (!isPlans) {
     document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH REGALOS';document.querySelector('.on-bottom').textContent='Una historia que solo ustedes podrían protagonizar.';
     $('#account-switch a').href=login?'/cuenta/?next=regalos':'/cuenta/?mode=login&next=regalos';
   }
+  if(next==='gift-admin'||next==='gift-orders'){
+    $('#account-title').textContent=next==='gift-admin'?'Administrar Regalos.':'Tus películas te esperan.';$('#account-intro').textContent=next==='gift-admin'?'Entra con la cuenta autorizada para consultar los pedidos.':'Entra para revisar tus guiones y descargar tus películas.';
+    document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH REGALOS';document.querySelector('.on-bottom').textContent='Tu cuenta. Tus películas.';
+    $('#account-switch a').href=login?'/cuenta/?next='+next:'/cuenta/?mode=login&next='+next;
+  }
   if(next==='creator-v1'){
     $('#account-title').textContent='Tu próxima historia empieza aquí.';$('#account-intro').textContent='Crea contenido con IA a partir de una idea, un guion o una referencia.';
     document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH CREADOR';document.querySelector('.on-bottom').textContent='Tu idea. Tu mundo. Tu video.';
@@ -95,7 +102,7 @@ if (!isPlans) {
     waiting = true; $('#signup-submit').disabled = true; $('#google-signin').disabled = true; message('Enviando tu enlace seguro…');
     try {
       await requestAccess($('#signup-email').value, !login);
-      message(next==='editor'?'Revisa tu correo y abre el enlace en este navegador para entrar al editor.':'Revisa tu correo y confirma el enlace en este navegador. Después verás tu plan; si ya tienes uno, entrarás a tu estudio.', 'success');
+      message(next==='gift-admin'||next==='gift-orders'?'Revisa tu correo y abre el enlace en este navegador para consultar los pedidos.':next==='editor'?'Revisa tu correo y abre el enlace en este navegador para entrar al editor.':'Revisa tu correo y confirma el enlace en este navegador. Después verás tu plan; si ya tienes uno, entrarás a tu estudio.', 'success');
       $('#signup-submit').textContent = 'Enlace enviado';
       setTimeout(() => { waiting = false; $('#signup-submit').disabled = googlePending; $('#signup-submit').textContent = 'Enviar otro enlace'; }, 60000);
     } catch (error) {
