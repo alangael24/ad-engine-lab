@@ -7,6 +7,7 @@ const planName = document.querySelector("#plan-name");
 const planIncludes = document.querySelector("#plan-includes");
 
 const planNames = {
+  gift_60:'CreativeRush Regalos — Película de 1 minuto', gift_120:'CreativeRush Regalos — Película de 2 minutos',
   esencial: "CreativeRush AI — Launch",
   pro: "CreativeRush AI — Pro",
   minute_1:"CreativeRush — 1 anuncio completo", minute_3:"CreativeRush — 3 anuncios completos", minute_8:"CreativeRush — 8 anuncios completos",
@@ -51,8 +52,9 @@ async function checkPurchase(attempt = 0) {
     const data = await response.json();
     if (response.ok && data.ready) {
       if (planNames[data.plan]) planName.textContent = planNames[data.plan];
-      planIncludes.textContent = data.videoSeconds?`Hasta 1 minuto por anuncio, con imágenes, voz, animación, edición y subtítulos. También puedes repartir la duración incluida en videos más cortos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
-      if(toolButton)toolButton.href=data.videoSeconds?"/anuncios-lab/":"/herramienta/";
+      const gift=['gift_60','gift_120'].includes(data.plan);
+      planIncludes.textContent = gift?`Tu película personalizada de ${data.videoSeconds===120?'2 minutos':'1 minuto'}, con guion, animación, narración, subtítulos, dedicatoria y descarga.`:data.videoSeconds?`Hasta 1 minuto por anuncio, con imágenes, voz, animación, edición y subtítulos. También puedes repartir la duración incluida en videos más cortos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
+      if(toolButton){toolButton.href=gift?"/regalos/?package="+data.plan:data.videoSeconds?"/anuncios-lab/":"/herramienta/";if(gift)toolButton.textContent="Preparar mi película →";}
       if (data.paymentStatus === "paid") {
         document.querySelector('#payment-title').textContent = 'Pago confirmado.';
         document.querySelector('#plan-price').textContent = new Intl.NumberFormat('es-MX', { style:'currency', currency:data.currency || 'MXN' }).format(data.amountTotal / 100);

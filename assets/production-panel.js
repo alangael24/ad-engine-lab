@@ -15,8 +15,10 @@ export function productionPanel({api,task,getProject,isDirty,tell,refresh,getRen
   clearTimeout(timer);currentId=p.id;
   const r=await api('/api/studio-production?project='+p.id);if(getProject()?.id!==p.id)return;
   onBalance(r.seconds);
-  balance.hidden=plans.hidden=!r.seconds?.enabled;
-  if(r.seconds?.enabled)balance.textContent=`${r.seconds.available} s disponibles · ${r.seconds.reserved} s en producción. Se reserva hasta 60 s al empezar y se descuenta la duración entregada, redondeada al segundo superior. Si falla, se libera la reserva.`;
+  const gift=creator&&p.data.idea?.startsWith('PELÍCULA PERSONALIZADA PARA REGALAR.');
+  balance.hidden=!r.seconds?.enabled;plans.hidden=!r.seconds?.enabled&&!gift;
+  plans.href=gift?'/regalos/?package='+(p.data.creatorBrief?.targetDuration>60?'gift_120':'gift_60'):'/planes/';plans.textContent=gift?'Comprar mi película':'Añadir minutos';
+  if(r.seconds?.enabled)balance.textContent=`${r.seconds.available} s disponibles · ${r.seconds.reserved} s en producción. Se reserva la duración disponible para tu proyecto al empezar y se descuenta la duración entregada, redondeada al segundo superior. Si falla, se libera la reserva.`;
   const j=r.productions[0],active=j&&['queued','running'].includes(j.status),render=getRenders().find(x=>x.project_revision===p.revision);
   const syncKey=j&&!active?j.id+':'+j.status:null;
   if(syncKey&&lastSyncedJob!==syncKey&&!isDirty()){lastSyncedJob=syncKey;await refresh(p.id);return;}

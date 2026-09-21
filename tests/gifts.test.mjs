@@ -21,3 +21,10 @@ test('maximum form lengths and three labeled references fit the existing product
  assert.throws(()=>giftRequest({...input,memory1:''}));assert.throws(()=>giftRequest(input,[{id:crypto.randomUUID(),label:''}]));assert.throws(()=>giftRequest({...input,look:'unknown'}));
  assert.match(GIFT_SCRIPT_REQUEST,/no inicies imágenes, voz ni video todavía/);
 });
+
+test('selected gift duration reaches the validated brief and story instructions',()=>{
+ const one=projectData(giftRequest({...input,package:'gift_60'})),two=projectData(giftRequest({...input,package:'gift_120'}));
+ assert.equal(one.creatorBrief.targetDuration,60);assert.equal(two.creatorBrief.targetDuration,120);
+ assert.match(two.idea,/aproximadamente dos minutos/);assert.match(one.idea,/aproximadamente un minuto/);
+ assert.throws(()=>giftRequest({...input,package:'gift_999'}));
+});

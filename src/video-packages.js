@@ -1,5 +1,9 @@
 // Prices and entitlements are server-owned; checkout input selects a code only.
 export const VIDEO_PACKAGES = Object.freeze({
+  gift_60: Object.freeze({code:'gift_60', name:'CreativeRush Regalos — Película de 1 minuto', amount:299, currency:'MXN', videoSeconds:60, destination:'/regalos/',
+    paymentLinkId:'plink_1UIDtvEudyi7fxH7tUG0mR4G', url:'https://buy.stripe.com/bJebJ1bZt5P55C8apybwk07'}),
+  gift_120: Object.freeze({code:'gift_120', name:'CreativeRush Regalos — Película de 2 minutos', amount:499, currency:'MXN', videoSeconds:120, destination:'/regalos/',
+    paymentLinkId:'plink_1UIDrMEudyi7fxH7Mh4ECV5Y', url:'https://buy.stripe.com/cNi14n1kP0uLe8E2X6bwk06'}),
   minute_1: Object.freeze({code:'minute_1', name:'CreativeRush — 1 anuncio completo', amount:500, currency:'MXN', videoSeconds:60,
     paymentLinkId:'plink_1UGV1iEudyi7fxH7ivDoeENH', url:'https://buy.stripe.com/00wfZhgfJ2CT7Kg69ibwk03'}),
   minute_3: Object.freeze({code:'minute_3', name:'CreativeRush — 3 anuncios completos', amount:1000, currency:'MXN', videoSeconds:180,

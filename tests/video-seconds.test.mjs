@@ -12,7 +12,7 @@ import * as webhook from '../functions/api/stripe/webhook.js';
 import * as account from '../functions/api/account.js';
 let db,stub,originalFetch;
 const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-only',STRIPE_WEBHOOK_SECRET:'whsec_test_seconds',APP_URL:'https://app.test'};
-before(async()=>{db=await database({seconds:false});for(const file of ['20260915073916_managed_h3_pod_lifecycle.sql','20260915081955_managed_pod_failed_start_refunds.sql','20260915170257_managed_pod_boot_progress.sql','20260916221655_managed_h3_attempt_recovery.sql','20260917022634_video_seconds_packages.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));stub=mockSupabase(db);originalFetch=globalThis.fetch;globalThis.fetch=stub.fetch;});
+before(async()=>{db=await database({seconds:false});for(const file of ['20260915073916_managed_h3_pod_lifecycle.sql','20260915081955_managed_pod_failed_start_refunds.sql','20260915170257_managed_pod_boot_progress.sql','20260916221655_managed_h3_attempt_recovery.sql','20260917022634_video_seconds_packages.sql','20260921203307_gift_movie_packages.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));stub=mockSupabase(db);originalFetch=globalThis.fetch;globalThis.fetch=stub.fetch;});
 after(async()=>{globalThis.fetch=originalFetch;await db.close();});
 async function buyer(plan='minute_1'){
  const u={id:crypto.randomUUID(),email:crypto.randomUUID()+'@example.test',email_confirmed_at:new Date().toISOString()};
@@ -172,4 +172,27 @@ test('only scoped edits retaining paid script and source clips can reuse their d
  const different=await start(f);
  assert.equal((await db.query('select included_seconds from video_seconds_reservations where production_id=$1',[different.id])).rows[0].included_seconds,0);
  await db.query("update studio_productions set status='failed' where id=$1",[different.id]);
+});
+
+test('two-minute creator gift reserves, settles and replays exactly 120 seconds; ads stay capped',async()=>{
+ const u=await buyer('gift_120');
+ await db.query("insert into studio_production_workers(id) values('seconds-test') on conflict(id) do update set last_seen_at=now()");
+ const data={productProfile:'creator-v1',creatorBrief:{kind:'story',targetDuration:120},title:'Regalo',brandId:null,idea:'Una historia familiar',aspectRatio:'16:9',scriptDraft:'Nuestra historia empieza aquí.',scenes:[],narrationAssetId:null};
+ const p=await call(db,'studio_write',[u.id,'create_project',crypto.randomUUID(),JSON.stringify(data),null]);
+ const f={u,p};const initial=await start(f);assert.equal(await seconds(u),0);
+ assert.equal((await start(f,initial.id)).id,initial.id);assert.equal(await seconds(u),0);
+ const j=await claim(initial);await assert.rejects(timing(j,121),/VIDEO_DURATION_LIMIT/);
+ await work(j,'finish_step',{key:'timing',result:[{id:crypto.randomUUID(),start:0,end:120}]});await deliver(j,120);assert.equal(await seconds(u),0);
+ await assert.rejects(start({u,p},crypto.randomUUID()),/INSUFFICIENT_VIDEO_SECONDS|STUDIO_CONFLICT/);
+ const adBuyer=await buyer('gift_120'),ad=await fixture(adBuyer),adJob=await claim(await start(ad));
+ await assert.rejects(timing(adJob,61),/VIDEO_DURATION_LIMIT/);await work(adJob,'fail',{code:'PRODUCTION_PROVIDER'});assert.equal(await seconds(adBuyer),120);
+});
+test('failed two-minute gifts refund once; a one-minute balance cannot fund a two-minute delivery',async()=>{
+ for(const plan of ['gift_60','gift_120']){
+  const u=await buyer(plan),p=await call(db,'studio_write',[u.id,'create_project',crypto.randomUUID(),JSON.stringify({productProfile:'creator-v1',creatorBrief:{kind:'story',targetDuration:120},title:'Regalo',brandId:null,idea:'Familia',aspectRatio:'16:9',scriptDraft:'Una historia.',scenes:[],narrationAssetId:null}),null]);
+  const j=await claim(await start({u,p}));
+  if(plan==='gift_60')await assert.rejects(timing(j,120),/INSUFFICIENT_VIDEO_SECONDS/);else await timing(j,120);
+  await work(j,'fail',{code:'PRODUCTION_PROVIDER'});assert.equal(await seconds(u),VIDEO_PACKAGES[plan].videoSeconds);
+  await assert.rejects(work(j,'fail',{code:'PRODUCTION_PROVIDER'}),/LEASE_LOST/);assert.equal(await seconds(u),VIDEO_PACKAGES[plan].videoSeconds);
+ }
 });

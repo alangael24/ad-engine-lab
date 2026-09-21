@@ -46,7 +46,7 @@ async function grantPurchase(supabase, event, session, plan, paymentLinkId, env)
 
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || null;
   const appUrl = String(env.APP_URL || "https://creativerushai.com").replace(/\/$/, "");
-  await ensureAccount(supabase, email, `${appUrl}${plan.videoSeconds?'/anuncios-lab/':'/herramienta/'}`);
+  await ensureAccount(supabase, email, `${appUrl}${plan.destination||(plan.videoSeconds?'/anuncios-lab/':'/herramienta/')}`);
 
   if(plan.videoSeconds){
     const {data,error}=await supabase.rpc('apply_video_seconds_purchase',{

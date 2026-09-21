@@ -5,7 +5,7 @@ import {authContext,readJson,rpc,UUID} from './generations.js';
 import {own,studioError} from './studio.js';
 export const PRODUCTION_ERRORS={
  INSUFFICIENT_VIDEO_SECONDS:[402,'No quedan suficientes segundos disponibles. Tu avance está guardado; puedes añadir otro paquete en Planes.'],
- VIDEO_DURATION_LIMIT:[422,'La narración supera los 60 segundos por anuncio. Acorta o divide el guion. Conservamos tu avance y liberamos los segundos reservados.'],
+ VIDEO_DURATION_LIMIT:[422,'La narración supera la duración máxima de esta película. Acorta o divide el guion. Conservamos tu avance y liberamos los segundos reservados.'],
  PRODUCTION_TIMEOUT:[409,'No pudimos completar el video dentro del plazo. Tu proyecto y los recursos terminados siguen guardados.'],
  PRODUCTION_GENERATION_OFFLINE:[503,'La animación no está disponible ahora. Conservamos tu avance sin iniciar nuevas imágenes ni voces.'],
  WORKER_OFFLINE:[503,'La animación se detuvo. Las imágenes y la voz están guardadas.'],
