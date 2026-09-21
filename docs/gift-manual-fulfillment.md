@@ -41,3 +41,7 @@ La API `/api/gift-admin` verifica la sesión con Auth antes de consultar datos. 
 ## Estilo único de nuevos pedidos
 
 Regalos ofrece solamente animación 3D tipo Pixar. El formulario fija `look: 3d`, normaliza los borradores antiguos y el brief incluye la dirección visual expresiva y cinematográfica. Los pedidos históricos conservan su estilo registrado; esta actualización no los reescribe. Mantener esta dirección al producir desde Codex.
+
+## Cambio de paquete en checkout
+
+El checkout muestra ambas opciones. Antes de aprobar la producción, el cliente puede cambiar entre 60 y 120 segundos. El servidor verifica dueño, estado y revisión, conserva recuerdos y fotos, actualiza el brief del pedido y el proyecto, y devuelve el guion a preparación si cambia la duración. No genera recursos ni descuenta saldo. Después de aprobar la producción, la selección queda bloqueada.

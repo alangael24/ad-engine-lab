@@ -15,6 +15,7 @@ export async function getGiftOrder(context){try{
 }catch(e){return error(e);}}
 export async function postGiftOrder(context){try{
  const {db,user}=await authContext(context),b=await readJson(context.request,4000);
- if(!UUID.test(b.id||'')||!['submit','approve','changes'].includes(b.action)||(b.action!=='submit'&&(!Number.isInteger(b.expected)||b.expected<1))||typeof(b.note??'')!=='string')throw Error('GIFT_INVALID');
+ if(!UUID.test(b.id||'')||!['submit','approve','changes','package'].includes(b.action)||(b.action!=='submit'&&(!Number.isInteger(b.expected)||b.expected<1))||typeof(b.note??'')!=='string')throw Error('GIFT_INVALID');
+ if(b.action==='package'){if(![60,120].includes(b.seconds))throw Error('GIFT_INVALID');const o=await rpc(db,'gift_order_package',{p_user:user.id,p_id:b.id,p_expected:b.expected,p_seconds:b.seconds});return json({order:publicOrder(o)});}
  const o=await rpc(db,'gift_order_customer',{p_user:user.id,p_id:b.id,p_action:b.action,p_expected:b.expected??null,p_note:b.note??''});return json({order:publicOrder(o)});
 }catch(e){return error(e);}}
