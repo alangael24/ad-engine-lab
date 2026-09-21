@@ -7,17 +7,18 @@ const read=k=>{try{return JSON.parse(sessionStorage.getItem(k));}catch{return nu
 const store=(k,v)=>sessionStorage.setItem(k,JSON.stringify(v));
 const fields=()=>Object.fromEntries(new FormData(form));
 function status(t,error=false){$('#gift-status').textContent=t;$('#gift-status').dataset.error=String(error);}
-function saveDraft(){try{store(DRAFT,{fields:fields(),step});}catch{status('No pudimos guardar el borrador en este navegador. No cierres esta pestaña.',true);}}
+function saveDraft(){try{store(DRAFT,{fields:fields(),step,version:2});}catch{status('No pudimos guardar el borrador en este navegador. No cierres esta pestaña.',true);}}
 const restored=read(DRAFT);if(restored?.fields)for(const [k,v]of Object.entries(restored.fields)){const input=form.elements.namedItem(k);if(input&&typeof v==='string')input.value=v;}
 const purchasedPackage=new URLSearchParams(location.search).get('package');
 if(['gift_60','gift_120'].includes(purchasedPackage))form.elements.namedItem('package').value=purchasedPackage;
-function paintPackage(){const code=form.elements.namedItem('package').value;$('#gift-duration').textContent=code==='gift_120'?'Película de 2 minutos':'Película de 1 minuto';saveDraft();}
+function paintPackage(){const code=form.elements.namedItem('package').value;$('#gift-duration').textContent=code==='gift_120'?'2 minutos · $499 MXN':'1 minuto · $299 MXN';for(const link of document.querySelectorAll('[data-gift-buy]'))link.hidden=link.dataset.giftBuy!==code;saveDraft();}
 for(const input of document.querySelectorAll('[name=package]'))input.addEventListener('change',paintPackage);
 for(const link of document.querySelectorAll('[data-gift-buy]'))link.addEventListener('click',e=>{if(busy){e.preventDefault();return;}form.elements.namedItem('package').value=link.dataset.giftBuy;paintPackage();});
 paintPackage();
 function validatePanel(n){for(const f of panels[n].querySelectorAll('input,textarea,select'))if(!f.checkValidity()){show(n);f.reportValidity();return false;}return true;}
-function show(n){step=n;panels.forEach((p,i)=>p.hidden=i!==n);document.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.step)===n?'step':'false'));$('#gift-back').hidden=n===0;$('#gift-next').hidden=n===2;$('#gift-submit').hidden=n!==2;$('#gift-next').textContent=n===0?'Sus recuerdos →':'Sus protagonistas →';saveDraft();}
-function go(n){if(busy)return;if(n>step)for(let i=0;i<n;i++)if(!validatePanel(i))return;show(n);panels[n].querySelector('input,textarea,select')?.focus();}
+const stepTitles=['Elige su película.','Empieza por alguien especial.','Sus recuerdos, su historia.','Dale vida a sus protagonistas.'];
+function show(n){step=n;document.body.dataset.giftStep=String(n);panels.forEach((p,i)=>p.hidden=i!==n);document.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.step)===n?'step':'false'));$('#form-title').textContent=stepTitles[n];$('#gift-back').hidden=n===0;$('#gift-next').hidden=n===3;$('#gift-submit').hidden=n!==3;$('#gift-purchase').hidden=n!==3;$('#gift-next').textContent=['Contar su historia →','Sus recuerdos →','Sus protagonistas →'][n]||'Continuar →';saveDraft();}
+function go(n){if(busy)return;if(n>step)for(let i=0;i<n;i++)if(!validatePanel(i))return;show(n);const heading=$('#form-title');heading.tabIndex=-1;heading.focus({preventScroll:true});heading.closest('.workbench').scrollIntoView({block:'start',behavior:'instant'});}
 for(const b of document.querySelectorAll('[data-step]'))b.onclick=()=>go(Number(b.dataset.step));
 $('#gift-next').onclick=()=>go(step+1);$('#gift-back').onclick=()=>go(step-1);form.addEventListener('input',saveDraft);
 function paintPhotos(){const list=$('#photo-list');list.replaceChildren();for(const p of photos){const row=document.createElement('div');row.className='photo-row';const img=document.createElement('img');img.src=p.url;img.alt='Foto de referencia seleccionada';const label=document.createElement('label');label.append('¿Quién aparece?');const input=document.createElement('input');input.required=true;input.maxLength=100;input.placeholder='Ana a la izquierda, Luis a la derecha';input.value=p.label;input.oninput=()=>{p.label=input.value;};label.append(input);const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','Quitar '+p.file.name);remove.onclick=()=>{URL.revokeObjectURL(p.url);photos=photos.filter(x=>x!==p);paintPhotos();};row.append(img,label,remove);list.append(row);}}
@@ -27,7 +28,7 @@ async function uploadPhoto(p){const r=await fetch('/api/studio?upload=1&kind=ima
 function resume(id){const a=$('#resume-project');a.href='/crear/?project='+encodeURIComponent(id);a.hidden=false;}
 function setBusy(value){busy=value;for(const f of form.querySelectorAll('input,textarea,select,button'))f.disabled=value;$('#gift-photos').disabled=value||!session;for(const b of document.querySelectorAll('[data-step],[name=package]'))b.disabled=value;}
 form.noValidate=true;
-form.onsubmit=async e=>{e.preventDefault();if(busy)return;for(let i=0;i<3;i++)if(!validatePanel(i))return;const submitted=fields();saveDraft();setBusy(true);let pending=read(PENDING);
+form.onsubmit=async e=>{e.preventDefault();if(busy)return;for(let i=0;i<panels.length;i++)if(!validatePanel(i))return;const submitted=fields();saveDraft();setBusy(true);let pending=read(PENDING);
  try{
   if(!await refreshAuth()){location.assign('/cuenta/?next=regalos');return;}
   if(pending&&pending.userId!==session.user.id){sessionStorage.removeItem(PENDING);pending=null;}
@@ -48,4 +49,4 @@ form.onsubmit=async e=>{e.preventDefault();if(busy)return;for(let i=0;i<3;i++)if
  }catch(error){status(error.message||'No pudimos completar este paso. Tu borrador está guardado.',true);if(pending)resume(pending.id);}
  finally{setBusy(false);}
 };
-$('#account-link').addEventListener('click',saveDraft);show(Number.isInteger(restored?.step)?Math.max(0,Math.min(2,restored.step)):0);refreshAuth();
+$('#account-link').addEventListener('click',saveDraft);show(Number.isInteger(restored?.step)?Math.max(0,Math.min(3,restored.step+(restored.version===2?0:1))):0);refreshAuth();
