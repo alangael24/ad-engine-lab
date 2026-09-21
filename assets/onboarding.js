@@ -3,10 +3,11 @@ const $ = selector => document.querySelector(selector);
 const isPlans = document.body.dataset.onboarding === 'plans';
 const params = new URLSearchParams(location.search);
 const login = params.get('mode') === 'login';
-const next = ['editor','planes','ads-sales-v1','creator-v1'].includes(params.get('next')) ? params.get('next') : 'tool';
+const next = ['editor','planes','ads-sales-v1','creator-v1','regalos'].includes(params.get('next')) ? params.get('next') : 'tool';
 if(next==='editor')sessionStorage.setItem('creative-rush-return','editor');
 if(next==='ads-sales-v1')sessionStorage.setItem('creative-rush-return','ads-sales-v1');
 if(next==='creator-v1')sessionStorage.setItem('creative-rush-return','creator-v1');
+if(next==='regalos')sessionStorage.setItem('creative-rush-return','regalos');
 let client, ready = false, routing = false, waiting = false, googleEnabled = false, googlePending = false;
 function message(text, tone = 'neutral') { $('#on-message').textContent = text; $('#on-message').dataset.tone = tone; }
 async function routeSession(session) {
@@ -20,6 +21,7 @@ async function routeSession(session) {
     if(!isPlans&&next==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     if(!isPlans&&next==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
     if(!isPlans&&next==='creator-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/crear/');return;}
+    if(!isPlans&&next==='regalos'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/');return;}
     const account = await apiRequest('/api/account');
     if (!isPlans) { location.replace(accountDestination(account, next)); return; }
     $('#account-email').textContent = account.email;
@@ -71,6 +73,11 @@ if (!isPlans) {
     $('#account-title').textContent='Tu editor empieza aquí.';$('#account-intro').textContent='Entra para guardar tus clips y editar por conversación.';
     document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH EDITOR';document.querySelector('.on-bottom').textContent='Tus clips. Tu estilo. Tu video.';
     $('#account-switch a').href=login?'/cuenta/?next=editor':'/cuenta/?mode=login&next=editor';
+  }
+  if(next==='regalos'){
+    $('#account-title').textContent='Su historia empieza aquí.';$('#account-intro').textContent='Entra para guardar sus recuerdos, añadir fotos y preparar la película.';
+    document.querySelector('.on-steps').hidden=true;document.querySelector('.on-eyebrow').textContent='CREATIVERUSH REGALOS';document.querySelector('.on-bottom').textContent='Una historia que solo ustedes podrían protagonizar.';
+    $('#account-switch a').href=login?'/cuenta/?next=regalos':'/cuenta/?mode=login&next=regalos';
   }
   if(next==='creator-v1'){
     $('#account-title').textContent='Tu próxima historia empieza aquí.';$('#account-intro').textContent='Crea contenido con IA a partir de una idea, un guion o una referencia.';

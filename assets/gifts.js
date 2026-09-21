@@ -1,0 +1,45 @@
+import {getAuthClient,apiRequest} from './auth-client.js';
+import {giftRequest,GIFT_SCRIPT_REQUEST} from './gift-model.js';
+const $=s=>document.querySelector(s),form=$('#gift-form'),panels=[...document.querySelectorAll('[data-panel]')];
+const DRAFT='creativerush-gift-draft-v1',PENDING='creativerush-gift-submit-v1';
+let step=0,session=null,busy=false,photos=[];
+const read=k=>{try{return JSON.parse(sessionStorage.getItem(k));}catch{return null;}};
+const store=(k,v)=>sessionStorage.setItem(k,JSON.stringify(v));
+const fields=()=>Object.fromEntries(new FormData(form));
+function status(t,error=false){$('#gift-status').textContent=t;$('#gift-status').dataset.error=String(error);}
+function saveDraft(){try{store(DRAFT,{fields:fields(),step});}catch{status('No pudimos guardar el borrador en este navegador. No cierres esta pestaña.',true);}}
+const restored=read(DRAFT);if(restored?.fields)for(const [k,v]of Object.entries(restored.fields)){const input=form.elements.namedItem(k);if(input&&typeof v==='string')input.value=v;}
+function validatePanel(n){for(const f of panels[n].querySelectorAll('input,textarea,select'))if(!f.checkValidity()){show(n);f.reportValidity();return false;}return true;}
+function show(n){step=n;panels.forEach((p,i)=>p.hidden=i!==n);document.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.step)===n?'step':'false'));$('#gift-back').hidden=n===0;$('#gift-next').hidden=n===2;$('#gift-submit').hidden=n!==2;$('#gift-next').textContent=n===0?'Sus recuerdos →':'Sus protagonistas →';saveDraft();}
+function go(n){if(busy)return;if(n>step)for(let i=0;i<n;i++)if(!validatePanel(i))return;show(n);panels[n].querySelector('input,textarea,select')?.focus();}
+for(const b of document.querySelectorAll('[data-step]'))b.onclick=()=>go(Number(b.dataset.step));
+$('#gift-next').onclick=()=>go(step+1);$('#gift-back').onclick=()=>go(step-1);form.addEventListener('input',saveDraft);
+function paintPhotos(){const list=$('#photo-list');list.replaceChildren();for(const p of photos){const row=document.createElement('div');row.className='photo-row';const img=document.createElement('img');img.src=p.url;img.alt='Foto de referencia seleccionada';const label=document.createElement('label');label.append('¿Quién aparece?');const input=document.createElement('input');input.required=true;input.maxLength=100;input.placeholder='Ana a la izquierda, Luis a la derecha';input.value=p.label;input.oninput=()=>{p.label=input.value;};label.append(input);const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','Quitar '+p.file.name);remove.onclick=()=>{URL.revokeObjectURL(p.url);photos=photos.filter(x=>x!==p);paintPhotos();};row.append(img,label,remove);list.append(row);}}
+$('#gift-photos').onchange=e=>{const incoming=[...e.target.files];e.target.value='';if(photos.length+incoming.length>3){status('Puedes añadir hasta tres fotos de referencia.',true);return;}if(incoming.some(f=>!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>6291456)){status('Usa JPG, PNG o WebP de hasta 6 MB por foto.',true);return;}for(const file of incoming)photos.push({file,label:'',id:null,url:URL.createObjectURL(file)});paintPhotos();status('');};
+async function refreshAuth(){try{const auth=await getAuthClient();const {data,error}=await auth.auth.getSession();if(error)throw error;session=data.session;$('#gift-photos').disabled=!session;$('#photo-auth').replaceChildren();if(!session){const a=document.createElement('a');a.href='/cuenta/?next=regalos';a.textContent='Inicia sesión para añadir tus fotos.';a.onclick=saveDraft;$('#photo-auth').append(a);}else{$('#account-link').href='/crear/';$('#account-link').textContent='Mi estudio';}return session;}catch(e){status('No pudimos conectar tu cuenta. Puedes escribir tu historia y volver a intentarlo.',true);return null;}}
+async function uploadPhoto(p){const r=await fetch('/api/studio?upload=1&kind=image',{method:'POST',headers:{authorization:`Bearer ${session.access_token}`,'content-type':p.file.type,'x-file-name':encodeURIComponent(p.file.name)},body:p.file});const result=await r.json();if(!r.ok)throw Error(result.error||'No pudimos guardar esta foto. Inténtalo de nuevo.');p.id=result.asset.id;return p.id;}
+function resume(id){const a=$('#resume-project');a.href='/crear/?project='+encodeURIComponent(id);a.hidden=false;}
+function setBusy(value){busy=value;for(const f of form.querySelectorAll('input,textarea,select,button'))f.disabled=value;$('#gift-photos').disabled=value||!session;for(const b of document.querySelectorAll('[data-step]'))b.disabled=value;}
+form.noValidate=true;
+form.onsubmit=async e=>{e.preventDefault();if(busy)return;for(let i=0;i<3;i++)if(!validatePanel(i))return;const submitted=fields();saveDraft();setBusy(true);let pending=read(PENDING);
+ try{
+  if(!await refreshAuth()){location.assign('/cuenta/?next=regalos');return;}
+  if(pending&&pending.userId!==session.user.id){sessionStorage.removeItem(PENDING);pending=null;}
+  if(!pending){
+   // Validate all text before uploading any file. Freeze the request before project creation.
+   const input=submitted;
+   giftRequest(input);
+   for(const p of photos){status(`Guardando foto ${photos.indexOf(p)+1} de ${photos.length}…`);if(!p.id)await uploadPhoto(p);}
+   const data=giftRequest(input,photos.map(p=>({id:p.id,label:p.label})));pending={id:crypto.randomUUID(),chatId:crypto.randomUUID(),userId:session.user.id,data};store(PENDING,pending);
+  }
+  status('Guardando tu historia…');
+  const saved=await apiRequest('/api/studio',{method:'POST',body:{action:'create_project',id:pending.id,data:pending.data}});const project=saved.value;resume(project.id);
+  const request={projectId:project.id,expected:project.revision,requestId:pending.chatId,message:GIFT_SCRIPT_REQUEST};
+  const chatKey='studio-chat:'+project.id;store(chatKey,request);status('Tu historia está guardada. Preparando el guion para que lo revises…');
+  try{const r=await apiRequest('/api/studio-chat',{method:'POST',body:request,onDelta:()=>{status('Escribiendo tu película. Después podrás revisar cada palabra…');}});if(r.edit.status!=='running')sessionStorage.removeItem(chatKey);}
+  catch(error){if(['CHAT_OFFLINE','CHAT_LIMIT','STUDIO_CONFLICT','CHAT_BUSY','UNAUTHORIZED'].includes(error.code)){sessionStorage.removeItem(chatKey);sessionStorage.setItem(chatKey+':draft',GIFT_SCRIPT_REQUEST);}/* The studio recovers ambiguous replies with this same request ID. */}
+  sessionStorage.removeItem(PENDING);sessionStorage.removeItem(DRAFT);location.assign('/crear/?project='+project.id);
+ }catch(error){status(error.message||'No pudimos completar este paso. Tu borrador está guardado.',true);if(pending)resume(pending.id);}
+ finally{setBusy(false);}
+};
+$('#account-link').addEventListener('click',saveDraft);show(Number.isInteger(restored?.step)?Math.max(0,Math.min(2,restored.step)):0);refreshAuth();
