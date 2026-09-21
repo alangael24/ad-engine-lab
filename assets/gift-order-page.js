@@ -11,8 +11,8 @@ async function refresh(){clearTimeout(timer);try{
  $('#order-balance').textContent=order.status==='script_ready'?`Tienes ${r.seconds.available} segundos disponibles. Al aprobar se reservan ${order.targetSeconds}.`:'';
  needsPayment=['received','script_ready'].includes(order.status)&&r.seconds.available<order.targetSeconds;
  $('#order-buy').hidden=!needsPayment;$('#order-buy').textContent=order.targetSeconds===120?'Comprar película de 2 minutos · $499 MXN':'Comprar película de 1 minuto · $299 MXN';
- // The server selects a payment link with the verified account identity; never trust query params as payment proof.
- $('#order-buy').onclick=async e=>{e.preventDefault();await task(async()=>{const r=await apiRequest('/api/checkout',{method:'POST',body:{plan:order.targetSeconds===120?'gift_120':'gift_60'}});location.assign(r.url);});};
+ $('#order-buy').href='/regalos/checkout/?id='+encodeURIComponent(order.id);
+ $('#order-buy').removeAttribute('target');
  $('#order-approve').disabled=needsPayment;$('#order-download').hidden=order.status!=='ready';
  $('#order-download').onclick=async e=>{e.preventDefault();await task(async()=>{const d=await apiRequest('/api/gift-orders?id='+id+'&download=1');location.assign(d.url);});};
  if(!['ready','cancelled'].includes(order.status))timer=setTimeout(()=>{if(!busy)refresh();},30000);

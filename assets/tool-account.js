@@ -1,3 +1,4 @@
+import {giftCheckoutReturn} from './gift-checkout-model.js';
 import { getAuthClient, apiRequest, accountDestination } from './auth-client.js';
 export { apiRequest } from './auth-client.js';
 const $ = selector => document.querySelector(selector);
@@ -15,6 +16,7 @@ async function applySession(next) {
     if(sessionStorage.getItem('creative-rush-return')==='editor'){sessionStorage.removeItem('creative-rush-return');location.replace('/editor/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='ads-sales-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/anuncios-lab/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='creator-v1'){sessionStorage.removeItem('creative-rush-return');location.replace('/crear/');return;}
+    if(sessionStorage.getItem('creative-rush-return')==='gift-checkout'){sessionStorage.removeItem('creative-rush-return');location.replace(giftCheckoutReturn(sessionStorage.getItem('gift-checkout-context')));return;}
     if(sessionStorage.getItem('creative-rush-return')==='gift-admin'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/admin/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='gift-orders'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/pedido/');return;}
     if(sessionStorage.getItem('creative-rush-return')==='regalos'){sessionStorage.removeItem('creative-rush-return');location.replace('/regalos/');return;}
