@@ -2,6 +2,7 @@ import {getSupabaseAdmin,json,normalizeEmail,isExistingUserError} from './backen
 import {readJson,readBounded,imageType,rpc,UUID,apiError} from './generations.js';
 import {giftRequest} from '../assets/gift-model.js';
 import {projectData} from '../assets/studio-model.js';
+import {whatsappPhone} from '../assets/gift-whatsapp-model.js';
 import {VIDEO_PACKAGES} from './video-packages.js';
 
 const TOKEN=/^[a-f0-9]{64}$/;
@@ -27,6 +28,7 @@ async function draftContext(context){
 }
 function guestError(e){
  if(e.message==='GIFT_NOT_FOUND')return json({error:'Este enlace privado no está disponible. Abre el enlace original de tu pedido.',code:e.message},404);
+ if(e.message==='GIFT_WHATSAPP_INVALID')return json({error:'Revisa tu número de WhatsApp e incluye el código de país (México: +52 y 10 dígitos).',code:e.message},400);
  if(e.message==='GIFT_INVALID')return json({error:'Revisa tu historia y las fotos antes de continuar.',code:e.message},400);
  return apiError(e);
 }
@@ -66,7 +68,8 @@ export async function guestPost(context){try{
  if(url.searchParams.has('checkout')){
   const b=await readJson(context.request,1000),plan=VIDEO_PACKAGES[b.plan];if(!['gift_60','gift_120'].includes(b.plan)||!plan)fail('GIFT_INVALID');
   for(const p of d.photos){const info=await db.storage.from('studio-media').info(`gift-guests/${d.id}/${p.id}`);if(info.error||Number(info.data?.size)!==p.size)fail('GIFT_INVALID');}
-  const c=await rpc(db,'gift_guest_checkout',{p_draft:d.id,p_plan:b.plan,p_token:randomToken()});
+  let phone;try{phone=whatsappPhone(b.whatsappPhone,b.whatsappConsent);}catch{fail('GIFT_WHATSAPP_INVALID');}
+  const c=await rpc(db,'gift_guest_checkout_contact',{p_draft:d.id,p_plan:b.plan,p_token:randomToken(),p_phone:phone});
   const portal=`/regalos/pedido/#gift=${c.access_token}`;
   if(c.order_id)return json({paid:true,portal});
   const payment=new URL(plan.url);payment.searchParams.set('client_reference_id','gift_'+c.id);payment.searchParams.set('locale','es');

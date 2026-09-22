@@ -79,3 +79,18 @@ uses isolated PostgreSQL (PGlite), fake storage and a fake email transport.
 It covers price/package mismatch, upload integrity, replayed payments, duplicate
 real purchases, private order isolation, approval idempotency, provider failure
 and retries. Run the other `gift-*.test.mjs` tests before deployment as well.
+
+## Optional WhatsApp delivery
+
+Guest checkout offers an unchecked “Recibir también por WhatsApp” option. The
+customer supplies their own international phone number and explicitly requests
+transactional delivery. Mexican local ten-digit numbers are normalized to +52.
+The private checkout stores the normalized number and consent time, copied to
+repeat purchases. A paid contact cannot be changed with the older draft token.
+
+The administrator sees this preference in the order detail. Once script-ready
+or delivered, “Abrir WhatsApp con el enlace” prepares a message for that number
+with that order's private portal. Only the verified administrator endpoint can
+return it. Opening the message does not send it or mark it delivered: the operator
+reviews and sends it in WhatsApp. No WhatsApp Business API is configured and no
+automatic WhatsApp delivery is claimed. Resend notifications remain enabled.

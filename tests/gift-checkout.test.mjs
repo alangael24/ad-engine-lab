@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {whatsappPhone} from '../assets/gift-whatsapp-model.js';
 import {giftCheckoutReturn} from '../assets/gift-checkout-model.js';
 const script=(await readFile(new URL('../assets/gift-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/,'');
 async function page({seconds=120,balance=0,status='received',loggedIn=true,failOrder=false,query='?id=abc&package=gift_60',payUrl='https://buy.stripe.com/test'}={}){
@@ -17,14 +18,14 @@ test('login return preserves package or order without accepting open redirects',
 test('both package controls update public checkout price, duration and Stripe plan',async()=>{const p=await page({query:'?package=gift_120'});await p.el('#choose-60').onchange();assert.equal(p.el('#package-price').textContent,'$299');assert.equal(p.el('#package-delivery').textContent,'Entrega en 24 horas*');await p.el('#choose-120').onchange();assert.equal(p.el('#package-price').textContent,'$499');await p.el('#choose-60').onchange();await p.submit();assert.equal(p.calls.at(-1).opts.body.plan,'gift_60');});
 
 test('guest checkout hides account email and opens Stripe without an auth request',async()=>{
- const source=(await readFile(new URL('../assets/gift-guest-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/,'');
+ const source=(await readFile(new URL('../assets/gift-guest-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
  const elements=new Map(),calls=[],navigation=[],portals=[];
  const el=k=>{if(!elements.has(k))elements.set(k,{hidden:false,disabled:true,value:k==='#choose-60'?'gift_60':'gift_120'});return elements.get(k);};
- const ctx=vm.createContext({URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120'}}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
+ const ctx=vm.createContext({whatsappPhone,sessionStorage:{setItem(){}},URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120'}}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
  vm.runInContext(source,ctx);await new Promise(r=>setImmediate(r));
  assert.equal(el('#checkout-account').hidden,true);assert.equal(el('#checkout-guest-info').hidden,false);
  assert.equal(el('#checkout-pay').disabled,false);
  el('#choose-60').onchange();assert.equal(el('#package-price').textContent,'$299');
  await el('#checkout-form').onsubmit({preventDefault(){}});
- assert.equal(calls.at(-1).opts.body.plan,'gift_60');assert.deepEqual(navigation,['https://buy.stripe.com/test']);assert.equal(portals.length,1);
+ assert.equal(calls.at(-1).opts.body.plan,'gift_60');assert.equal(calls.at(-1).opts.body.whatsappConsent,false);assert.deepEqual(navigation,['https://buy.stripe.com/test']);assert.equal(portals.length,1);
 });

@@ -19,6 +19,14 @@ export async function getGiftAdmin(context){try{
    if(o.status!=='ready'||!o.asset_id)return json({error:'La película todavía no está entregada.'},409);
    const asset=await own(db,'studio_assets',o.user_id,o.asset_id);return json({url:await signed(db,asset.bucket,asset.storage_path,true)});
   }
+  const contact=await db.from('gift_guest_checkouts').select('whatsapp_phone,whatsapp_consented_at,access_token').eq('order_id',o.id).maybeSingle();if(contact.error)throw contact.error;
+  const delivery=contact.data?.whatsapp_phone&&contact.data?.whatsapp_consented_at?{phone:contact.data.whatsapp_phone,consentedAt:contact.data.whatsapp_consented_at}:null;
+  if(url.searchParams.has('whatsapp')){
+   if(!delivery||!['script_ready','ready'].includes(o.status))return json({error:'WhatsApp estará disponible cuando el cliente lo haya solicitado y el guion o la película estén listos.'},409);
+   const portal=new URL('/regalos/pedido/',context.env.APP_URL||'https://creativerushai.com');if(portal.protocol!=='https:')throw Error('INVALID_APP_URL');portal.hash='gift='+contact.data.access_token;
+   const message=o.status==='ready'?'Tu película de CreativeRush está lista. Descárgala aquí:':'Tu guion de CreativeRush está listo. Revísalo y apruébalo aquí:';
+   return json({url:'https://wa.me/'+delivery.phone.slice(1)+'?text='+encodeURIComponent(message+'\n'+portal.href+'\nEste enlace es privado. Guárdalo y no lo compartas.')});
+  }
   const customer=await db.auth.admin.getUserById(o.user_id);if(customer.error)throw customer.error;
   const ids=[...new Set(o.brief?.creativeMemory?.characterAssetIds||[])].filter(x=>UUID.test(x)).slice(0,20);
   const photos=await Promise.all(ids.map(async assetId=>{
@@ -27,7 +35,7 @@ export async function getGiftAdmin(context){try{
    if(a.kind!=='image'||!['image/jpeg','image/png','image/webp'].includes(a.mime_type))throw Error('GIFT_REFERENCE_INVALID');
    return {id:a.id,name:a.name,url:await signed(db,a.bucket,a.storage_path)};
   }));
-  return json({order:{...summary(o),revision:o.revision,script:o.script,brief:o.brief,customerNote:o.customer_note,reviewNote:o.review_note,approvedAt:o.approved_at,deliveredAt:o.delivered_at,customerEmail:customer.data.user?.email||'',photos}});
+  return json({order:{...summary(o),revision:o.revision,script:o.script,brief:o.brief,customerNote:o.customer_note,reviewNote:o.review_note,approvedAt:o.approved_at,deliveredAt:o.delivered_at,whatsapp:delivery,customerEmail:customer.data.user?.email||'',photos}});
  }
  const status=url.searchParams.get('status')||'',page=Number(url.searchParams.get('page')||0);
  if(status&&!statuses.includes(status)||!Number.isInteger(page)||page<0||page>10000)return json({error:'Filtro no válido.'},400);

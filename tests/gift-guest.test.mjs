@@ -7,6 +7,8 @@ import {guestGet,guestPost,randomToken,digest,fulfillGuest} from '../src/gift-gu
 import {getGiftOrder,postGiftOrder} from '../src/gift-orders.js';
 import {getSupabaseAdmin} from '../src/backend.js';
 import {VIDEO_PACKAGES} from '../src/video-packages.js';
+import {getGiftAdmin} from '../src/gift-admin.js';
+import {whatsappPhone} from '../assets/gift-whatsapp-model.js';
 import {sendGiftMail} from '../src/gift-mail.js';
 import Stripe from 'stripe';
 import {onRequestPost as webhook} from '../functions/api/stripe/webhook.js';
@@ -14,7 +16,7 @@ let db,stub,original;
 const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-only',GIFT_GUEST_ENABLED:'true',RESEND_API_KEY:'fake',GIFT_EMAIL_FROM:'Regalos <test@example.test>',GIFT_EMAIL_VERIFIED:'true'};
 const fields={recipient:'Ana',names:'Ana y Luis',occasion:'anniversary',memory1:'Nos conocimos en un café.',look:'3d',tone:'warm',ratio:'9:16',package:'gift_60'};
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0]);
-before(async()=>{db=await database();await db.exec(await readFile(new URL('../supabase/migrations/20260922002237_gift_guest_checkout.sql',import.meta.url),'utf8'));stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=stub.fetch;});
+before(async()=>{db=await database();await db.exec(await readFile(new URL('../supabase/migrations/20260922002237_gift_guest_checkout.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922015331_gift_whatsapp_delivery.sql',import.meta.url),'utf8'));stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=stub.fetch;});
 after(async()=>{globalThis.fetch=original;await db.close();});
 const context=(path,{body,token,access,bytes,customEnv=env}={})=>({env:customEnv,request:new Request('https://app.test/api/gift-guest'+path,{method:body||bytes?'POST':'GET',headers:{'cf-connecting-ip':'192.0.2.1',...(token?{'x-gift-draft':token}:{}),...(access?{'x-gift-access':access}:{}),'content-type':bytes?'image/png':'application/json'},body:bytes|| (body?JSON.stringify(body):undefined)})});
 async function draft(photo=false){const d={id:crypto.randomUUID(),token:randomToken(),fields,photos:photo?[{id:crypto.randomUUID(),label:'Ana',hash:await digest(png),mime:'image/png',size:png.length}]:[]};const r=await guestPost(context('?create=1',{body:d}));assert.equal(r.status,200,await r.text());return d;}
@@ -73,4 +75,26 @@ test('only a signed paid Stripe event can finalize the guest purchase',async()=>
  const stripe=new Stripe('test_only'),signature=await stripe.webhooks.generateTestHeaderStringAsync({payload,secret});
  const accepted=await webhook(request(signature));assert.equal(accepted.status,200);assert.equal((await accepted.json()).applied,true);
  assert.equal((await (await webhook(request(signature))).json()).applied,false);
+});
+
+test('WhatsApp requires opt-in, validates numbers, survives payment, and can only be opened by admin',async()=>{
+ assert.equal(whatsappPhone('garbage',false),null);assert.equal(whatsappPhone('55 1234 5678',true),'+525512345678');assert.equal(whatsappPhone('+1 (303) 555-1234',true),'+13035551234');assert.throws(()=>whatsappPhone('+52 1 5512345678',true));
+ const d=await draft(),path=`?draft=${d.id}&checkout=1`;
+ const post=body=>guestPost(context(path,{token:d.token,body:{plan:'gift_60',...body}}));
+ assert.equal((await post({whatsappConsent:true,whatsappPhone:'bad'})).status,400);
+ assert.equal((await guestPost(context(path,{token:randomToken(),body:{plan:'gift_60',whatsappConsent:true,whatsappPhone:'5512345678'}}))).status,404);
+ await post({whatsappConsent:false,whatsappPhone:'5512345678'});
+ assert.equal((await db.query('select whatsapp_phone from gift_guest_checkouts where draft_id=$1',[d.id])).rows[0].whatsapp_phone,null);
+ const c=await (await post({whatsappConsent:true,whatsappPhone:'+52 55 1234 5678'})).json(),s=session(c),paid=await fulfill(s);
+ let contact=(await db.query('select whatsapp_phone,whatsapp_consented_at from gift_guest_checkouts where order_id=$1',[paid.orderId])).rows[0];assert.equal(contact.whatsapp_phone,'+525512345678');assert.ok(contact.whatsapp_consented_at);
+ await post({whatsappConsent:true,whatsappPhone:'+525587654321'});
+ assert.equal((await db.query('select whatsapp_phone from gift_guest_checkouts where order_id=$1',[paid.orderId])).rows[0].whatsapp_phone,'+525512345678');
+ const repeat=await fulfill({...s,id:'cs_test_'+crypto.randomUUID()});assert.equal((await db.query('select whatsapp_phone from gift_guest_checkouts where order_id=$1',[repeat.orderId])).rows[0].whatsapp_phone,'+525512345678');
+ const buyer=Array.from(stub.users.values()).find(u=>u.email===s.customer_details.email);
+ const adminCtx=()=>({env,request:new Request('https://app.test/api/gift-admin?id='+paid.orderId+'&whatsapp=1',{headers:{authorization:'Bearer '+buyer.id}})});
+ assert.equal((await getGiftAdmin(adminCtx())).status,403);buyer.app_metadata={creativerush_gift_admin:true};
+ assert.equal((await getGiftAdmin(adminCtx())).status,409);
+ await call(db,'gift_order_operator',[paid.orderId,'script',1,{script:'Gracias por estar aquí.'}]);
+ const r=await getGiftAdmin(adminCtx());assert.equal(r.status,200);const u=new URL((await r.json()).url);assert.equal(u.hostname,'wa.me');assert.equal(u.pathname,'/525512345678');assert.match(u.searchParams.get('text'),/guion.*listo/);assert.ok(u.searchParams.get('text').includes(c.portal));
+ for(const role of ['anon','authenticated']){await db.exec('set role '+role);try{await assert.rejects(call(db,'gift_guest_checkout_contact',[d.id,'gift_60',randomToken(),'+525512345678']),/permission denied/);}finally{await db.exec('reset role');}}
 });

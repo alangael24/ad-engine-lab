@@ -18,8 +18,11 @@ async function load(){if(busy)return;busy=true;$('#refresh').disabled=true;$('#n
   if(!o.photos.length)$('#photos').append(el('p','Este pedido no incluye fotos. Los personajes tendrán una apariencia inventada.'));
   for(const p of o.photos){const f=el('figure',''),a=el('a',''),img=document.createElement('img');a.href=p.url;a.target='_blank';a.rel='noopener noreferrer';img.src=p.url;img.alt=p.name||'Referencia del cliente';img.loading='lazy';a.append(img);f.append(a,el('figcaption',p.name));$('#photos').append(f);}
   $('#download').hidden=o.status!=='ready';
+  $('#whatsapp-delivery').hidden=!o.whatsapp;$('#whatsapp-open').hidden=true;$('#whatsapp-contact').textContent=o.whatsapp?`${o.whatsapp.phone} · Autorizado el ${date(o.whatsapp.consentedAt)}`:'';$('#send-whatsapp').hidden=!o.whatsapp||!['script_ready','ready'].includes(o.status);
  }catch(e){$('#notice').textContent=e.message||'No pudimos abrir los pedidos.';$('#login').hidden=e.code!=='UNAUTHORIZED';$('#switch-account').hidden=e.code!=='FORBIDDEN';}
  finally{busy=false;$('#refresh').disabled=false;}}
 $('#switch-account').onclick=async()=>{try{const auth=await getAuthClient();const {error}=await auth.auth.signOut();if(error)throw error;location.assign('/cuenta/?next=gift-admin');}catch(e){$('#notice').textContent=e.message;}};
 $('#refresh').onclick=load;$('#status-filter').onchange=()=>{page=0;load();};$('#previous').onclick=()=>{if(!busy&&page>0){page--;load();}};$('#next').onclick=()=>{if(!busy){page++;load();}};
 $('#download').onclick=async e=>{e.preventDefault();try{const r=await apiRequest('/api/gift-admin?id='+encodeURIComponent(id)+'&download=1');location.assign(r.url);}catch(e){$('#notice').textContent=e.message;}};load();
+
+$('#send-whatsapp').onclick=async()=>{const button=$('#send-whatsapp');button.disabled=true;try{const r=await apiRequest('/api/gift-admin?id='+encodeURIComponent(id)+'&whatsapp=1');const u=new URL(r.url);if(u.protocol!=='https:'||u.hostname!=='wa.me')throw Error('Enlace de WhatsApp no válido.');const a=$('#whatsapp-open');a.href=u.href;a.hidden=false;a.click();}catch(e){$('#notice').textContent=e.message;}finally{button.disabled=false;}};
