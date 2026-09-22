@@ -1,3 +1,4 @@
+import {isPayFirst,giftPurchaseRequest} from '../assets/gift-pay-first-model.js';
 import {giftBriefMissing} from '../assets/gift-brief.js';
 import {getSupabaseAdmin,json,normalizeEmail,isExistingUserError} from './backend.js';
 import {readJson,readBounded,imageType,rpc,UUID,apiError} from './generations.js';
@@ -40,7 +41,7 @@ export async function guestGet(context){try{
   const c=await one(getSupabaseAdmin(context.env),'gift_guest_checkouts','access_token',token);
   if(!c)fail('GIFT_NOT_FOUND');return json({orderId:c.order_id,pending:!c.order_id});
  }
- const {d}=await draftContext(context);return json({title:giftRequest(d.fields,d.photos).title,plan:d.fields.package});
+ const {d}=await draftContext(context);return json({title:(isPayFirst(d.fields)?giftPurchaseRequest(d.fields.package):giftRequest(d.fields,d.photos)).title,plan:d.fields.package});
 }catch(e){return guestError(e);}}
 export async function guestPost(context){try{
  if(!guestEnabled(context.env))return json({error:'El pago sin registro todavía no está disponible.',code:'GIFT_GUEST_DISABLED'},503);
@@ -50,7 +51,7 @@ export async function guestPost(context){try{
   if(!UUID.test(b.id||'')||!TOKEN.test(b.token||'')||!Array.isArray(b.photos))fail('GIFT_INVALID');
   const photos=b.photos.map(p=>({id:p.id,label:p.label,hash:p.hash,mime:p.mime,size:p.size}));
   if(new Set(photos.map(p=>p.id)).size!==photos.length||photos.some(p=>!UUID.test(p.id||'')||!TOKEN.test(p.hash||'')||!['image/png','image/jpeg','image/webp'].includes(p.mime)||!Number.isInteger(p.size)||p.size<1||p.size>6291456))fail('GIFT_INVALID');
-  try{giftRequest(b.fields,photos);}catch{fail('GIFT_INVALID');}
+  try{if(isPayFirst(b.fields)){giftPurchaseRequest(b.fields.package);if(photos.length||Object.keys(b.fields).some(k=>!['flow','package'].includes(k)))fail('GIFT_INVALID');}else giftRequest(b.fields,photos);}catch{fail('GIFT_INVALID');}
   const ip=context.request.headers.get('cf-connecting-ip');if(!ip)fail('GIFT_INVALID');
   await rpc(db,'gift_guest_create',{p_id:b.id,p_hash:await digest(b.token),p_ip:await digest(ip),p_fields:b.fields,p_photos:photos});
   return json({id:b.id});
@@ -97,6 +98,6 @@ export async function fulfillGuest(db,event,session,plan,paymentLinkId){
   if(info.error){const copy=await db.storage.from('studio-media').copy(`gift-guests/${d.id}/${p.id}`,path);if(copy.error)throw copy.error;}
   photos.push({id:assetId,label:p.label});assets.push({id:assetId,kind:'image',name:p.label,bucket:'studio-media',storage_path:path,mime_type:p.mime,size_bytes:p.size});
  }
- const data=projectData(giftRequest({...d.fields,package:plan.code},photos));
+ const data=projectData(isPayFirst(d.fields)?giftPurchaseRequest(plan.code):giftRequest({...d.fields,package:plan.code},photos));
  return rpc(db,'gift_guest_fulfill',{p_checkout:c.id,p_event:event.id,p_session:session.id,p_link:paymentLinkId,p_email:email,p_customer:typeof session.customer==='string'?session.customer:null,p_plan:plan.code,p_amount:session.amount_total,p_currency:session.currency,p_data:data,p_assets:assets});
 }

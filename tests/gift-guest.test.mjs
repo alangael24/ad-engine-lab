@@ -16,7 +16,7 @@ let db,stub,original;
 const env={SUPABASE_URL:'http://supabase.test',SUPABASE_SERVICE_ROLE_KEY:'test-only',GIFT_GUEST_ENABLED:'true',RESEND_API_KEY:'fake',GIFT_EMAIL_FROM:'Regalos <test@example.test>',GIFT_EMAIL_VERIFIED:'true'};
 const fields={recipient:'Ana',names:'Ana y Luis',occasion:'anniversary',memory1:'Nos conocimos en un café.',look:'3d',tone:'warm',ratio:'9:16',package:'gift_60'};
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0]);
-before(async()=>{db=await database();await db.exec(await readFile(new URL('../supabase/migrations/20260922002237_gift_guest_checkout.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922015331_gift_whatsapp_delivery.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922020036_gift_whatsapp_after_payment.sql',import.meta.url),'utf8'));stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=stub.fetch;});
+before(async()=>{db=await database();await db.exec(await readFile(new URL('../supabase/migrations/20260922002237_gift_guest_checkout.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922015331_gift_whatsapp_delivery.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922020036_gift_whatsapp_after_payment.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20260922165737_gift_payment_first.sql',import.meta.url),'utf8'));stub=mockSupabase(db);original=globalThis.fetch;globalThis.fetch=stub.fetch;});
 after(async()=>{globalThis.fetch=original;await db.close();});
 const context=(path,{body,token,access,bytes,customEnv=env}={})=>({env:customEnv,request:new Request('https://app.test/api/gift-guest'+path,{method:body||bytes?'POST':'GET',headers:{'cf-connecting-ip':'192.0.2.1',...(token?{'x-gift-draft':token}:{}),...(access?{'x-gift-access':access}:{}),'content-type':bytes?'image/png':'application/json'},body:bytes|| (body?JSON.stringify(body):undefined)})});
 async function draft(photo=false){const d={id:crypto.randomUUID(),token:randomToken(),fields,photos:photo?[{id:crypto.randomUUID(),label:'Ana',hash:await digest(png),mime:'image/png',size:png.length}]:[]};const r=await guestPost(context('?create=1',{body:d}));assert.equal(r.status,200,await r.text());return d;}
@@ -123,4 +123,41 @@ test('scoped Stripe test webhook creates one real-shaped order and suppresses te
  const again=await testWebhook(request());assert.equal((await again.json()).applied,false);
  const outbox=(await db.query('select status,error_code from gift_email_outbox where order_id=$1',[config.checkoutId])).rows;
  assert.equal(outbox.length,1);assert.equal(outbox[0].error_code,'TEST_ORDER_NO_EMAIL');assert.equal(outbox[0].status,'failed');
+});
+
+test('pay-first purchases require verified payment, collect the correct brief afterwards and resume safely',async()=>{
+ for(const plan of ['gift_60','gift_120']){
+  const d={id:crypto.randomUUID(),token:randomToken(),fields:{flow:'pay_first',package:plan},photos:[]};
+  const ctx=(path,options={})=>{const c=context(path,options);c.request.headers.set('cf-connecting-ip',plan==='gift_60'?'192.0.2.51':'192.0.2.52');return c;};
+  assert.equal((await guestPost(ctx('?create=1',{body:d}))).status,200);
+  const c=await checkout(d,plan),access=new URL(c.portal,'https://app.test').hash.slice(6),orderId=new URL(c.url).searchParams.get('client_reference_id').slice(5);
+  const post=(body,token=access)=>postGiftOrder(ctx('',{access:token,body:{id:orderId,...body}}));
+  assert.equal((await post({action:'personalize_save',fields})).status,404);
+  const s=session(c,plan),paid=await fulfill(s,plan);assert.equal(paid.orderId,orderId);
+  let order=(await (await getGiftOrder(ctx('?id='+orderId,{access}))).json()).order;
+  assert.equal(order.personalization.state,'pending');assert.equal(order.targetSeconds,plan==='gift_60'?60:120);
+  await assert.rejects(call(db,'gift_order_operator',[orderId,'script',order.revision,{script:'Must not start before personalization.'}]),/GIFT_PERSONALIZATION_REQUIRED/);
+  assert.equal((await post({action:'personalize_save',fields:{recipient:'Ana',memory1:'Café',package:'gift_120'}})).status,200);
+  order=(await (await getGiftOrder(ctx('?id='+orderId,{access}))).json()).order;
+  assert.equal(order.personalization.fields.recipient,'Ana');assert.equal(order.personalization.fields.package,undefined);
+  assert.equal((await post({action:'personalize_save',fields},randomToken())).status,404);
+  assert.equal((await post({action:'personalize_submit',draftId:d.id,draftToken:d.token})).status,400);
+  const actual={id:crypto.randomUUID(),token:randomToken(),fields:{...fields,package:'gift_120',message:'Gracias por todo.'},photos:[{id:crypto.randomUUID(),label:'Ana',hash:await digest(png),mime:'image/png',size:png.length}]};
+  assert.equal((await guestPost(ctx('?create=1',{body:actual}))).status,200);
+  const submit=()=>post({action:'personalize_submit',draftId:actual.id,draftToken:actual.token});
+  assert.equal((await submit()).status,400); // missing upload; premium also missing second memory
+  if(plan==='gift_120'){actual.id=crypto.randomUUID();actual.token=randomToken();actual.fields.memory2='Nos reencontramos en el aeropuerto.';assert.equal((await guestPost(ctx('?create=1',{body:actual}))).status,200);}
+  assert.equal((await guestPost(ctx(`?draft=${actual.id}&upload=${actual.photos[0].id}`,{token:actual.token,bytes:png}))).status,200);
+  const submitted=await submit();assert.equal(submitted.status,200,await submitted.clone().text());
+  const final=(await submitted.json()).order;assert.equal(final.targetSeconds,plan==='gift_60'?60:120);assert.equal(final.personalization.state,'complete');assert.match(final.title,/Ana/);
+  assert.equal((await submit()).status,200); // response lost: no second order, assets or charge
+  assert.equal((await post({action:'personalize_save',fields})).status,400);
+  assert.equal((await fulfill(s,plan)).applied,false);
+  const stored=(await db.query('select brief from gift_orders where id=$1',[orderId])).rows[0].brief;
+  assert.equal(stored.creatorBrief.targetDuration,final.targetSeconds);assert.equal(stored.creativeMemory.characterAssetIds.length,1);
+  const assetCount=(await db.query('select count(*)::int n from studio_assets where storage_path like $1',[`gift-orders/${orderId}/%`])).rows[0].n;assert.equal(assetCount,1);
+  await call(db,'gift_order_operator',[orderId,'script',final.revision,{script:'Te conocí tomando café.'}]);
+  assert.equal((await db.query('select count(*)::int n from video_seconds_ledger where external_id=$1',['gift:'+orderId+':reserve'])).rows[0].n,0);
+ }
+ for(const role of ['anon','authenticated']){await db.exec('set role '+role);try{await assert.rejects(call(db,'gift_personalization_save',[crypto.randomUUID(),crypto.randomUUID(),{}]),/permission denied/);}finally{await db.exec('reset role');}}
 });

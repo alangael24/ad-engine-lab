@@ -67,7 +67,7 @@ async function checkPurchase(attempt = 0) {
       }
       setStatus(
         privateToken?"Tu pedido está confirmado":"Tu cuenta y tu saldo están listos",
-        privateToken?"Abre tu pedido para seguir el avance y, si quieres, añadir WhatsApp. También recibirás sus enlaces en el correo que usaste en Stripe.":"Entra con el mismo correo de tu cuenta. Tu saldo ya está acreditado en CreativeRush.",
+        privateToken?"Abre tu pedido para personalizar tu película, seguir el avance y, si quieres, añadir WhatsApp. También recibirás sus enlaces en el correo que usaste en Stripe.":"Entra con el mismo correo de tu cuenta. Tu saldo ya está acreditado en CreativeRush.",
         true,
       );
       return;

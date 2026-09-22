@@ -1,6 +1,6 @@
 import {rpc} from './generations.js';
-export function giftEmail(kind,url){
- const copy={received:['Recibimos tu historia','Tu pedido está confirmado. Aquí podrás revisar el guion y seguir el avance de tu película.'],script_ready:['Tu guion está listo para revisar','Lee tu guion, pide los cambios que necesites y apruébalo cuando esté listo.'],ready:['Tu película está lista','Tu regalo ya está terminado. Abre este enlace para descargarlo y compartirlo.']}[kind];
+export function giftEmail(kind,url,pending=false){
+ const copy=pending&&kind==='received'?['Tu regalo está pagado: personalízalo','Gracias por tu compra. Abre tu pedido para contarnos su historia, añadir las fotos y preparar tu película. Puedes hacerlo ahora o continuar después desde este enlace.']:{received:['Recibimos tu historia','Tu pedido está confirmado. Aquí podrás revisar el guion y seguir el avance de tu película.'],script_ready:['Tu guion está listo para revisar','Lee tu guion, pide los cambios que necesites y apruébalo cuando esté listo.'],ready:['Tu película está lista','Tu regalo ya está terminado. Abre este enlace para descargarlo y compartirlo.']}[kind];
  if(!copy)throw Error('INVALID_EMAIL_KIND');
  return {subject:`${copy[0]} — CreativeRush`,text:`${copy[1]}\n\n${url}\n\nEste enlace es privado y permite acceder a tu pedido. Guárdalo y no lo compartas.\nCreativeRush Regalos`};
 }
@@ -13,7 +13,8 @@ export async function sendGiftMail(db,env,{fetcher=fetch}={}){
    const q=await db.from('gift_guest_checkouts').select('email,access_token').eq('order_id',m.order_id).single();if(q.error||!q.data?.email)throw Error('ORDER_EMAIL_MISSING');
    const app=new URL(env.APP_URL||'https://creativerushai.com');if(app.protocol!=='https:')throw Error('INVALID_APP_URL');
    const url=new URL('/regalos/pedido/',app);url.hash='gift='+q.data.access_token;
-   const res=await fetcher('https://api.resend.com/emails',{method:'POST',headers:{authorization:`Bearer ${env.RESEND_API_KEY}`,'content-type':'application/json','idempotency-key':`gift-${m.id}`},body:JSON.stringify({from:env.GIFT_EMAIL_FROM,to:[q.data.email],...giftEmail(m.kind,url.href)}),signal:AbortSignal.timeout(15000)});
+   const order=await db.from('gift_orders').select('personalization').eq('id',m.order_id).single();if(order.error)throw order.error;
+   const res=await fetcher('https://api.resend.com/emails',{method:'POST',headers:{authorization:`Bearer ${env.RESEND_API_KEY}`,'content-type':'application/json','idempotency-key':`gift-${m.id}`},body:JSON.stringify({from:env.GIFT_EMAIL_FROM,to:[q.data.email],...giftEmail(m.kind,url.href,order.data?.personalization?.state==='pending')}),signal:AbortSignal.timeout(15000)});
    if(!res.ok)throw Error(`MAIL_HTTP_${res.status}`);const body=await res.json();if(typeof body.id!=='string')throw Error('MAIL_RESPONSE_INVALID');
    await rpc(db,'gift_email_finish',{p_id:m.id,p_lease:m.lease,p_provider:body.id,p_error:null});sent++;
   }catch(e){
