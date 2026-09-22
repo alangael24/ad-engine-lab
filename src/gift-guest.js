@@ -2,7 +2,6 @@ import {getSupabaseAdmin,json,normalizeEmail,isExistingUserError} from './backen
 import {readJson,readBounded,imageType,rpc,UUID,apiError} from './generations.js';
 import {giftRequest} from '../assets/gift-model.js';
 import {projectData} from '../assets/studio-model.js';
-import {whatsappPhone} from '../assets/gift-whatsapp-model.js';
 import {VIDEO_PACKAGES} from './video-packages.js';
 
 const TOKEN=/^[a-f0-9]{64}$/;
@@ -68,8 +67,7 @@ export async function guestPost(context){try{
  if(url.searchParams.has('checkout')){
   const b=await readJson(context.request,1000),plan=VIDEO_PACKAGES[b.plan];if(!['gift_60','gift_120'].includes(b.plan)||!plan)fail('GIFT_INVALID');
   for(const p of d.photos){const info=await db.storage.from('studio-media').info(`gift-guests/${d.id}/${p.id}`);if(info.error||Number(info.data?.size)!==p.size)fail('GIFT_INVALID');}
-  let phone;try{phone=whatsappPhone(b.whatsappPhone,b.whatsappConsent);}catch{fail('GIFT_WHATSAPP_INVALID');}
-  const c=await rpc(db,'gift_guest_checkout_contact',{p_draft:d.id,p_plan:b.plan,p_token:randomToken(),p_phone:phone});
+  const c=await rpc(db,'gift_guest_checkout',{p_draft:d.id,p_plan:b.plan,p_token:randomToken()});
   const portal=`/regalos/pedido/#gift=${c.access_token}`;
   if(c.order_id)return json({paid:true,portal});
   const payment=new URL(plan.url);payment.searchParams.set('client_reference_id','gift_'+c.id);payment.searchParams.set('locale','es');

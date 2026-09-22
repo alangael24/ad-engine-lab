@@ -21,3 +21,8 @@ body[data-gift-step="3"] .gift-layout{display:block;max-width:1180px}body[data-g
 
 .gift-fixed-style{display:flex;align-items:center;gap:16px;background:#f8f0f4;border:1px solid #e2d5dc;border-radius:12px;padding:18px;margin:0 0 22px}.gift-fixed-style .style-art{width:64px;height:72px;flex-shrink:0;font-size:44px;margin:0}.gift-fixed-style h3{font-size:16px;line-height:1.4;margin:0 0 6px}.gift-fixed-style p{font-size:13px;line-height:1.6;color:#766b70;margin:0}
 @media(max-width:400px){.gift-fixed-style{gap:12px;padding:14px}.gift-fixed-style .style-art{width:44px;height:56px;font-size:34px}}
+
+
+.order-whatsapp{padding:16px;border:1px solid #dfd2da;border-radius:12px;margin:18px 0;background:#faf7f8}.order-whatsapp .whatsapp-choice{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px}.order-whatsapp .whatsapp-choice input{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0;accent-color:#78445f}.whatsapp-choice small{display:block;font-size:12px;font-weight:400;margin-top:4px;color:#766b70}#whatsapp-number-wrap{margin-top:16px}#whatsapp-number{font-size:16px;width:100%;background:white}.order-whatsapp .helper{margin-bottom:0}
+
+.order-whatsapp h2{font-size:22px;margin:0 0 8px}.order-whatsapp .back{margin-top:14px}#whatsapp-status{font-size:14px}

@@ -27,5 +27,5 @@ test('guest checkout hides account email and opens Stripe without an auth reques
  assert.equal(el('#checkout-pay').disabled,false);
  el('#choose-60').onchange();assert.equal(el('#package-price').textContent,'$299');
  await el('#checkout-form').onsubmit({preventDefault(){}});
- assert.equal(calls.at(-1).opts.body.plan,'gift_60');assert.equal(calls.at(-1).opts.body.whatsappConsent,false);assert.deepEqual(navigation,['https://buy.stripe.com/test']);assert.equal(portals.length,1);
+ assert.equal(calls.at(-1).opts.body.plan,'gift_60');assert.equal(Object.hasOwn(calls.at(-1).opts.body,'whatsappConsent'),false);assert.deepEqual(navigation,['https://buy.stripe.com/test']);assert.equal(portals.length,1);
 });

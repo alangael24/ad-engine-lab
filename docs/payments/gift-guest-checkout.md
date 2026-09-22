@@ -80,13 +80,19 @@ It covers price/package mismatch, upload integrity, replayed payments, duplicate
 real purchases, private order isolation, approval idempotency, provider failure
 and retries. Run the other `gift-*.test.mjs` tests before deployment as well.
 
-## Optional WhatsApp delivery
+## Optional WhatsApp delivery after payment
 
-Guest checkout offers an unchecked “Recibir también por WhatsApp” option. The
-customer supplies their own international phone number and explicitly requests
-transactional delivery. Mexican local ten-digit numbers are normalized to +52.
-The private checkout stores the normalized number and consent time, copied to
-repeat purchases. A paid contact cannot be changed with the older draft token.
+Checkout contains no WhatsApp controls, phone field or contact validation. Stripe
+email remains the only required delivery contact before payment. Once the signed
+Stripe webhook creates the paid order, its private portal offers “¿También por
+WhatsApp?” as a separate optional form. Pending/unpaid orders cannot save a number.
+The confirmation page links to this portal and mentions the optional preference.
+
+The customer supplies their own international phone number and explicitly requests
+transactional delivery. They can add, change or remove it through the paid order's
+private capability or verified account ownership. It does not modify the script,
+charge credit or block approval/download. The older prepayment draft cannot change
+this preference. The service-only RPC checks ownership and confirmed checkout.
 
 The administrator sees this preference in the order detail. Once script-ready
 or delivered, “Abrir WhatsApp con el enlace” prepares a message for that number

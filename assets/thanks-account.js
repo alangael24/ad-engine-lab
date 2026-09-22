@@ -56,7 +56,7 @@ async function checkPurchase(attempt = 0) {
       const gift=['gift_60','gift_120'].includes(data.plan);
       planIncludes.textContent = gift?`Tu película personalizada de ${data.videoSeconds===120?'2 minutos':'1 minuto'}, con guion, animación, narración, subtítulos, dedicatoria y descarga.`:data.videoSeconds?`Hasta 1 minuto por anuncio, con imágenes, voz, animación, edición y subtítulos. También puedes repartir la duración incluida en videos más cortos.`:`${data.videoCredits} clips de video + ${data.imageCredits} generaciones de imágenes.`;
       const privateToken=gift&&lastPrivateAccess();
-      if(toolButton){toolButton.href=privateToken?'/regalos/pedido/#gift='+privateToken:gift?"/regalos/pedido/":data.videoSeconds?"/anuncios-lab/":"/herramienta/";if(gift)toolButton.textContent="Ver mis películas →";}
+      if(toolButton){toolButton.href=privateToken?'/regalos/pedido/#gift='+privateToken:gift?"/regalos/pedido/":data.videoSeconds?"/anuncios-lab/":"/herramienta/";if(gift)toolButton.textContent="Ver mi pedido →";}
       if (data.paymentStatus === "paid") {
         document.querySelector('#payment-title').textContent = 'Pago confirmado.';
         document.querySelector('#plan-price').textContent = new Intl.NumberFormat('es-MX', { style:'currency', currency:data.currency || 'MXN' }).format(data.amountTotal / 100);
@@ -64,7 +64,7 @@ async function checkPurchase(attempt = 0) {
       }
       setStatus(
         privateToken?"Tu pedido está confirmado":"Tu cuenta y tu saldo están listos",
-        privateToken?"Abre tu pedido para seguir el avance. También recibirás sus enlaces en el correo que usaste en Stripe.":"Entra con el mismo correo de tu cuenta. Tu saldo ya está acreditado en CreativeRush.",
+        privateToken?"Abre tu pedido para seguir el avance y, si quieres, añadir WhatsApp. También recibirás sus enlaces en el correo que usaste en Stripe.":"Entra con el mismo correo de tu cuenta. Tu saldo ya está acreditado en CreativeRush.",
         true,
       );
       return;
