@@ -2,13 +2,23 @@
 
 ## Activation status
 
-The guest flow is implemented behind `GIFT_GUEST_ENABLED=true`. It also requires
-`RESEND_API_KEY`, `GIFT_EMAIL_FROM` and `GIFT_EMAIL_VERIFIED=true` on Pages.
-Until a real sender has been verified and a transactional test delivered, keep
-these flags off. Existing authenticated checkout remains available.
+Activated in production on 2026-09-21. The guest flow requires
+`GIFT_GUEST_ENABLED=true`, `RESEND_API_KEY`, `GIFT_EMAIL_FROM` and
+`GIFT_EMAIL_VERIFIED=true` on Pages.
 
-No paid media generation, Stripe charge or real email is part of the automated
-tests. No provider account or sender was created by this change.
+- Resend verified `correo.creativerushai.com` with dedicated DKIM and sending
+  CNAME records; existing root MX/SPF records were preserved.
+- The API key has sending-only access restricted to this subdomain. Credentials
+  are Cloudflare secrets, not repository files.
+- Sender: `CreativeRush Regalos <pedidos@correo.creativerushai.com>`.
+- `creativerush-gift-mail` runs every minute with the existing retryable outbox.
+- The authorized operator test was accepted and marked **Delivered** by Resend
+  (email ID `01a0c68b-d6bc-7158-a9b2-9f2a0f03b0b1`). This verifies sender delivery,
+  not customer payment or a complete real-order lifecycle.
+- Guest authorization, payment replay and private-link isolation are covered by
+  isolated tests. A separate Stripe test-mode end-to-end payment remains pending.
+
+No live Stripe charge or paid media generation was performed during activation.
 
 ## Flow
 
