@@ -1,8 +1,8 @@
 const topic=(id,label,question,hint,example)=>({id,label,question,hint,example});
-export function giftMemoryOptions({relationship,occasion}={}){
+function relationshipMemoryOptions({relationship,occasion}={}){
  if(occasion==='pregnancy')return [
-  topic('news','La noticia','¿Qué noticia quieres revelar y a quién?','Cuenta lo que ya sabes y en qué momento quieres revelar la sorpresa.','Quiero decirle a mi mamá que va a ser abuela. Que la noticia aparezca al final.'),
-  topic('bond','Lo que nos une','¿Qué recuerdo explica por qué quieres compartirle esta noticia?','Piensa en algo que esa persona haya hecho por ti.','Mi mamá me leía un cuento cada noche. Me emociona imaginarla haciéndolo otra vez.'),
+  topic('news','La noticia','¿Qué noticia quieres revelar y a quién?','Cuenta lo que ya sabes y en qué momento quieres revelar la sorpresa.','Quiero anunciar que viene un bebé. Que la sorpresa aparezca al final de nuestra historia.'),
+  topic('bond','Lo que nos une','¿Qué recuerdo explica por qué quieres compartirle esta noticia?','Piensa en algo que esa persona haya hecho por ti.','Siempre hablamos de lo importante que es la familia. Quiero recordar una de esas conversaciones antes de dar la noticia.'),
   topic('reveal','Cómo sorprenderle','¿Qué detalle haría que entendiera la sorpresa?','Una frase, un objeto o una costumbre que tenga sentido para ustedes.','Siempre pone un plato de más. Quiero que al final aparezca una sillita junto a la mesa.')];
  if(occasion==='memorial')return [
   topic('ritual','Su costumbre','¿Qué pequeña costumbre suya te gustaría volver a ver?','El lugar, lo que hacía y un detalle que te haga recordarle.','Los domingos preparaba café y ponía su radio junto a la ventana.'),
@@ -28,10 +28,46 @@ export function giftMemoryOptions({relationship,occasion}={}){
   topic('adventure','Nuestra aventura','¿Qué aventura todavía les hace reír?','Qué intentaban hacer y qué terminó pasando.','Fuimos a acampar y tardamos una hora en entender cómo armar la tienda.'),
   topic('support','Cuando me apoyó','¿Cuándo estuvo ahí para ti?','Un gesto concreto que quieras agradecerle.','Llegó con comida y se quedó conmigo toda la tarde cuando más compañía necesitaba.'),
   topic('joke','Nuestra broma','¿Qué broma o costumbre solo ustedes entienden?','Explica cómo empezó, para poder representarla.','Siempre nos regalamos la misma taza que ninguno de los dos quiere perder.')];
+ if(relationship==='family')return [
+  topic('tradition','Nuestra tradición','¿Qué tradición familiar te gustaría convertir en una escena?','Cuenta una ocasión concreta: quién estaba y qué pasó.','Cada diciembre hacemos tamales en casa de mi tía. El año pasado terminamos cantando en la cocina.'),
+  topic('growing','Crecimos juntos','¿Qué recuerdo de cuando eran más pequeños todavía les hace sonreír?','Un juego, una travesura o un lugar que compartían.','Mi prima y yo construíamos casas con las sábanas de la abuela y dormíamos ahí.'),
+  topic('gathering','Una reunión especial','¿Qué pasó en aquella reunión que nadie ha olvidado?','No necesitas contar toda la celebración: elige su mejor momento.','Mi hermano intentó preparar el pastel y todos acabamos ayudándole a decorarlo.'),
+  topic('support','Cuando nos apoyamos','¿Qué hizo esa persona por ti o por la familia?','Un gesto concreto y por qué te importó.','Mi tía me recibió en su casa cuando empecé a estudiar en otra ciudad.')];
+ if(relationship==='other')return [
+  topic('connection','Cómo llegó a mi vida','¿Cómo conociste a esta persona y qué hizo que fuera importante para ti?','Explica qué vínculo tienen sin necesidad de ponerle una etiqueta.','Fue mi profesora de dibujo. Un día guardó mi trabajo para enseñarlo en la exposición.'),
+  topic('lesson','Algo que me enseñó','¿Qué aprendiste de esa persona en un momento concreto?','Cuenta lo que hicieron o las palabras que recuerdas.','Me ayudó a practicar mi primera presentación hasta que dejé de tener miedo.'),
+  topic('gesture','Un gesto inolvidable','¿Qué pequeño gesto suyo te gustaría devolver con este regalo?','Dónde ocurrió, qué hizo y cómo te hizo sentir.','Mi vecino cuidó mis plantas mientras estuve fuera y me recibió con una flor nueva.'),
+  topic('shared','Un momento compartido','¿Qué momento juntos te gustaría volver a ver?','Puede ser algo sencillo; lo importante es que tenga sentido para ustedes.','Después de cada ensayo nos sentábamos en la plaza a platicar.')];
  return [
   topic('day','Un día especial','¿Qué pasó ese día y por qué lo recuerdas?','Elige una escena: dónde estaban, qué hicieron y cómo te hizo sentir.','Cocinamos juntos un domingo y acabamos llenos de harina.'),
   topic('support','Un gesto que agradezco','¿Qué hizo por ti que nunca has olvidado?','Algo concreto, aunque parezca pequeño.','Vino a buscarme cuando perdí el último autobús y no me dejó volver solo.'),
   topic('ritual','Una costumbre nuestra','¿Qué hacen juntos que te gustaría conservar?','Una frase, un lugar o una tradición que reconozcan.','Nos reunimos cada domingo a desayunar y siempre prepara el mismo café.')];
+}
+// The occasion leads; relationship topics remain available without adding fields.
+export function giftMemoryOptions(context={}){
+ const base=relationshipMemoryOptions(context);
+ if(['pregnancy','memorial','reunion'].includes(context.occasion))return base;
+ const byOccasion={
+  birthday:[topic('birthday','Un cumpleaños inolvidable','¿Qué pasó en un cumpleaños suyo que todavía recuerdan?','Un momento concreto: la sorpresa, quién estuvo o algo que les hizo reír.','Se fue la luz antes de partir el pastel y terminamos cantando con las linternas del celular.'),topic('celebrate','Lo que celebro de ti','¿Qué hizo esa persona que muestra por qué es tan especial para ti?','Piensa en una escena que muestre esa cualidad.','Siempre logra hacernos reír. Una vez improvisó un baile en la cocina para animarnos.')],
+  thanks:[topic('gratitude','Lo que hizo por mí','¿Qué hizo por ti que quieres agradecerle con este regalo?','Cuenta cuándo pasó, qué hizo y cómo te ayudó.','Me acompañó a mi primer día de trabajo y me esperó a la salida para saber cómo me había ido.'),topic('impact','Lo que cambió para mí','¿Qué cambió en tu vida gracias a ese gesto?','Una consecuencia real, aunque sea pequeña.','Después de practicar conmigo cada tarde, por fin me animé a manejar sola.')],
+  family:[topic('family-day','Un día en familia','¿Qué día con tu familia te gustaría volver a vivir?','Elige una escena e indica quién estaba.','Fuimos al río con mis hermanos. Mi papá nos enseñó a lanzar piedras sobre el agua.')],
+  anniversary:context.relationship==='partner'?[]:[topic('anniversary','Lo que celebramos','¿Qué aniversario celebran y qué momento lo representa?','Aclara de quién es la historia y qué fecha o etapa están recordando.','Mis papás cumplen treinta años de casados. Quiero recrear cómo se conocieron en el baile del pueblo.')]
+ };
+ return [...(byOccasion[context.occasion]||[]),...base].slice(0,5);
+}
+export function giftDedicationGuide({relationship,occasion}={}){
+ const occasionGuides={
+  pregnancy:{question:'¿Qué quieres decirle después de revelar la noticia?',example:'Nos emociona compartir contigo esta nueva etapa de nuestra familia.'},
+  memorial:{question:'¿Qué palabras te gustaría dedicarle?',example:'Tu manera de cuidarnos sigue conmigo. Gracias por tanto cariño.'},
+  reunion:{question:'¿Qué significa para ti volver a estar juntos?',example:'Extrañaba hasta nuestros desayunos de siempre. Qué alegría tenerte cerca otra vez.'},
+  birthday:{question:'¿Qué quieres desearle en este cumpleaños?',example:'Que este año te regale tantas alegrías como las que tú nos das.'},
+  thanks:{question:'¿Qué quieres que sepa sobre lo que hizo por ti?',example:'Quizá para ti fue un pequeño gesto. Para mí significó no estar solo.'},
+  family:{question:'¿Qué quieres decirle sobre los momentos que comparten?',example:'Lo que más me gusta de estos recuerdos es haberlos vivido contigo.'},
+  anniversary:relationship==='partner'?{question:'¿Qué quieres decirle sobre su historia juntos?',example:'Volvería a elegir aquella primera cita contigo. Feliz aniversario.'}:{question:'¿Qué quieres dedicarle en este aniversario?',example:'Qué bonito poder celebrar esta historia y todos los recuerdos que nos ha dado.'}
+ };
+ if(occasionGuides[occasion])return occasionGuides[occasion];
+ const examples={partner:'Gracias por hacer que cualquier lugar se sienta como casa.',mother:'Mamá, ahora entiendo mejor todo lo que hiciste por mí. Gracias por tanto.',father:'Papá, llevo conmigo lo que me enseñaste. Gracias por estar ahí.',friend:'Gracias por las risas y por quedarte también en los días difíciles.',family:'Qué suerte compartir estos recuerdos y ser parte de la misma familia.',other:'Lo que hiciste por mí sigue siendo importante. Quería que lo supieras.'};
+ return {question:'¿Qué te gustaría decirle al terminar?',example:examples[relationship]||'Gracias por ser parte de estos recuerdos. Quería regalarte una forma de volver a vivirlos.'};
 }
 // These are prompts for remembering, never prefilled biography.
 export function mountGiftMemoryGuide(container,{context={},input,question,hint,second=false}){
