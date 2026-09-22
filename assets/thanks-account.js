@@ -1,4 +1,5 @@
 import {lastPrivateAccess} from './gift-guest-client.js';
+import {trackGiftPurchase} from './gift-tracking.js';
 const params = new URLSearchParams(window.location.search);
 const sessionId = params.get("session_id") || "";
 const status = document.querySelector("#access-status");
@@ -16,6 +17,8 @@ const planNames = {
 
 function trackPurchase(data) {
   if (['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) return;
+  if (sessionId.startsWith('cs_test_')) return;
+  if (['gift_60','gift_120'].includes(data.plan)) { trackGiftPurchase(data, sessionId); return; }
   if (typeof window.fbq !== "function" || !Number.isFinite(data.amountTotal) || !sessionId) return;
 
   const storageKey = `meta_purchase_${sessionId}`;

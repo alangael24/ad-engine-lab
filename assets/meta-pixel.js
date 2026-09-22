@@ -34,12 +34,18 @@
   else window.addEventListener("load", scheduleRemotePixel, { once: true });
 })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
+// Manual events only: the gift forms contain personal stories and photo labels.
+window.fbq('set', 'autoConfig', false, '2843277659378048');
 window.fbq("init", "2843277659378048");
 window.fbq("track", "PageView");
+if (window.location.pathname === '/regalos/' || window.location.pathname === '/regalos') {
+  window.fbq('track', 'ViewContent', { content_name: 'CreativeRush Regalos', content_category: 'regalos', content_ids: ['gift_60', 'gift_120'], content_type: 'product', currency: 'MXN' });
+}
 
 document.addEventListener("click", (event) => {
   const checkout = event.target.closest?.('a[href*="buy.stripe.com"]');
   if (!checkout) return;
+  if (new URL(checkout.href).pathname.startsWith('/test_')) return;
 
   const offers = [
     {
