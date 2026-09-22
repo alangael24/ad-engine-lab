@@ -1,3 +1,4 @@
+import {giftBriefMissing} from '../assets/gift-brief.js';
 import {getSupabaseAdmin,json,normalizeEmail,isExistingUserError} from './backend.js';
 import {readJson,readBounded,imageType,rpc,UUID,apiError} from './generations.js';
 import {giftRequest} from '../assets/gift-model.js';
@@ -66,6 +67,7 @@ export async function guestPost(context){try{
  }
  if(url.searchParams.has('checkout')){
   const b=await readJson(context.request,1000),plan=VIDEO_PACKAGES[b.plan];if(!['gift_60','gift_120'].includes(b.plan)||!plan)fail('GIFT_INVALID');
+  if(d.fields.briefVersion==='1'&&giftBriefMissing(d.fields,b.plan).length)return json({error:'Completa los recuerdos y la dedicatoria de esta opción antes de pagar.',code:'GIFT_BRIEF_INCOMPLETE'},400);
   for(const p of d.photos){const info=await db.storage.from('studio-media').info(`gift-guests/${d.id}/${p.id}`);if(info.error||Number(info.data?.size)!==p.size)fail('GIFT_INVALID');}
   const c=await rpc(db,'gift_guest_checkout',{p_draft:d.id,p_plan:b.plan,p_token:randomToken()});
   const portal=`/regalos/pedido/#gift=${c.access_token}`;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {giftBriefMissing} from '../assets/gift-brief.js';
 import {whatsappPhone} from '../assets/gift-whatsapp-model.js';
 import {giftCheckoutReturn} from '../assets/gift-checkout-model.js';
 const script=(await readFile(new URL('../assets/gift-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/,'');
@@ -20,8 +21,8 @@ test('both package controls update public checkout price, duration and Stripe pl
 test('guest checkout hides account email and opens Stripe without an auth request',async()=>{
  const source=(await readFile(new URL('../assets/gift-guest-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
  const elements=new Map(),calls=[],navigation=[],portals=[];
- const el=k=>{if(!elements.has(k))elements.set(k,{hidden:false,disabled:true,value:k==='#choose-60'?'gift_60':'gift_120'});return elements.get(k);};
- const ctx=vm.createContext({whatsappPhone,sessionStorage:{setItem(){},getItem(){return null;}},URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120'}}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
+ const el=k=>{if(!elements.has(k))elements.set(k,{hidden:false,disabled:true,value:k==='#choose-60'?'gift_60':k==='#choose-120'?'gift_120':''});return elements.get(k);};
+ const ctx=vm.createContext({giftBriefMissing,whatsappPhone,sessionStorage:{setItem(){},getItem(){return null;}},URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120',memory1:'El café',memory2:'El viaje',message:'Te quiero'},photos:[]}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
  vm.runInContext(source,ctx);await new Promise(r=>setImmediate(r));
  assert.equal(el('#checkout-account').hidden,true);assert.equal(el('#checkout-guest-info').hidden,false);
  assert.equal(el('#checkout-pay').disabled,false);

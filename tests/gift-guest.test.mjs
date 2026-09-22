@@ -99,3 +99,15 @@ test('WhatsApp is optional after confirmed payment, owned, revocable and private
  assert.equal((await db.query('select whatsapp_consented_at from gift_guest_checkouts where order_id=$1',[paid.orderId])).rows[0].whatsapp_consented_at,null);
  for(const role of ['anon','authenticated']){await db.exec('set role '+role);try{await assert.rejects(call(db,'gift_order_whatsapp',[buyer.id,paid.orderId,'+525512345678']),/permission denied/);}finally{await db.exec('reset role');}}
 });
+
+test('new intake cannot open premium payment without its second memory and closing message',async()=>{
+ const d={id:crypto.randomUUID(),token:randomToken(),fields:{...fields,briefVersion:'1',message:'Gracias por estar siempre.'},photos:[]};
+ assert.equal((await guestPost(context('?create=1',{body:d}))).status,200);
+ const denied=await guestPost(context(`?draft=${d.id}&checkout=1`,{token:d.token,body:{plan:'gift_120'}}));
+ assert.equal(denied.status,400);assert.equal((await denied.json()).code,'GIFT_BRIEF_INCOMPLETE');
+ assert.equal((await db.query('select count(*)::int n from gift_guest_checkouts where draft_id=$1',[d.id])).rows[0].n,0);
+ await checkout(d,'gift_60');
+ const full={...d,id:crypto.randomUUID(),token:randomToken(),fields:{...d.fields,memory2:'Nos reencontramos en el aeropuerto.'}};
+ assert.equal((await guestPost(context('?create=1',{body:full}))).status,200);
+ await checkout(full,'gift_120');
+});

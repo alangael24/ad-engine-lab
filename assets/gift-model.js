@@ -34,7 +34,7 @@ export function giftRequest(raw,photos=[]){
  const idea=[`PELÍCULA PERSONALIZADA PARA REGALAR. Para: ${recipient}. ${raw.names?'Protagonistas y pronunciación':'Otros protagonistas y pronunciación'}: ${names||'No indicados'}. Ocasión: ${GIFT_OCCASIONS[raw.occasion]}. Tono: ${GIFT_TONES[raw.tone]}.`,
  relationship&&`Relación con quien regala: ${GIFT_RELATIONSHIPS[relationship]}.`,emotion&&`Emoción que debe transmitir: ${GIFT_EMOTIONS[emotion]}.`,
  'Estilo visual único: animación 3D tipo Pixar.',
- `Recuerdo o noticia que el cliente quiere contar: ${memory1}`,memory2&&`Detalle personal que deben reconocer: ${memory2}`,memory3&&`Otro recuerdo: ${memory3}`,message&&`Mensaje que quiero dedicar: ${message}`,avoid&&`No incluir ni cambiar: ${avoid}`,
+ `Recuerdo o noticia que el cliente quiere contar: ${memory1}`,memory2&&`Otro momento o detalle personal: ${memory2}`,memory3&&`Otro recuerdo: ${memory3}`,message&&`Mensaje que quiero dedicar: ${message}`,avoid&&`No incluir ni cambiar: ${avoid}`,
  `Narra una historia de aproximadamente ${targetDuration===120?'dos minutos':'un minuto'}, con un comienzo, recuerdos conectados y una dedicatoria final. Prepara un momento de reconocimiento con un detalle concreto del recuerdo. Conserva los nombres, relaciones, hechos y rasgos de las fotos. No inventes bodas, hijos, fechas, pérdidas ni otros datos personales. Puedes enriquecer la puesta en escena sin alterar lo sucedido. Sin oferta, marca, beneficios comerciales ni CTA. Primero propone el guion; el cliente debe aprobarlo antes de producir.`,
  photos.length?`Referencias de identidad: ${photos.map(p=>`${p.label.trim()} (asset ${p.id})`).join('; ')}.`:'Sin fotografías todavía: no afirmes conocer el aspecto real de los protagonistas.'
  ].filter(Boolean).join('\n');
