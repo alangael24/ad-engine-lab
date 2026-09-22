@@ -26,3 +26,6 @@ body[data-gift-step="3"] .gift-layout{display:block;max-width:1180px}body[data-g
 .order-whatsapp{padding:16px;border:1px solid #dfd2da;border-radius:12px;margin:18px 0;background:#faf7f8}.order-whatsapp .whatsapp-choice{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px}.order-whatsapp .whatsapp-choice input{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0;accent-color:#78445f}.whatsapp-choice small{display:block;font-size:12px;font-weight:400;margin-top:4px;color:#766b70}#whatsapp-number-wrap{margin-top:16px}#whatsapp-number{font-size:16px;width:100%;background:white}.order-whatsapp .helper{margin-bottom:0}
 
 .order-whatsapp h2{font-size:22px;margin:0 0 8px}.order-whatsapp .back{margin-top:14px}#whatsapp-status{font-size:14px}
+
+/* Compact gift intake: story, photos, then the single package checkout. */
+.steps .step-upcoming{flex:1;display:block;text-align:center;padding:6px 2px;min-height:48px;color:#85767e;font-size:13px;line-height:1.3}.steps .step-upcoming span{display:block;margin:3px 0 0;font-size:12px}.gift-extra-details{border-top:1px solid #eee8e5;margin-top:24px}.gift-extra-details[open]>summary{margin-bottom:12px}

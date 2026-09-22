@@ -21,7 +21,7 @@ test('guest checkout hides account email and opens Stripe without an auth reques
  const source=(await readFile(new URL('../assets/gift-guest-checkout.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
  const elements=new Map(),calls=[],navigation=[],portals=[];
  const el=k=>{if(!elements.has(k))elements.set(k,{hidden:false,disabled:true,value:k==='#choose-60'?'gift_60':'gift_120'});return elements.get(k);};
- const ctx=vm.createContext({whatsappPhone,sessionStorage:{setItem(){}},URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120'}}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
+ const ctx=vm.createContext({whatsappPhone,sessionStorage:{setItem(){},getItem(){return null;}},URL,URLSearchParams,document:{querySelector:el},window:{addEventListener(){}},location:{search:'?draft=draft1',assign:u=>navigation.push(u)},storedGuest:()=>({id:'draft1',token:'test-token',fields:{package:'gift_120'}}),rememberPortal:p=>portals.push(p),guestRequest:async(path,opts)=>{calls.push({path,opts});return path.includes('checkout=1')?{url:'https://buy.stripe.com/test',portal:'/regalos/pedido/#gift=test'}:{title:'Regalo para Ana'};}});
  vm.runInContext(source,ctx);await new Promise(r=>setImmediate(r));
  assert.equal(el('#checkout-account').hidden,true);assert.equal(el('#checkout-guest-info').hidden,false);
  assert.equal(el('#checkout-pay').disabled,false);

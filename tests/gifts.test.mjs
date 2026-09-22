@@ -17,7 +17,7 @@ test('gift project preserves memories and owned photos through save and idempote
 });
 test('maximum form lengths and three labeled references fit the existing production contract',()=>{
  const raw={...input,relationship:'family',emotion:'gratitude',occasion:'pregnancy',recipient:'a'.repeat(80),names:'b'.repeat(120),memory1:'c'.repeat(300),memory2:'d'.repeat(300),memory3:'e'.repeat(300),message:'f'.repeat(300),avoid:'g'.repeat(160)};
- const data=projectData(giftRequest(raw,Array.from({length:3},()=>({id:crypto.randomUUID(),label:'h'.repeat(100)}))));assert.ok(data.idea.length<=3000);assert.equal(data.creativeMemory.characterAssetIds.length,3);
+ const data=projectData(giftRequest(raw,Array.from({length:3},()=>({id:crypto.randomUUID(),label:'h'.repeat(100)}))));assert.ok(data.idea.length<=3000);const {names,...compact}=raw;assert.ok(giftRequest({...compact,additionalNames:names},Array.from({length:3},()=>({id:crypto.randomUUID(),label:'h'.repeat(100)}))).idea.length<=3000);assert.equal(data.creativeMemory.characterAssetIds.length,3);
  assert.throws(()=>giftRequest({...input,memory1:''}));assert.throws(()=>giftRequest(input,[{id:crypto.randomUUID(),label:''}]));assert.throws(()=>giftRequest({...input,look:'unknown'}));assert.throws(()=>giftRequest({...input,look:'clay'}));assert.match(giftRequest(input).idea,/Estilo visual único: animación 3D tipo Pixar/);
  assert.match(GIFT_SCRIPT_REQUEST,/no inicies imágenes, voz ni video todavía/);
 });
@@ -38,11 +38,12 @@ test('guided answers reach the stored director brief for every occasion without 
  assert.throws(()=>giftRequest({...input,relationship:'invalid'}));
 });
 
-test('old drafts return to their matching panel after duration moves to the end',()=>{
- assert.deepEqual([0,1,2,3].map(step=>giftDraftStep({version:2,step})),[3,0,1,2]);
- assert.deepEqual([0,1,2].map(step=>giftDraftStep({step})),[0,1,2]);
- assert.equal(giftDraftStep({version:3,step:3}),3);
+test('old drafts retain a useful step after merging the story and removing duplicate duration',()=>{
+ assert.deepEqual([0,1,2,3].map(step=>giftDraftStep({version:2,step})),[1,0,0,1]);
+ assert.deepEqual([0,1,2].map(step=>giftDraftStep({step})),[0,0,1]);
+ assert.equal(giftDraftStep({version:3,step:3}),1);
  assert.equal(giftDraftStep(null),0);
+ assert.deepEqual([0,1,2,3].map(step=>giftDraftStep({version:4,step})),[0,1,1,1]);
 });
 
 test('occasion-specific prompts take precedence over the relationship',()=>{
@@ -56,4 +57,12 @@ test('selected gift duration reaches the validated brief and story instructions'
  assert.equal(one.creatorBrief.targetDuration,60);assert.equal(two.creatorBrief.targetDuration,120);
  assert.match(two.idea,/aproximadamente dos minutos/);assert.match(one.idea,/aproximadamente un minuto/);
  assert.throws(()=>giftRequest({...input,package:'gift_999'}));
+});
+
+test('minimal intake needs no duplicate protagonist name and keeps optional details',()=>{
+ const {names,...minimal}=input;
+ assert.match(projectData(giftRequest(minimal)).idea,/Para: Ana\. Otros protagonistas y pronunciación: No indicados\./);
+ assert.match(projectData(giftRequest({...minimal,additionalNames:'su hija Sofía'})).idea,/Otros protagonistas y pronunciación: su hija Sofía/);
+ assert.match(projectData(giftRequest(input)).idea,/Ana y Luis/);
+ assert.throws(()=>giftRequest({...minimal,recipient:''}));
 });
