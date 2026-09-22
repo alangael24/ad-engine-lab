@@ -111,3 +111,16 @@ test('new intake cannot open premium payment without its second memory and closi
  assert.equal((await guestPost(context('?create=1',{body:full}))).status,200);
  await checkout(full,'gift_120');
 });
+
+test('scoped Stripe test webhook creates one real-shaped order and suppresses test notifications',async()=>{
+ const {testWebhook}=await import('../src/gift-stripe-test.js');
+ const d=await draft(),c=await checkout(d),s=session(c);s.payment_link='plink_scopedtest';s.livemode=false;s.customer_details.email='regalos-prueba@example.com';
+ const config={secret:'whsec_scopedtest',checkoutId:s.client_reference_id.slice(5),paymentLinkId:s.payment_link,plan:'gift_60',email:s.customer_details.email,expiresAt:Date.now()+3600000};
+ const event={id:'evt_scoped_'+crypto.randomUUID(),type:'checkout.session.completed',livemode:false,data:{object:s}},payload=JSON.stringify(event);
+ const signature=await new Stripe('unused').webhooks.generateTestHeaderStringAsync({payload,secret:config.secret});
+ const request=()=>({env:{...env,GIFT_STRIPE_TEST:JSON.stringify(config)},request:new Request('https://app.test/api/stripe/gift-test-webhook',{method:'POST',headers:{'stripe-signature':signature},body:payload})});
+ const first=await testWebhook(request());assert.equal(first.status,200);assert.equal((await first.json()).applied,true);
+ const again=await testWebhook(request());assert.equal((await again.json()).applied,false);
+ const outbox=(await db.query('select status,error_code from gift_email_outbox where order_id=$1',[config.checkoutId])).rows;
+ assert.equal(outbox.length,1);assert.equal(outbox[0].error_code,'TEST_ORDER_NO_EMAIL');assert.equal(outbox[0].status,'failed');
+});

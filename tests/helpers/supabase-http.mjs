@@ -55,6 +55,11 @@ export function mockSupabase(db) {
         if(!['eq','gt'].includes(op)) throw Error(`Unexpected filter ${op}`);
         args.push(rhs);conditions.push(`${safe(key)} ${op==='eq'?'=':'>'} $${args.length}`);
       }
+      if(request.method==='PATCH') {
+        const body=await request.json();const sets=Object.entries(body).map(([key,value])=>{args.push(value);return `${safe(key)}=$${args.length}`;});
+        const result=await db.query(`update public.${safe(name)} set ${sets.join(',')}${conditions.length?' where '+conditions.join(' and '):''} returning *`,args);
+        return respond(result.rows);
+      }
       const columns=(url.searchParams.get('select') || '*').split(',').map(x=>x==='*'?'*':safe(x));
       let query=`select ${columns.join(',')} from public.${safe(name)}${conditions.length?' where '+conditions.join(' and '):''}`;
       if(url.searchParams.get('order'))query+=' order by '+url.searchParams.get('order').split(',').map(part=>{const [col,direction]=part.split('.');return safe(col)+' '+(direction==='desc'?'desc':'asc');}).join(',');
