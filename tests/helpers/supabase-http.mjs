@@ -1,7 +1,7 @@
 // Test-only transport: real supabase-js requests execute against isolated PostgreSQL.
 // This module is never imported by production code or the static build.
-const tables = new Set(['gift_orders','production_spend_reservations','video_seconds_reservations','h3_pod_control','h3_pod_runs','h3_generation_attempts','generation_jobs','generation_workers','generation_references','credit_balances','purchases','studio_assets','studio_brands','studio_projects','studio_scene_versions','studio_renders','studio_workers','studio_reference_analyses','studio_chat_edits','studio_productions','studio_production_workers','video_edit_sessions','video_edit_jobs','video_edit_workers']);
-const functions = new Set(['gift_order_customer','recover_production_step','apply_video_seconds_purchase','h3_pod_work','h3_attempt_progress','h3_pod_ready','h3_pod_boot_progress','h3_pod_download_progress','account_production_spend','serverless_idle_work','reserve_production_spend','gpu_idle_check','reserve_generation','register_generation_reference','claim_generation','claim_serverless_generation','generation_provider_progress','generation_serverless_shutdown','heartbeat_generation','finish_generation','cancel_generation','sweep_generations','apply_saas_purchase','studio_read','studio_write','studio_render_worker','studio_editorial_begin','studio_editorial_checkpoint','studio_editorial_manifest','studio_reference_write','studio_chat_write','studio_chat_prepare','studio_chat_commit','studio_production_start','studio_production_work','video_edit_write','video_edit_work']);
+const tables = new Set(['gift_guest_drafts','gift_guest_checkouts','gift_email_outbox','gift_orders','production_spend_reservations','video_seconds_reservations','h3_pod_control','h3_pod_runs','h3_generation_attempts','generation_jobs','generation_workers','generation_references','credit_balances','purchases','studio_assets','studio_brands','studio_projects','studio_scene_versions','studio_renders','studio_workers','studio_reference_analyses','studio_chat_edits','studio_productions','studio_production_workers','video_edit_sessions','video_edit_jobs','video_edit_workers']);
+const functions = new Set(['gift_guest_create','gift_guest_checkout','gift_guest_repeat_payment','gift_guest_fulfill','gift_email_claim','gift_email_finish','gift_order_customer','recover_production_step','apply_video_seconds_purchase','h3_pod_work','h3_attempt_progress','h3_pod_ready','h3_pod_boot_progress','h3_pod_download_progress','account_production_spend','serverless_idle_work','reserve_production_spend','gpu_idle_check','reserve_generation','register_generation_reference','claim_generation','claim_serverless_generation','generation_provider_progress','generation_serverless_shutdown','heartbeat_generation','finish_generation','cancel_generation','sweep_generations','apply_saas_purchase','studio_read','studio_write','studio_render_worker','studio_editorial_begin','studio_editorial_checkpoint','studio_editorial_manifest','studio_reference_write','studio_chat_write','studio_chat_prepare','studio_chat_commit','studio_production_start','studio_production_work','video_edit_write','video_edit_work']);
 const safe = name => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw Error('Invalid test identifier'); return `"${name}"`; };
 export function mockSupabase(db) {
   const users = new Map(), media = new Map(), invites = [];
@@ -16,6 +16,13 @@ export function mockSupabase(db) {
       return u ? respond(u) : respond({message:'Invalid token'},401);
     }
     if(path.startsWith('/auth/v1/admin/users/')){const u=users.get(path.split('/').at(-1));return u?respond({user:u}):respond({message:'Not found'},404);}
+    if(path==='/auth/v1/admin/users' && request.method==='POST') {
+      const body=await request.json();
+      const found=await db.query('select id,email from auth.users where email=$1',[body.email]);
+      if(found.rows.length)return respond({msg:'User already registered'},422);
+      const u={id:crypto.randomUUID(),email:body.email,email_confirmed_at:body.email_confirm?'now':null};
+      await db.query('insert into auth.users(id,email) values($1,$2)',[u.id,u.email]);users.set(u.id,u);return respond(u);
+    }
     if (path==='/auth/v1/invite') {
       const body=await request.json(); invites.push({email:body.email,redirectTo:url.searchParams.get('redirect_to')});
       const found=await db.query('select id,email from auth.users where email=$1',[body.email]);
@@ -56,6 +63,11 @@ export function mockSupabase(db) {
       const result=await db.query(query,args); const singular=request.headers.get('accept')?.includes('vnd.pgrst.object');
       if(singular && result.rows.length!==1) return respond({message:'JSON object requested, multiple (or no) rows returned',code:'PGRST116'},406);
       return respond(request.method==='HEAD'?null:singular?result.rows[0]:result.rows,200,{'content-range':`0-${Math.max(result.rows.length-1,0)}/${result.rows.length}`});
+    }
+    if(path==='/storage/v1/object/copy') {
+      const b=await request.json(),source=media.get(`${b.bucketId}/${b.sourceKey}`);
+      if(!source)return respond({message:'Not found'},404);
+      media.set(`${b.destinationBucket||b.bucketId}/${b.destinationKey}`,source);return respond({Key:b.destinationKey});
     }
     if(path.startsWith('/storage/v1/object/upload/sign/')) {
       const key=path.slice('/storage/v1/object/upload/sign/'.length);

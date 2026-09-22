@@ -1,14 +1,22 @@
-import {apiRequest} from './auth-client.js';
-const $=s=>document.querySelector(s),id=new URLSearchParams(location.search).get('id');let order,busy=false,timer,needsPayment=true;
+import {apiRequest as accountRequest} from './auth-client.js';
+import {privateAccess} from './gift-guest-client.js';
+const incoming=privateAccess();let access=incoming||sessionStorage.getItem('gift-order-access');
+if(incoming)sessionStorage.setItem('gift-order-access',incoming);
+// An explicit account order URL always uses account authentication.
+if(new URLSearchParams(location.search).has('id'))access=null;
+async function apiRequest(path,options={}){if(!access)return accountRequest(path,options);const r=await fetch(path,{method:options.method||'GET',headers:{'x-gift-access':access,...(options.body?{'content-type':'application/json'}:{})},body:options.body?JSON.stringify(options.body):undefined}),b=await r.json();if(!r.ok)throw Error(b.error||'No pudimos abrir tu pedido.');return b;}
+
+const $=s=>document.querySelector(s);let id=new URLSearchParams(location.search).get('id');let order,busy=false,timer,needsPayment=true;
 const states={received:'Recibimos tu historia. Prepararemos el guion para que lo revises aquí.',script_ready:'Tu guion está listo. Revísalo antes de aprobar la producción.',approved:'Guion aprobado. Tu película está pendiente de producción.',producing:'Estamos creando tu película.',ready:'Tu película está lista para descargar.',cancelled:'Este pedido fue cancelado. Los segundos reservados se liberaron.'};
 function say(t){$('#order-status').textContent=t;}
 async function refresh(){clearTimeout(timer);try{
+ if(access&&!id){const response=await fetch('/api/gift-guest?order=1',{headers:{'x-gift-access':access}}),info=await response.json();if(!response.ok)throw Error(info.error);if(!info.orderId){say('Esperamos la confirmación de Stripe. No necesitas volver a pagar.');timer=setTimeout(refresh,5000);return;}id=info.orderId;}
  const r=await apiRequest('/api/gift-orders'+(id?'?id='+encodeURIComponent(id):''));
  $('#admin-link').hidden=!r.canAdmin;
  if(!id){say(r.orders.length?'Abre una película para ver su avance.':'Todavía no has enviado una historia.');const list=$('#order-list');list.replaceChildren();for(const o of r.orders){const a=document.createElement('a');a.className='order-list-item';a.href='/regalos/pedido/?id='+o.id;a.textContent=`${o.title} — ${states[o.status]}`;list.append(a);}return;}
  order=r.order;$('#order-title').textContent=order.title;$('#order-details').hidden=false;say(states[order.status]);$('#order-reference').textContent='Pedido '+order.id.slice(0,8);$('#order-progress').textContent=`Película de ${order.targetSeconds/60} minuto${order.targetSeconds>60?'s':''}`;
  $('#order-script').hidden=!order.script;$('#order-script').textContent=order.script;$('#order-review').hidden=order.status!=='script_ready';
- $('#order-balance').textContent=order.status==='script_ready'?`Tienes ${r.seconds.available} segundos disponibles. Al aprobar se reservan ${order.targetSeconds}.`:'';
+ $('#order-balance').textContent=!access&&order.status==='script_ready'?`Tienes ${r.seconds.available} segundos disponibles. Al aprobar se reservan ${order.targetSeconds}.`:'';
  needsPayment=['received','script_ready'].includes(order.status)&&r.seconds.available<order.targetSeconds;
  $('#order-buy').hidden=!needsPayment;$('#order-buy').textContent=order.targetSeconds===120?'Comprar película de 2 minutos · $499 MXN':'Comprar película de 1 minuto · $299 MXN';
  $('#order-buy').href='/regalos/checkout/?id='+encodeURIComponent(order.id);

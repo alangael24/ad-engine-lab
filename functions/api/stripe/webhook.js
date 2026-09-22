@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import {fulfillGuest} from '../../../src/gift-guest.js';
 import {
   PLAN_BY_PAYMENT_LINK,
   getPaymentLinkId,
@@ -40,6 +41,9 @@ async function ensureAccount(supabase, email, redirectTo) {
 async function grantPurchase(supabase, event, session, plan, paymentLinkId, env) {
   if (plan.videoSeconds && (session.payment_status !== 'paid' || session.currency !== 'mxn' || session.amount_total !== plan.amount * 100)) {
     throw new Error('Package payment does not match the fixed price and currency.');
+  }
+  if(String(session.client_reference_id||'').startsWith('gift_')) {
+    return fulfillGuest(supabase,event,session,plan,paymentLinkId);
   }
   const email = normalizeEmail(session.customer_details?.email || session.customer_email);
   if (!email) throw new Error("La sesión pagada no contiene un correo de cliente.");

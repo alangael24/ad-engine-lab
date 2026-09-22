@@ -1,0 +1,12 @@
+name = "creativerush-gift-mail"
+main = "workers/gift-mail-worker.mjs"
+compatibility_date = "2026-09-21"
+compatibility_flags = ["nodejs_compat"]
+[observability]
+enabled = true
+[triggers]
+crons = ["* * * * *"]
+[vars]
+APP_URL = "https://creativerushai.com"
+# Supply SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY,
+# GIFT_EMAIL_FROM and GIFT_EMAIL_VERIFIED only after verifying the sender.
