@@ -40,6 +40,14 @@ window.fbq("init", "2843277659378048");
 window.fbq("track", "PageView");
 if (window.location.pathname === '/regalos/' || window.location.pathname === '/regalos') {
   window.fbq('track', 'ViewContent', { content_name: 'CreativeRush Regalos', content_category: 'regalos', content_ids: ['gift_60', 'gift_120'], content_type: 'product', currency: 'MXN' });
+} else if (window.location.pathname === '/regalos/checkout/' || window.location.pathname === '/regalos/checkout') {
+  const plan = new URLSearchParams(window.location.search).get('package');
+  if (plan === 'gift_60' || plan === 'gift_120') {
+    window.fbq('trackCustom', 'GiftCheckoutPage', {
+      content_category: 'regalos', content_ids: [plan], content_type: 'product',
+      currency: 'MXN', value: plan === 'gift_60' ? 299 : 499,
+    });
+  }
 }
 
 document.addEventListener("click", (event) => {

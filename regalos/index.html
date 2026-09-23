@@ -1,10 +1,103 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Una película de su historia — CreativeRush Regalos</title><meta name="description" content="Regala una película animada de su historia. Elige tu paquete y personalízalo después de pagar. Desde $299 MXN."><link rel="canonical" href="https://creativerushai.com/regalos/"><link rel="icon" href="/assets/icon.svg"><link rel="stylesheet" href="/assets/gifts.css"><link rel="stylesheet" href="/assets/gift-offers.css"><script defer src="/assets/meta-pixel.js"></script></head>
-<body><header class="nav"><a class="logo" href="/">Creative<span>Rush</span><small>REGALOS</small></a><nav aria-label="Navegación"><a href="/regalos/pedido/">Mis películas</a></nav></header>
-<main class="gift-offers"><header class="offers-heading"><p class="eyebrow">HISTORIAS QUE SE REGALAN</p><h1>Su historia merece<br><em>su propia película.</em></h1><p>Convierte sus recuerdos en una película animada 3D tipo Pixar, con sus protagonistas, narración y una dedicatoria tuya.</p></header>
-<ol class="offer-journey"><li><b>1</b> Elige tu regalo y paga</li><li><b>2</b> Cuéntanos su historia y añade fotos</li><li><b>3</b> Aprueba el guion y recibe su película</li></ol>
-<section aria-labelledby="offers-title"><h2 id="offers-title">Elige cuánto de su historia quieres contar</h2><p class="offers-note">Después del pago te guiaremos para personalizar tu película. <strong>No necesitas tener las fotos listas ahora.</strong></p>
-<div class="gift-offer-grid"><article class="gift-offer"><p class="eyebrow">UN MOMENTO INOLVIDABLE</p><h3>Un recuerdo especial</h3><p>Para dedicarle ese momento que nunca olvidaste.</p><p class="offer-price">$299 <small>MXN</small></p><p class="offer-once">Pago único · Sin suscripción</p><ul><li><strong>1 minuto</strong> de película animada</li><li>Un recuerdo central y tu dedicatoria</li><li>Personajes inspirados en sus fotos</li><li>Guion, narración, música y subtítulos</li><li>Video para descargar y compartir</li><li><strong>Entrega en 24 horas*</strong></li></ul><a class="primary" href="/regalos/checkout/?package=gift_60">Crear mi regalo · $299 →</a></article>
-<article class="gift-offer popular"><span class="popular-label">Más popular</span><p class="eyebrow">MÁS RECUERDOS, MÁS HISTORIA</p><h3>Nuestra historia</h3><p>Para unir los momentos que los convirtieron en ustedes.</p><p class="offer-price">$499 <small>MXN</small></p><p class="offer-once">Pago único · Sin suscripción</p><ul><li><strong>2 minutos</strong> de película animada</li><li>Varios momentos conectados y más espacio para tu dedicatoria</li><li>Personajes inspirados en sus fotos</li><li>Guion, narración, música y subtítulos</li><li>Video para descargar y compartir</li><li><strong>Entrega en 1 hora*</strong></li></ul><a class="primary" href="/regalos/checkout/?package=gift_120">Crear nuestra historia · $499 →</a></article></div>
-<p class="offers-note delivery-note">*El tiempo de entrega empieza después del pago, cuando completes la información y apruebes el guion. Podrás guardar tus respuestas y continuar desde el enlace privado de tu pedido.</p></section>
-<section class="offer-faq"><h2>Un regalo personal, sin complicarte.</h2><details><summary>¿Tengo que escribir el guion?</summary><p>No. Después del pago te haremos preguntas sencillas para elegir los recuerdos. Nosotros prepararemos el guion y tú lo aprobarás antes de producir.</p></details><details><summary>¿Y si todavía no tengo las fotos?</summary><p>Puedes personalizar después. Guardaremos tu pedido y te enviaremos un enlace privado al correo que uses en Stripe.</p></details><details><summary>¿Qué pasa si cuento muchos recuerdos?</summary><p>Nos servirán como contexto. En la película de un minuto priorizamos el recuerdo principal y tu dedicatoria; en la de dos minutos conectamos varios momentos. Revisarás el guion antes de producir.</p></details></section>
-</main><footer>CreativeRush · Hecho para las historias que merecen quedarse.<a href="/anuncios-lab/">¿Buscas crear anuncios?</a></footer></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Una película de su historia — CreativeRush Regalos</title>
+  <meta name="description" content="Regala una película animada de su historia. Elige tu paquete y personalízalo después de pagar. Desde $299 MXN.">
+  <link rel="canonical" href="https://creativerushai.com/regalos/">
+  <link rel="icon" href="/assets/icon.svg">
+  <link rel="stylesheet" href="/assets/gifts.css">
+  <link rel="stylesheet" href="/assets/gift-offers.css">
+  <script defer src="/assets/meta-pixel.js"></script>
+  <script type="module" src="/assets/gift-offers.js"></script>
+</head>
+<body>
+  <header class="nav">
+    <a class="logo" href="/">Creative<span>Rush</span><small>REGALOS</small></a>
+    <nav aria-label="Navegación"><a href="/regalos/pedido/">Mis películas</a></nav>
+  </header>
+  <main class="gift-offers">
+    <section class="offer-hero" aria-labelledby="gift-hero-title">
+      <div class="offer-hero-copy">
+        <p class="eyebrow">HISTORIAS QUE SE REGALAN</p>
+        <h1 id="gift-hero-title">Su historia merece <em>su propia película.</em></h1>
+        <p>Convierte sus recuerdos y fotos en una película animada personalizada para regalar.</p>
+      </div>
+      <figure class="offer-hero-preview">
+        <div class="offer-preview-frame">
+          <video autoplay muted loop playsinline controls preload="metadata" poster="/videos/regalos/pareja-ejemplo.webp" aria-label="Ejemplo visual de una película animada de pareja">
+            <source src="/videos/regalos/pareja-ejemplo.mp4" type="video/mp4">
+            Tu navegador no puede reproducir esta muestra.
+          </video>
+          <span class="offer-preview-label">Ejemplo de película</span>
+        </div>
+        <figcaption>Muestra visual. Tu película incluye narración y música.</figcaption>
+      </figure>
+      <div class="offer-hero-action">
+        <p>Desde <strong>$299 MXN</strong> <span>· pago único</span></p>
+        <a class="primary" href="/regalos/checkout/?package=gift_60" data-gift-event="GiftHeroClick">Elegir mi película →</a>
+        <small>Elige la duración y personalízala después de pagar.</small>
+      </div>
+    </section>
+
+    <section id="planes" class="offer-plans" aria-labelledby="offers-title">
+      <h2 id="offers-title">Elige cuánto de su historia quieres contar</h2>
+      <p class="offers-note">Después del pago te guiaremos para personalizar tu película. <strong>No necesitas tener las fotos listas ahora.</strong></p>
+      <div class="gift-offer-grid">
+        <article class="gift-offer">
+          <p class="eyebrow">UN MOMENTO INOLVIDABLE</p>
+          <h3>Un recuerdo especial</h3>
+          <p>Para dedicarle ese momento que nunca olvidaste.</p>
+          <p class="offer-price">$299 <small>MXN</small></p>
+          <p class="offer-once">Pago único · Sin suscripción</p>
+          <ul>
+            <li><strong>1 minuto</strong> de película animada</li>
+            <li>Un recuerdo central y tu dedicatoria</li>
+            <li>Personajes inspirados en sus fotos</li>
+            <li>Guion, narración, música y subtítulos</li>
+            <li>Video para descargar y compartir</li>
+            <li><strong>Entrega en 24 horas*</strong></li>
+          </ul>
+          <a class="primary" href="/regalos/checkout/?package=gift_60" data-gift-event="GiftPlanSelected" data-gift-plan="gift_60">Crear mi regalo · $299 →</a>
+        </article>
+        <article class="gift-offer popular">
+          <span class="popular-label">Más popular</span>
+          <p class="eyebrow">MÁS RECUERDOS, MÁS HISTORIA</p>
+          <h3>Nuestra historia</h3>
+          <p>Para unir los momentos que los convirtieron en ustedes.</p>
+          <p class="offer-price">$499 <small>MXN</small></p>
+          <p class="offer-once">Pago único · Sin suscripción</p>
+          <ul>
+            <li><strong>2 minutos</strong> de película animada</li>
+            <li>Varios momentos conectados y más espacio para tu dedicatoria</li>
+            <li>Personajes inspirados en sus fotos</li>
+            <li>Guion, narración, música y subtítulos</li>
+            <li>Video para descargar y compartir</li>
+            <li><strong>Entrega en 1 hora*</strong></li>
+          </ul>
+          <a class="primary" href="/regalos/checkout/?package=gift_120" data-gift-event="GiftPlanSelected" data-gift-plan="gift_120">Crear nuestra historia · $499 →</a>
+        </article>
+      </div>
+      <p class="offers-note delivery-note">*El tiempo de entrega empieza después del pago, cuando completes la información y apruebes el guion. Podrás guardar tus respuestas y continuar desde el enlace privado de tu pedido.</p>
+    </section>
+
+    <section class="offer-process" aria-labelledby="offer-process-title">
+      <h2 id="offer-process-title">Así funciona</h2>
+      <ol class="offer-journey">
+        <li><b>1</b> Elige tu regalo y paga</li>
+        <li><b>2</b> Cuéntanos su historia y añade fotos</li>
+        <li><b>3</b> Aprueba el guion y recibe su película</li>
+      </ol>
+    </section>
+
+    <section class="offer-faq">
+      <h2>Un regalo personal, sin complicarte.</h2>
+      <details><summary>¿Tengo que escribir el guion?</summary><p>No. Después del pago te haremos preguntas sencillas para elegir los recuerdos. Nosotros prepararemos el guion y tú lo aprobarás antes de producir.</p></details>
+      <details><summary>¿Y si todavía no tengo las fotos?</summary><p>Puedes personalizar después. Guardaremos tu pedido y te enviaremos un enlace privado al correo que uses en Stripe.</p></details>
+      <details><summary>¿Qué pasa si cuento muchos recuerdos?</summary><p>Nos servirán como contexto. En la película de un minuto priorizamos el recuerdo principal y tu dedicatoria; en la de dos minutos conectamos varios momentos. Revisarás el guion antes de producir.</p></details>
+    </section>
+  </main>
+  <footer>CreativeRush · Hecho para las historias que merecen quedarse.<a href="/anuncios-lab/">¿Buscas crear anuncios?</a></footer>
+</body>
+</html>
