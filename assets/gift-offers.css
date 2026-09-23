@@ -1,3 +1,4 @@
+html{scroll-behavior:smooth}
 .gift-offers{max-width:1080px;margin:auto;padding:42px 24px 60px}
 .offer-hero{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"copy preview" "action preview";gap:10px 42px;align-items:center;margin-bottom:62px}
 .offer-hero-copy{grid-area:copy;align-self:end}
@@ -39,6 +40,7 @@
 .offer-faq details{border-bottom:1px solid #ddd6e5;padding:18px 0}
 .offer-faq summary{font-weight:600;cursor:pointer}
 .offer-faq p{line-height:1.6;color:#62606a}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media(max-width:700px){
   .gift-offers{padding:18px 18px 45px}
   .offer-hero{grid-template-columns:1fr;grid-template-areas:"copy" "preview" "action";gap:13px;margin-bottom:43px}
