@@ -1,4 +1,7 @@
 html{scroll-behavior:smooth}
+.gift-timer-strip{display:flex;align-items:center;justify-content:center;gap:14px;min-height:28px;padding:4px 10px;background:#f5edf1;color:#78445f;border-bottom:1px solid #e9dce3}
+.gift-timer-offer{font-size:11px;line-height:1.2;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.gift-timer-count{padding-left:14px;border-left:1px solid #d7becb;font-size:14px;line-height:1;font-weight:700;letter-spacing:.6px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .gift-offers{max-width:1080px;margin:auto;padding:42px 24px 60px}
 .offer-hero{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"copy preview" "action preview";gap:10px 42px;align-items:center;margin-bottom:62px}
 .offer-hero-copy{grid-area:copy;align-self:end}
@@ -23,7 +26,10 @@ html{scroll-behavior:smooth}
 .gift-offer{position:relative;background:#fff;border:1px solid #e3dfeb;border-radius:24px;padding:34px;display:flex;flex-direction:column;box-shadow:0 12px 40px #31214a06}
 .gift-offer h3{font-size:29px;margin:10px 0}
 .gift-offer>p{line-height:1.5}
-.gift-offer .offer-price{font-size:48px;font-weight:750;margin:20px 0 0;line-height:1.2}
+.offer-promotion{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 0}
+.offer-promotion del{font-size:18px;line-height:1.4;color:#82747d;text-decoration-thickness:1.5px}
+.offer-discount{padding:5px 10px;border-radius:999px;background:#f5edf1;color:#78445f;font-size:12px;line-height:1.4;font-weight:700;white-space:nowrap}
+.gift-offer .offer-price{font-size:48px;font-weight:750;margin:6px 0 0;line-height:1.2}
 .offer-price small{font-size:16px;color:#77727e;font-weight:500}
 .offer-once{color:#716b78;font-size:14px;margin:6px 0 20px}
 .gift-offer ul{border-top:1px solid #eee;padding:24px 0 14px;list-style:none;flex:1;margin:0}
@@ -42,6 +48,8 @@ html{scroll-behavior:smooth}
 .offer-faq p{line-height:1.6;color:#62606a}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media(max-width:700px){
+  .gift-timer-strip{gap:8px}
+  .gift-timer-count{padding-left:8px}
   .gift-offers{padding:18px 18px 45px}
   .offer-hero{grid-template-columns:1fr;grid-template-areas:"copy" "preview" "action";gap:13px;margin-bottom:43px}
   .offer-hero-copy .eyebrow{text-align:center;font-size:10px;margin-bottom:10px}
@@ -61,3 +69,16 @@ html{scroll-behavior:smooth}
   .offer-journey{flex-direction:column;gap:12px;margin:24px auto 34px;max-width:330px}
   .popular-label{margin-top:-42px}
 }
+
+/* Customer stories next to the gift packages. */
+
+.offer-reviews{margin:48px 0 52px;scroll-margin-top:28px}
+.offer-reviews>.eyebrow{text-align:center;margin:0 0 10px}
+.offer-reviews h2{font-size:35px;margin:0 auto 25px;max-width:540px}
+.offer-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.offer-review{margin:0;display:flex;flex-direction:column;background:#fffdfa;border:1px solid #e7dcd9;border-radius:18px;padding:26px 28px}
+.offer-review-mark{font-family:Georgia,serif;font-size:51px;line-height:.8;color:#a57789;margin-bottom:12px}
+.offer-review blockquote{margin:0 0 23px;font-size:17px;line-height:1.65;flex:1;color:#493a42}
+.offer-review figcaption{font-size:13px;font-weight:700;line-height:1.6;color:#78445f}
+.offer-review figcaption span{font-weight:400;color:#85757c}
+@media(max-width:700px){.offer-reviews{margin:35px 0 40px}.offer-reviews h2{font-size:29px}.offer-review-grid{grid-template-columns:1fr;gap:12px}.offer-review{padding:22px}.offer-review blockquote{font-size:16px;margin-bottom:18px}}
