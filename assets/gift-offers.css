@@ -43,12 +43,11 @@ html{scroll-behavior:smooth}
 .offer-process>.eyebrow,.offer-faq>.eyebrow{text-align:center;margin:0 0 10px;line-height:1.6}
 .gift-offers .offer-process h2,.gift-offers .offer-faq h2{font-size:35px;margin:0 0 12px}
 .offer-section-intro{max-width:460px;margin:0 auto;text-align:center;color:#70616b;font-size:15px;line-height:1.6}
-.offer-journey{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:0;margin:28px 0 20px}
+.offer-journey{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:0;margin:28px 0 0}
 .offer-journey li{display:flex;align-items:flex-start;gap:14px;min-width:0;padding:22px;background:#fffdfa;border:1px solid #e7dcd9;border-radius:16px}
 .offer-step-number{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#f0e1e8;color:#78445f;font-size:14px;font-weight:700}
 .offer-journey h3{font-size:17px;line-height:1.4;margin:5px 0 7px}
 .offer-journey p{font-size:14px;line-height:1.65;margin:0;color:#70616b}
-.offer-process-note{max-width:540px;margin:0 auto;text-align:center;font-size:12px;line-height:1.6;color:#70616b}
 .offer-faq{max-width:760px;margin:52px auto 0;scroll-margin-top:24px}
 .offer-faq-list{display:grid;gap:10px;margin-top:24px}
 .offer-faq details{margin:0;padding:0;border:1px solid #e7dcd9;border-radius:14px;background:#fffdfa;overflow:hidden}
@@ -68,6 +67,7 @@ html{scroll-behavior:smooth}
 .offer-faq-action .primary{display:block;text-decoration:none;padding:15px 18px;min-height:50px;font-size:16px}
 .offer-faq-action p{font-size:12px;color:#766b70;line-height:1.5;margin:10px 0 0}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media(max-width:960px){.offer-journey{grid-template-columns:1fr}}
 @media(max-width:700px){
   .gift-timer-strip{gap:8px}
   .gift-timer-count{padding-left:8px}
@@ -91,7 +91,7 @@ html{scroll-behavior:smooth}
   .offer-process>.eyebrow,.offer-faq>.eyebrow{font-size:10px;letter-spacing:1.1px}
   .gift-offers .offer-process h2,.gift-offers .offer-faq h2{font-size:30px}
   .offer-section-intro{font-size:14px}
-  .offer-journey{grid-template-columns:1fr;gap:10px;margin:22px 0 16px}
+  .offer-journey{grid-template-columns:1fr;gap:10px;margin:22px 0 0}
   .offer-journey li{padding:16px 14px;gap:12px}
   .offer-step-number{flex-basis:30px;width:30px;height:30px;font-size:13px}
   .offer-journey h3{font-size:16px;margin-top:3px}
