@@ -39,13 +39,34 @@ html{scroll-behavior:smooth}
 .gift-offer.popular{border:2px solid #7958c4}
 .popular-label{align-self:flex-start;background:#efe9fb;color:#6943b2;font-size:13px;font-weight:700;border-radius:30px;padding:7px 13px;margin-top:-48px;margin-bottom:15px}
 .delivery-note{font-size:13px;margin-top:24px}
-.offer-process{padding-top:24px}
-.offer-journey{list-style:none;display:flex;justify-content:center;gap:28px;padding:0;margin:24px 0 32px;font-size:14px}
-.offer-journey b{display:inline-grid;place-items:center;border-radius:50%;background:#eee8ff;color:#6b4eb5;width:26px;height:26px;margin-right:5px}
-.offer-faq{max-width:710px;margin:45px auto 0}
-.offer-faq details{border-bottom:1px solid #ddd6e5;padding:18px 0}
-.offer-faq summary{font-weight:600;cursor:pointer}
-.offer-faq p{line-height:1.6;color:#62606a}
+.offer-process{padding:32px;background:#f3ede9;border:1px solid #e9dfda;border-radius:24px;scroll-margin-top:24px}
+.offer-process>.eyebrow,.offer-faq>.eyebrow{text-align:center;margin:0 0 10px;line-height:1.6}
+.gift-offers .offer-process h2,.gift-offers .offer-faq h2{font-size:35px;margin:0 0 12px}
+.offer-section-intro{max-width:460px;margin:0 auto;text-align:center;color:#70616b;font-size:15px;line-height:1.6}
+.offer-journey{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:0;margin:28px 0 20px}
+.offer-journey li{display:flex;align-items:flex-start;gap:14px;min-width:0;padding:22px;background:#fffdfa;border:1px solid #e7dcd9;border-radius:16px}
+.offer-step-number{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#f0e1e8;color:#78445f;font-size:14px;font-weight:700}
+.offer-journey h3{font-size:17px;line-height:1.4;margin:5px 0 7px}
+.offer-journey p{font-size:14px;line-height:1.65;margin:0;color:#70616b}
+.offer-process-note{max-width:540px;margin:0 auto;text-align:center;font-size:12px;line-height:1.6;color:#70616b}
+.offer-faq{max-width:760px;margin:52px auto 0;scroll-margin-top:24px}
+.offer-faq-list{display:grid;gap:10px;margin-top:24px}
+.offer-faq details{margin:0;padding:0;border:1px solid #e7dcd9;border-radius:14px;background:#fffdfa;overflow:hidden}
+.offer-faq details[open]{border-color:#d3b7c4}
+.offer-faq summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:66px;padding:18px 20px;list-style:none;font-size:16px;line-height:1.45;font-weight:600;color:#493a42;cursor:pointer}
+.offer-faq summary::-webkit-details-marker{display:none}
+.offer-faq summary::marker{content:''}
+.offer-faq summary::after{content:'+';display:grid;place-items:center;flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#f5edf1;color:#78445f;font-size:22px;font-weight:400;line-height:1}
+.offer-faq details[open]>summary::after{content:'−'}
+.offer-faq summary:hover{background:#fcf7f9}
+.offer-faq summary:focus-visible{outline:2px solid #986080;outline-offset:-4px;border-radius:12px}
+.offer-faq-answer{padding:0 20px 20px}
+.offer-faq-answer p{font-size:15px;line-height:1.7;color:#70616b;margin:0}
+.offer-faq-answer p+p{margin-top:12px}
+.offer-faq-answer strong{color:#493a42;font-weight:600}
+.offer-faq-action{max-width:360px;margin:26px auto 0;text-align:center}
+.offer-faq-action .primary{display:block;text-decoration:none;padding:15px 18px;min-height:50px;font-size:16px}
+.offer-faq-action p{font-size:12px;color:#766b70;line-height:1.5;margin:10px 0 0}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media(max-width:700px){
   .gift-timer-strip{gap:8px}
@@ -66,7 +87,19 @@ html{scroll-behavior:smooth}
   .gift-offer-grid{grid-template-columns:1fr;gap:30px}
   .gift-offer{padding:28px 23px}
   .gift-offers h2{font-size:26px}
-  .offer-journey{flex-direction:column;gap:12px;margin:24px auto 34px;max-width:330px}
+  .offer-process{padding:24px 16px;border-radius:20px}
+  .offer-process>.eyebrow,.offer-faq>.eyebrow{font-size:10px;letter-spacing:1.1px}
+  .gift-offers .offer-process h2,.gift-offers .offer-faq h2{font-size:30px}
+  .offer-section-intro{font-size:14px}
+  .offer-journey{grid-template-columns:1fr;gap:10px;margin:22px 0 16px}
+  .offer-journey li{padding:16px 14px;gap:12px}
+  .offer-step-number{flex-basis:30px;width:30px;height:30px;font-size:13px}
+  .offer-journey h3{font-size:16px;margin-top:3px}
+  .offer-faq{margin-top:36px}
+  .offer-faq-list{margin-top:20px}
+  .offer-faq summary{padding:16px;gap:12px;font-size:15px;min-height:62px}
+  .offer-faq-answer{padding:0 16px 18px}
+  .offer-faq-answer p{font-size:14px;line-height:1.7}
   .popular-label{margin-top:-42px}
 }
 
