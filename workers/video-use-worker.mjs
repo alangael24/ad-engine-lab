@@ -4,6 +4,7 @@ import {resolve,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {runVideoUse} from './video-use/agent.mjs';
+import {editorModels,editorModelsConfig} from './video-use/models.mjs';
 import {createSandbox,processCommand,safePath} from './video-use/sandbox.mjs';
 const here=dirname(fileURLToPath(import.meta.url));
 export function videoEditApi({appUrl,token,workerId,fetchImpl=fetch}){
@@ -56,7 +57,7 @@ export async function processVideoEdit(job,api,{env=process.env,fetchImpl=fetch,
  try{
   await api('heartbeat',identity);
   const input=await prepareInputs(job,root,{env,fetchImpl,signal:abort.signal,sandboxOptions,cachedTranscripts});
-  const result=await run({root,mode:job.kind==='edit'?'edit':'plan',request:job.request,strategy:job.kind==='edit'?job.strategy:'',memory:job.memory,env,fetchImpl,signal:abort.signal,sandboxOptions,...input});
+  const result=await run({root,mode:job.kind==='edit'?'edit':'plan',request:job.request,strategy:job.kind==='edit'?job.strategy:'',memory:job.memory,env,fetchImpl,signal:abort.signal,sandboxOptions,...editorModels(env,{fetchImpl}),...input});
   const {path,...publicResult}=result;
   if(path){
    const verifiedPath=await safePath(resolve(root,'edit'),path);const bytes=await readFile(verifiedPath);if(bytes.length>52428800)throw Error('Output exceeds 50 MB');
@@ -73,6 +74,8 @@ export async function processVideoEdit(job,api,{env=process.env,fetchImpl=fetch,
 }
 export async function main(){
  const env=process.env;if(!env.REFERENCE_FLASH_KEY||!env.ELEVENLABS_API_KEY)throw Error('Configure Flash and Scribe before advertising availability');
+ // Opus + DeepSeek by default (VIDEO_USE_MODELS=astra restores the legacy loop); fail closed without keys.
+ editorModelsConfig(env);
  // Fail closed: never advertise a worker that cannot create its sandbox.
  if(process.platform!=='darwin')await processCommand('docker',['image','inspect',env.VIDEO_USE_IMAGE||'creativerush-video-use:1']);
  const check=await mkdtemp(resolve(tmpdir(),'video-use-ready-'));

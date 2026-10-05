@@ -13,6 +13,7 @@
     "deploy": "wrangler pages deploy dist --project-name ad-engine-lab"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@supabase/supabase-js": "2.112.4",
     "stripe": "22.5.0"
   },
