@@ -160,6 +160,8 @@ def extract_segment(
     preview: bool = False,
     draft: bool = False,
     output: dict | None = None,
+    zoom: float = 1.0,
+    zoom_center: tuple[float, float] = (0.5, 0.42),
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -189,6 +191,11 @@ def extract_segment(
     if is_hdr_source(source):
         vf_parts.append(TONEMAP_CHAIN)
     vf_parts.append(scale)
+    if zoom > 1.0 and output:
+        # Punch-in: crop the framed canvas around zoom_center, then restore canvas size.
+        w, h = int(output['width']), int(output['height'])
+        cx, cy = zoom_center
+        vf_parts.append(f"crop=trunc(iw/{zoom}/2)*2:trunc(ih/{zoom}/2)*2:(iw-iw/{zoom})*{cx}:(ih-ih/{zoom})*{cy},scale={w}:{h},setsar=1")
     if grade_filter:
         vf_parts.append(grade_filter)
     vf = ",".join(vf_parts)
@@ -265,7 +272,11 @@ def extract_all_segments(
         print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}")
         if is_auto:
             print(f"        grade: {seg_filter or '(none)'}")
-        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft, output=edl.get("output"))
+        zoom = float(r.get("zoom", 1.0))
+        center = tuple(r.get("zoom_center") or (0.5, 0.42))
+        if zoom > 1.0:
+            print(f"        zoom: {zoom:.2f} at {center}")
+        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft, output=edl.get("output"), zoom=zoom, zoom_center=center)
         seg_paths.append(out_path)
 
     return seg_paths
@@ -556,6 +567,9 @@ def apply_loudnorm_two_pass(
 # -------- Final compositing (Rule 1 + Rule 4) -------------------------------
 
 
+SFX_DIR = Path(__file__).resolve().parent.parent / "sfx"
+
+
 def build_final_composite(
     base_path: Path,
     overlays: list[dict],
@@ -563,15 +577,18 @@ def build_final_composite(
     out_path: Path,
     edit_dir: Path,
     subtitle_style: str | None = None,
+    sfx: list[dict] | None = None,
 ) -> None:
     """Final pass: base → overlays (PTS-shifted) → subtitles LAST → out.
+    Sound effects are mixed over the continuous source audio.
 
-    If there are no overlays and no subtitles, just copy base to out.
+    If there are no overlays, subtitles or sound effects, just copy base to out.
     """
     has_overlays = bool(overlays)
     has_subs = subtitles_path is not None and subtitles_path.exists()
+    sfx = sfx or []
 
-    if not has_overlays and not has_subs:
+    if not has_overlays and not has_subs and not sfx:
         # Nothing to do — just rename/copy base to final name
         run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
@@ -581,6 +598,8 @@ def build_final_composite(
         ov_path = resolve_path(ov["file"], edit_dir)
         inputs += ["-i", str(ov_path)]
 
+    for fx in sfx:
+        inputs += ["-i", str(SFX_DIR / f"{fx['sound']}.wav")]
     filter_parts: list[str] = ["[0:v]setpts=PTS-STARTPTS[basev]"]
     # PTS-shift every overlay so its frame 0 lands at start_in_output
     for idx, ov in enumerate(overlays, start=1):
@@ -595,7 +614,7 @@ def build_final_composite(
         end = t + dur
         next_label = f"[v{idx}]"
         filter_parts.append(
-            f"{current}[a{idx}]overlay=eof_action=pass:repeatlast=0:enable='between(t,{t:.3f},{end:.3f})'{next_label}"
+            f"{current}[a{idx}]overlay=x={int(ov.get('x', 0))}:y={int(ov.get('y', 0))}:eof_action=pass:repeatlast=0:enable='between(t,{t:.3f},{end:.3f})'{next_label}"
         )
         current = next_label
 
@@ -605,6 +624,9 @@ def build_final_composite(
         # ASS carries measured canvas geometry and per-word colors. Do not replace
         # these with the legacy SRT style (which uses different script coordinates).
         style = "" if subtitles_path.suffix.lower() == '.ass' else f":force_style='{subtitle_style or SUB_FORCE_STYLE}'"
+        # Bundled caption faces (e.g. Instrument Serif) are resolved by libass from here.
+        fonts_dir = str((Path(__file__).resolve().parent.parent / 'fonts')).replace(":", r"\:").replace("'", r"\'")
+        style += f":fontsdir='{fonts_dir}'"
         filter_parts.append(
             f"{current}subtitles='{subs_abs}'{style}[outv]"
         )
@@ -617,6 +639,21 @@ def build_final_composite(
         else:
             out_label = "[0:v]"
 
+    audio_label, audio_codec = "0:a", ["-c:a", "copy"]
+    if sfx:
+        first = len(overlays) + 1
+        labels = []
+        for i, fx in enumerate(sfx):
+            delay = max(0, round(float(fx["at"]) * 1000))
+            filter_parts.append(f"[{first + i}:a]volume={float(fx.get('gain_db', -6))}dB,adelay={delay}|{delay}[fx{i}]")
+            labels.append(f"[fx{i}]")
+        # normalize=0 keeps narration level; loudnorm runs afterwards.
+        filter_parts.append(f"[0:a]{''.join(labels)}amix=inputs={len(sfx) + 1}:duration=first:normalize=0[aout]")
+        audio_label, audio_codec = "[aout]", ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
+    if out_label == "[0:v]":
+        # Sound effects only: route the PTS-reset base video straight through.
+        filter_parts.append("[basev]null[outv]")
+        out_label = "[outv]"
     filter_complex = ";".join(filter_parts)
 
     cmd = [
@@ -624,16 +661,16 @@ def build_final_composite(
         *inputs,
         "-filter_complex", filter_complex,
         "-map", out_label,
-        "-map", "0:a",
+        "-map", audio_label,
         "-t", f"{media_duration(base_path):.6f}",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        *audio_codec,
         "-movflags", "+faststart",
         str(out_path),
     ]
     print(f"compositing → {out_path.name}")
-    print(f"  overlays: {len(overlays)}, subtitles: {'yes' if has_subs else 'no'}")
+    print(f"  overlays: {len(overlays)}, subtitles: {'yes' if has_subs else 'no'}, sfx: {len(sfx)}")
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
@@ -717,11 +754,11 @@ def main() -> None:
     overlays = edl.get("overlays") or []
     if args.no_loudnorm:
         # Composite directly to final output
-        build_final_composite(base_path, overlays, subs_path, out_path, edit_dir, edl.get("subtitle_style"))
+        build_final_composite(base_path, overlays, subs_path, out_path, edit_dir, edl.get("subtitle_style"), edl.get("sfx"))
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
-        build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir, edl.get("subtitle_style"))
+        build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir, edl.get("subtitle_style"), edl.get("sfx"))
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)

@@ -87,7 +87,22 @@ test('HTTP routes reject anonymous users and expose only the owner session; no r
  }finally{globalThis.fetch=network;await db.close();}
 });
 
-test('Flash requests retain at most four images without losing textual observations',()=>{
- const input=Array.from({length:8},(_,i)=>({role:'user',content:[{type:'text',text:'source '+i},{type:'image_url',image_url:{url:'image'+i}}]}));
- const output=boundedVisualContext(input);assert.equal(output.flatMap(m=>m.content).filter(x=>x.type==='image_url').length,4);assert.equal(input[0].content[1].type,'image_url');assert.equal(output[0].content[0].text,'source 0');
+const imageTurns=(n,from=0)=>Array.from({length:n},(_,i)=>({role:'user',content:[{type:'text',text:'source '+(from+i)},{type:'image_url',image_url:{url:'image'+(from+i)}}]}));
+const imageCount=messages=>messages.flatMap(m=>m.content).filter(x=>x.type==='image_url').length;
+test('Visual context is bounded in batches without losing textual observations',()=>{
+ const input=imageTurns(10),output=boundedVisualContext(input);
+ assert.equal(imageCount(output),4);assert.equal(output[0].content[1].type,'text');assert.equal(output[9].content[1].type,'image_url');
+ assert.equal(input[0].content[1].type,'image_url');assert.equal(output[0].content[0].text,'source 0');
+ assert.equal(imageCount(boundedVisualContext(imageTurns(9))),9);
+});
+test('Visual context stays append-only between batch drops so prompt caches keep matching',()=>{
+ const history=imageTurns(10);
+ for(let n=11;n<16;n++){
+  const before=JSON.stringify(boundedVisualContext(history));history.push(...imageTurns(1,n-1));
+  assert.ok(JSON.stringify(boundedVisualContext(history)).startsWith(before.slice(0,-1)));
+ }
+});
+test('Pinned source and reference samples are never dropped or forwarded with the flag',()=>{
+ const output=boundedVisualContext([{role:'user',pinned:true,content:[{type:'image_url',image_url:{url:'reference'}}]},...imageTurns(20)]);
+ assert.equal(output[0].content[0].type,'image_url');assert.equal(output[0].pinned,undefined);assert.ok(imageCount(output)<=10);
 });

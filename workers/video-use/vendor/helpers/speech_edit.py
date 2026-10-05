@@ -170,40 +170,87 @@ def mapped_words(edl, edit_dir):
     return result
 
 
+# Bundled caption faces (file under vendor/fonts, libass family name). 'sans' uses the system font.
+FONTS_DIR=Path(__file__).resolve().parent.parent/'fonts'
+CAPTION_FONTS={'sans':None,'instrument_serif':('InstrumentSerif-Regular.ttf','Instrument Serif'),'rounded':('Nunito-Black.ttf','Nunito Black'),'condensed':('Anton-Regular.ttf','Anton')}
+
+
 def build_dynamic_ass(edl, edit_dir, out_path):
     from PIL import ImageFont
     words=mapped_words(edl,edit_dir)
     width,height=(edl.get('output',{}).get(k,v) for k,v in [('width',1080),('height',1920)])
     options=edl.get('dynamic_captions',{})
-    if not isinstance(options,dict) or set(options)-{'color','highlight','font_size','max_words','bottom_fraction'}:
+    if not isinstance(options,dict) or set(options)-{'color','highlight','font_size','max_words','bottom_fraction','font','emphasis','emphasis_color','emphasis_scale'}:
         raise ValueError('Unknown dynamic caption settings')
     size=int(options.get('font_size',round(min(width*.075,height*.06))))
     maximum=int(options.get('max_words',4));bottom=float(options.get('bottom_fraction',.19))
-    if not 12 <= size <= min(width*.15,height*.15) or not 1 <= maximum <= 7 or not .1 <= bottom <= .35:
+    if not 12 <= size <= min(width*.15,height*.15) or not 1 <= maximum <= 7 or not .1 <= bottom <= .8:
         raise ValueError('Unsafe caption dimensions')
-    font_path=Path('/System/Library/Fonts/Supplemental/Arial Bold.ttf') if sys.platform=='darwin' else Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf')
+    face=options.get('font','sans')
+    if face not in CAPTION_FONTS:raise ValueError('Unknown caption font')
+    if face=='sans':
+        font_path=Path('/System/Library/Fonts/Supplemental/Arial Bold.ttf') if sys.platform=='darwin' else Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf')
+        family='Arial' if sys.platform=='darwin' else 'DejaVu Sans'
+        # Bold sans with a solid outline; the original look.
+        bold,outline,shadow,back=-1,max(2,round(size*.06)),0,'&H00000000'
+    elif face=='condensed':
+        font_path=FONTS_DIR/CAPTION_FONTS[face][0];family=CAPTION_FONTS[face][1]
+        # Tall condensed display sans with a soft shadow, like ad keyword captions.
+        bold,outline,shadow,back=0,max(1,round(size*.03)),max(2,round(size*.05)),'&H78000000'
+    elif face=='rounded':
+        font_path=FONTS_DIR/CAPTION_FONTS[face][0];family=CAPTION_FONTS[face][1]
+        # Heavy rounded sans with a solid dark outline, like creator-app captions.
+        bold,outline,shadow,back=0,max(2,round(size*.08)),0,'&H00000000'
+    else:
+        font_path=FONTS_DIR/CAPTION_FONTS[face][0];family=CAPTION_FONTS[face][1]
+        # Editorial serif: thin outline plus a soft drop shadow, like reel captions.
+        bold,outline,shadow,back=0,max(1,round(size*.02)),max(2,round(size*.04)),'&H64000000'
     font=ImageFont.truetype(str(font_path),size)
-    family='Arial' if sys.platform=='darwin' else 'DejaVu Sans'
-    margin=math.ceil(width*.09);usable=width-2*margin-2*max(2,round(size*.06))
+    scale=float(options.get('emphasis_scale',1))
+    if not 1 <= scale <= 2.5:raise ValueError('Unsafe caption emphasis scale')
+    big=ImageFont.truetype(str(font_path),round(size*scale)) if scale>1 else font
+    margin=math.ceil(width*.09);usable=width-2*margin-2*outline
     def color(value):
         if not re.fullmatch(r'#[0-9a-fA-F]{6}',value):raise ValueError('Invalid caption color')
         return '&H00'+value[5:7]+value[3:5]+value[1:3]
     primary=color(options.get('color','#ffffff'));highlight=color(options.get('highlight','#ffdf00'))
+    # Keywords keep their own color whether or not they are the active word.
+    norm=lambda t:re.sub(r'[^\w]','',t.casefold())
+    emphasis={norm(t) for t in options.get('emphasis',[])};emphasized=color(options.get('emphasis_color',options.get('highlight','#ffdf00')))
     def text(w):
         value=w['text'].upper() if edl.get('caption_case')=='upper' else w['text']
         return value.replace('\\','＼').replace('{','｛').replace('}','｝').replace('\n',' ').replace('\r',' ')
-    def layout(group):
+    is_key=lambda w:norm(w['text']) in emphasis
+    def factor(w):
+        # Base size multiplier; a single word too wide for the safe area shrinks alone
+        # (down to 40%) instead of forcing a smaller size on every caption.
+        base=scale if scale>1 and is_key(w) else 1
+        natural=font.getlength(text(w))*base
+        fit=min(1,usable*.98/natural) if natural else 1
+        if fit<.4:raise ValueError(f'Word "{text(w)}" is too wide even at 40%; lower font_size or emphasis_scale')
+        return base*fit
+    def length(ws):
+        return sum(font.getlength(text(w))*factor(w) for w in ws)+font.getlength(' ')*max(0,len(ws)-1)
+    def wrap(ws):
         lines=[[]]
-        for w in group:
-            if font.getlength(text(w))>usable:raise ValueError('Word exceeds safe width; choose smaller caption font')
-            if lines[-1] and font.getlength(' '.join(text(x) for x in lines[-1]+[w]))>usable:lines.append([])
+        for w in ws:
+            if lines[-1] and length(lines[-1]+[w])>usable:lines.append([])
             lines[-1].append(w)
         return lines
+    def layout(group):
+        if scale==1:return wrap(group)
+        # Stacked emphasis: small lead-in words, enlarged keywords on their own line.
+        runs=[]
+        for w in group:
+            if runs and is_key(runs[-1][-1])==is_key(w):runs[-1].append(w)
+            else:runs.append([w])
+        return [line for run in runs for line in wrap(run)]
+    max_lines=3 if scale>1 else 2
     groups=[];current=[]
     for w in words:
         if current and (w['segment']!=current[-1]['segment'] or w.get('speaker_id')!=current[-1].get('speaker_id') or
                         w['start']-current[-1]['end']>.35 or len(current)>=maximum or
-                        re.search(r'[,;:.!?…]$',current[-1]['text']) or len(layout(current+[w]))>2):
+                        re.search(r'[,;:.!?…]$',current[-1]['text']) or len(layout(current+[w]))>max_lines):
             groups.append(current);current=[]
         current.append(w)
     if current:groups.append(current)
@@ -221,7 +268,7 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{family},{size},{primary},{primary},&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,{max(2,round(size*.06))},0,2,{margin},{margin},{round(height*bottom)},1
+Style: Default,{family},{size},{primary},{primary},&H00000000,{back},{bold},0,0,0,100,100,0,0,1,{outline},{shadow},2,{margin},{margin},{round(height*bottom)},1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''
@@ -231,7 +278,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if any(x['start']<end and x['end']>start for x in edl.get('caption_exclusions',[])):
             excluded.extend({'source':w['source'],'index':w['index'],'segment':w['segment']} for w in group);continue
         lines=layout(group)
-        if len(lines)>2:raise ValueError('Caption exceeds two lines')
+        if len(lines)>max_lines:raise ValueError('Caption exceeds line limit')
         # One stable phrase layout; only color changes, never reflow or word animation.
         times=sorted(set(round(t*100) for w in group for t in (w['start'],w['end'])))
         if times[0]<last_end:raise ValueError('Rounded captions overlap')
@@ -239,18 +286,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if round(w['end']*100)<=round(w['start']*100):raise ValueError('Word shorter than ASS precision')
         for a,b in zip(times,times[1:]):
             midpoint=(a+b)/200
-            value=r'\N'.join(' '.join('{\\c'+(highlight if w['start']<=midpoint<w['end'] else primary)+'&}'+escape(text(w)) for w in line) for line in lines)
+            def word(w):
+                fill=emphasized if is_key(w) else highlight if w['start']<=midpoint<w['end'] else primary
+                zoom=round(factor(w)*100)
+                if zoom!=100:return '{\\c'+fill+'&\\fscx'+str(zoom)+'\\fscy'+str(zoom)+'}'+escape(text(w))+'{\\fscx100\\fscy100}'
+                return '{\\c'+fill+'&}'+escape(text(w))
+            value=r'\N'.join(' '.join(word(w) for w in line) for line in lines)
             events.append(f'Dialogue: 0,{stamp(a)},{stamp(b)},Default,,0,0,0,,{value}')
         last_end=times[-1]
         cps=sum(len(text(w)) for w in group)/max(.01,end-start)
         audit.append({'group':gi,'start':start,'end':end,'text':' '.join(text(w) for w in group),
                       'lines':[' '.join(text(w) for w in line) for line in lines],
-                      'widths':[round(font.getlength(' '.join(text(w) for w in line)),2) for line in lines],
+                      'widths':[round(length(line),2) for line in lines],
+                      'shrunk_words':[text(w) for w in group if factor(w)<(scale if scale>1 and is_key(w) else 1)],
                       'words':[{'source':w['source'],'index':w['index'],'segment':w['segment'],'start':w['start'],'end':w['end']} for w in group],
                       'reading_speed_warning':cps>25})
     Path(out_path).write_text(header+'\n'.join(events)+'\n')
     report={'version':1,'groups':audit,'excluded_words':excluded,'word_count':len(words),
-            'safe_width':usable,'font_path':str(font_path),'font_size':size,'events':len(events),
+            'safe_width':usable,'font':face,'font_path':str(font_path),'font_size':size,'events':len(events),
             'timing_tolerance_seconds':.01,'visual_review_required':True}
     Path(out_path).with_suffix('.audit.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     return report
