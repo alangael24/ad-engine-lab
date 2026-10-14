@@ -1,0 +1,4 @@
+#!/bin/sh
+# Motor de edición determinista (ver: motor estilos)
+DIR=$(cd "$(dirname "$0")/.." && pwd)
+PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m motor "$@"

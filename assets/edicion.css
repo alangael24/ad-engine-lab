@@ -1,0 +1,86 @@
+/* /edicion: una caja de chat. Saludo, adjuntar video, pegar referencia, enviar. */
+:root { --bg: #faf9f5; --box: #ffffff; --text: #1f1e1d; --muted: #75736c; --line: #dedcd4; --line-2: #ecebe5;
+  --accent: #f018a6; --accent-2: #c70f87; --green: #1f8a52; --red: #c2413b; color-scheme: light; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+.ed-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.ed-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; }
+.ed-logo { color: var(--text); font-weight: 800; letter-spacing: -0.02em; text-decoration: none; }
+.ed-logo span { color: var(--accent); }
+.ed-ghost { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer; }
+
+.ed { width: min(100% - 32px, 680px); margin: 0 auto; padding: clamp(40px, 14vh, 140px) 0 60px; display: grid; gap: 14px; }
+h1 { margin: 0 0 22px; text-align: center; font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-weight: 400;
+  font-size: clamp(2rem, 6vw, 3.1rem); letter-spacing: -0.02em; line-height: 1.1; }
+.ed-mark { color: var(--accent); font-size: 0.85em; }
+.ed-banner { margin: 0 0 8px; padding: 12px 16px; border-radius: 14px; text-align: center; font-size: 0.95rem; }
+.ed-banner[data-kind="ok"] { background: #e4f4ea; color: var(--green); }
+.ed-banner[data-kind="warn"] { background: #fbe9e7; color: var(--red); }
+
+.ed-box { display: grid; gap: 6px; padding: 14px 14px 10px; border: 1px solid var(--line); border-radius: 22px; background: var(--box);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05); transition: border-color 0.15s, box-shadow 0.15s; }
+.ed-box:focus-within, .ed-box.is-over { border-color: #c9c6bc; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 14px 36px rgba(0, 0, 0, 0.08); }
+.ed-box textarea { width: 100%; min-height: 56px; max-height: 240px; padding: 6px 6px 4px; border: 0; outline: 0; resize: none; background: transparent;
+  color: var(--text); font: inherit; font-size: 1.05rem; line-height: 1.5; }
+.ed-box textarea::placeholder { color: #9b998f; }
+
+.ed-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ed-chips:empty { display: none; }
+.ed-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 7px 8px 7px 12px; border: 1px solid var(--line-2); border-radius: 12px;
+  background: #f6f5f0; font-size: 0.88rem; }
+.ed-chip b { font-weight: 600; }
+.ed-chip small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.ed-chip[data-state="loading"] small::after { content: " · subiendo…"; }
+.ed-chip[data-state="error"] { border-color: #f1c9c5; background: #fbe9e7; color: var(--red); }
+.ed-chip button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent;
+  color: var(--muted); font-size: 1rem; cursor: pointer; }
+.ed-chip button:hover { background: var(--line-2); }
+
+.ed-bar { display: flex; align-items: center; gap: 10px; }
+.ed-plus { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--text); font-size: 1.5rem;
+  font-weight: 300; cursor: pointer; }
+.ed-plus:hover { background: #f1f0eb; }
+.ed-plus input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ed-hint { flex: 1; color: var(--muted); font-size: 0.9rem; }
+.ed-price { color: var(--muted); font-size: 0.9rem; }
+.ed-send { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; }
+.ed-send svg { width: 20px; height: 20px; }
+.ed-send:hover { background: var(--accent-2); }
+.ed-send:disabled { background: #e7c3da; cursor: not-allowed; }
+.ed-plus:focus-within, .ed-send:focus-visible, .ed-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ed-status { min-height: 1.3em; margin: 2px 0 0; text-align: center; color: var(--muted); font-size: 0.92rem; }
+.ed-status[data-kind="error"] { color: var(--red); }
+.ed-status[data-kind="ok"] { color: var(--green); }
+
+.ed-orders { margin-top: 26px; }
+.ed-orders h2 { margin: 0 0 10px; color: var(--muted); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; }
+.ed-orders ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ed-orders li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 0.95rem; }
+.ed-orders li:hover { background: #f1f0eb; }
+.ed-orders li button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--box); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.ed-pill { color: var(--muted); font-size: 0.88rem; }
+.ed-pill[data-status="delivered"] { color: var(--green); }
+.ed-pill[data-status="failed"] { color: var(--red); }
+.ed-pill[data-status="paid"], .ed-pill[data-status="processing"] { color: var(--accent-2); }
+
+@media (max-width: 520px) {
+  .ed-price { display: none; }
+  .ed-chip small { max-width: 140px; }
+}
+
+/* "Tus videos": descargar y pedir cambios */
+.ed-orders li { display: grid; grid-template-columns: 1fr; justify-content: stretch; gap: 8px; }
+.ed-row-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ed-row-actions { display: flex; align-items: center; gap: 8px; }
+.ed-orders li button.ed-ghost { background: transparent; }
+.ed-revise { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--box); }
+.ed-revise textarea { width: 100%; border: 0; outline: 0; resize: vertical; background: transparent; color: var(--text); font: inherit; font-size: 0.95rem; }
+.ed-revise-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); }
+.ed-revise-bar button { padding: 7px 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.ed-revise-bar button:disabled { opacity: 0.5; cursor: wait; }
+.ed-note { font-size: 0.85rem; }
+.ed-note[data-kind="error"] { color: var(--red); }

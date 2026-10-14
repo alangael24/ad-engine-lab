@@ -8,6 +8,7 @@ import {
   json,
   normalizeEmail,
 } from "../../../src/backend.js";
+import { applyEdicionPayment, isEdicionSession } from "../../../src/edicion-payment.js";
 
 const HANDLED_EVENTS = new Set([
   "checkout.session.completed",
@@ -107,6 +108,11 @@ export async function onRequestPost({ request, env }) {
     }
     if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
       return json({ received: true, payment: "pending" });
+    }
+
+    if (isEdicionSession(session)) {
+      const result = await applyEdicionPayment(getSupabaseAdmin(env), event, session);
+      return json({ received: true, applied: Boolean(result?.applied) });
     }
 
     const paymentLinkId = getPaymentLinkId(session.payment_link);

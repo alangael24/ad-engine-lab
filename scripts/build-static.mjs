@@ -30,6 +30,7 @@ const staticEntries = [
   "regalos",
   "editor",
   "productos",
+  "edicion",
   "cuenta",
   "planes",
   "campus",
