@@ -36,7 +36,8 @@ Código: `workers/edicion-worker.mjs`, helpers del agente en `workers/edicion/bi
 | `CREATIVE_RUSH_URL` | `https://creativerushai.com` |
 | `EDICION_WORKER_TOKEN` | Igual que en Cloudflare Pages (≥ 32 caracteres) |
 | `EDICION_WORKER_ID` | `edicion-render-1` |
-| `ANTHROPIC_API_KEY` | Llave dedicada, con límite de gasto |
+| `ANTHROPIC_API_KEY` | Llave dedicada, con límite de gasto (recomendada) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Alternativa para validar demanda: token de suscripción de `claude setup-token`. Revisa los términos de Anthropic y los límites de uso por 5 h antes de vender en volumen |
 | `OPENAI_API_KEY` | Para imágenes (planes pro/premium) |
 | `ELEVENLABS_API_KEY` | Transcripción (Scribe) en servidor. No hace falta en Mac |
 | `EDICION_TRANSCRIBIR` | Opcional: `local` (Whisper en el chip de la Mac, por defecto en macOS) o `scribe` (por defecto en Linux) |
@@ -67,3 +68,12 @@ En Cloudflare Pages: `EDICION_ENABLED=true`, `EDICION_WORKER_TOKEN`, `STRIPE_SEC
   Un cambio en cualquier servidor (Render tras un deploy, otra instancia, tu Mac) descarga ese proyecto y el material,
   y Haiku aplica el cambio. Solo si el proyecto no existe, Opus rehace el video con el cambio incluido (~$2).
 - El proyecto se sube antes de cerrar el lease; si su subida falla, la entrega sigue igual.
+
+## Cambios rápidos
+- Primero se intenta el camino rápido: Haiku, en un solo turno y sin herramientas, devuelve solo los valores de
+  `receta.json` que cambian (`{"cambios":[{"ruta","valor"}]}`); el worker los valida (rutas existentes, sin `_ayuda`
+  ni `__proto__`) y vuelve a ejecutar `python3 render.py --receta receta_vN.json --salida video_final_vN.mp4`.
+  Medido: Haiku 3–5 s y ~$0.002; el render depende del script de Opus (hoy 2–2.5 min para 55 s de video).
+- Si el cambio no cabe en la receta (`no_aplica`) o el render falla, entra el agente Haiku y luego Opus.
+- Los cambios tienen su propia cola (cada 4 s, `EDICION_REVISION_POLL_MS`) y no esperan a las ediciones nuevas.
+- En Mac el agente corre con otro HOME; el worker le pasa `PYTHONUSERBASE` para que encuentre numpy/opencv.

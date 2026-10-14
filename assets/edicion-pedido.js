@@ -51,7 +51,8 @@ function schedule() {
   const o = state.order, uploading = Object.values(state.uploads).some(u => u.active);
   let wait = 0;
   if (o.status === 'awaiting_payment') wait = state.pollCount++ < 40 ? 2500 : 0;
-  else if (['paid', 'processing'].includes(o.status) || ['queued', 'processing'].includes(o.revisionStatus)) wait = 15000;
+  else if (['queued', 'processing'].includes(o.revisionStatus)) wait = 5000; // un cambio tarda ~1 min
+  else if (['paid', 'processing'].includes(o.status)) wait = 15000;
   if (wait && !uploading) state.pollTimer = setTimeout(() => refresh().catch(() => schedule()), wait);
 }
 
