@@ -3,6 +3,7 @@ import { json } from './backend.js';
 import { authContext, readJson, rpc, ApiError, apiError, UUID } from './generations.js';
 import { own, signed } from './studio.js';
 import { applyEdicionPayment } from './edicion-payment.js';
+import { getGuest, postGuest } from './edicion-guest.js';
 import { EDICION_PLANS, MAX_INSTRUCTIONS, MAX_REVISION_REQUEST, referenceUrl } from '../assets/edicion-plans.js';
 
 const ERRORS = {
@@ -14,6 +15,11 @@ const ERRORS = {
   EDICION_NOT_READY: [409, 'Tu video editado todavía no está listo.'],
   EDICION_REVISION_BUSY: [409, 'Ya estamos aplicando tus cambios. Espera a que termine esta versión.'],
   EDICION_REVISION_LIMIT: [429, 'Ya usaste todas las rondas de cambios de este video.'],
+  EDICION_NOT_PAID: [402, 'Todavía estamos confirmando tu pago. Espera unos segundos.'],
+  EDICION_MATERIAL_MISSING: [400, 'Falta tu video o el video que te gusta.'],
+  EDICION_ALREADY_SUBMITTED: [409, 'Tu pedido ya está en edición; ya no se puede cambiar el material.'],
+  EDICION_UPLOAD_INCOMPLETE: [409, 'Tu video no terminó de subirse. Vuelve a elegirlo para continuar.'],
+  IDEMPOTENCY_CONFLICT: [409, 'Ese pedido ya existe. Recarga la página.'],
   STUDIO_ASSET_NOT_FOUND: [404, 'Ese archivo no pertenece a tu cuenta o no es un video MP4.'],
   STUDIO_NOT_FOUND: [404, 'No encontramos ese pedido en tu cuenta.'],
 };
@@ -83,10 +89,16 @@ export async function reconcilePayments(db, env, orders, stripe = stripeClient(e
   return changed;
 }
 
+// Pedidos sin cuenta (página privada) y configuración pública; el resto exige sesión.
+const GUEST_ACTIONS = new Set(['start', 'recover', 'part', 'parts', 'material', 'submit', 'revision']);
+const guestOptions = env => ({ enabled: edicionEnabled(env), stripeClient, reconcile: (db, rows) => reconcilePayments(db, env, rows) });
+
 export async function getEdicion(context) {
   try {
-    const { db, user } = await authContext(context);
     const url = new URL(context.request.url);
+    if (url.searchParams.has('config')) return json({ enabled: edicionEnabled(context.env), plans: EDICION_PLANS });
+    if (url.searchParams.has('o')) return await getGuest(context, url, guestOptions(context.env));
+    const { db, user } = await authContext(context);
     const reconcile = async rows => edicionEnabled(context.env) && await reconcilePayments(db, context.env, rows);
     if (url.searchParams.has('order')) {
       let o = await own(db, 'edicion_orders', user.id, url.searchParams.get('order'));
@@ -117,9 +129,14 @@ export function publicOrder(o) {
 
 export async function postEdicion(context) {
   try {
+    const body = await readJson(context.request, 8000);
+    // Un pedido ya pagado puede terminar de entregar su material aunque se pausen las ventas.
+    if (body?.token || context.request.headers.get('x-edicion-token')) {
+      if (!GUEST_ACTIONS.has(body?.action)) throw new ApiError('EDICION_INVALID');
+      return await postGuest(context, body, guestOptions(context.env));
+    }
     if (!edicionEnabled(context.env)) throw new ApiError('EDICION_DISABLED');
     const { db, user } = await authContext(context);
-    const body = await readJson(context.request, 8000);
     if (body?.action === 'revision') return json({ order: await requestRevision(db, user, body) }, 202);
     const { plan, orderId, data } = validateOrder(body);
     const order = await rpc(db, 'edicion_write', { p_user: user.id, p_action: 'create', p_id: orderId, p_data: data });

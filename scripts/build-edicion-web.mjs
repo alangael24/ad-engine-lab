@@ -2,10 +2,11 @@
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EDICION_ASSETS } from '../workers/edicion-web.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const out = resolve(root, 'dist-edicion');
 await rm(out, { recursive: true, force: true });
 await mkdir(resolve(out, 'assets'), { recursive: true });
 await cp(resolve(root, 'edicion'), resolve(out, 'edicion'), { recursive: true });
-for (const f of ['edicion.js', 'edicion.css', 'edicion-plans.js']) await cp(resolve(root, 'assets', f), resolve(out, 'assets', f));
+for (const f of EDICION_ASSETS) await cp(resolve(root, 'assets', f), resolve(out, 'assets', f));

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#faf9f5" />
     <title>Edita tu video como el que te gusta | CreativeRush AI</title>
-    <meta name="description" content="Adjunta tu video, pega el link del que te gusta y te lo devolvemos editado en ese estilo." />
+    <meta name="description" content="Paga, mándanos tu video y el que te gusta, y te lo devolvemos editado en ese estilo. Sin crear cuenta." />
     <link rel="canonical" href="https://creativerushai.com/edicion/" />
     <meta property="og:title" content="Edita tu video como el que te gusta | CreativeRush AI" />
-    <meta property="og:description" content="Adjunta tu video, pega el link del que te gusta y te lo devolvemos editado en ese estilo." />
+    <meta property="og:description" content="Paga, mándanos tu video y el que te gusta, y te lo devolvemos editado en ese estilo. Sin crear cuenta." />
     <meta property="og:image" content="https://creativerushai.com/assets/creative-rush-profile.png" />
     <link rel="icon" href="/assets/favicon.png" />
     <link rel="stylesheet" href="/assets/edicion.css" />
@@ -18,34 +18,32 @@
   <body>
     <header class="ed-top">
       <a class="ed-logo" href="/" aria-label="CreativeRush">Creative<span>Rush</span></a>
-      <button type="button" class="ed-ghost" data-logout hidden>Salir</button>
     </header>
 
     <main class="ed">
       <p class="ed-banner" data-banner hidden></p>
-      <h1><span class="ed-mark" aria-hidden="true">✦</span> <span data-greeting>¿Qué video editamos hoy?</span></h1>
+      <h1><span class="ed-mark" aria-hidden="true">✦</span> Edita tu video como el que te gusta</h1>
+      <p class="ed-lead">Paga, mándanos tu video y el que te gusta, y te lo devolvemos editado en ese estilo. Sin crear cuenta.</p>
 
-      <form class="ed-box" data-composer>
-        <ul class="ed-chips" data-chips></ul>
-        <label class="ed-sr" for="ed-input" data-input-label>Mensaje</label>
-        <textarea id="ed-input" data-input rows="2" maxlength="2000"
-          placeholder="Pega el link de un video que te guste y dime qué quieres…"></textarea>
-        <div class="ed-bar">
-          <label class="ed-plus" title="Adjuntar tu video" data-plus>
-            <input type="file" accept="video/mp4" data-file />
-            <span aria-hidden="true">+</span><span class="ed-sr">Adjuntar video</span>
-          </label>
-          <span class="ed-hint" data-hint>Adjunta tu video</span>
-          <span class="ed-price" data-price>$399 MXN</span>
-          <button class="ed-send" type="submit" data-send disabled aria-label="Enviar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+      <ol class="ed-steps">
+        <li><b>1</b><span>Pagas en Stripe</span></li>
+        <li><b>2</b><span>Subes tu video y el que te gusta</span></li>
+        <li><b>3</b><span>Lo recibes editado y pides cambios</span></li>
+      </ol>
+
+      <section class="ed-card">
+        <div class="ed-card-head">
+          <h2 data-plan-name>Edición Pro</h2>
+          <p class="ed-card-price"><s data-plan-regular hidden></s> <strong data-plan-price></strong></p>
         </div>
-      </form>
+        <ul class="ed-features" data-plan-features></ul>
+        <button type="button" class="ed-cta" data-start disabled>Empezar</button>
+        <p class="ed-fine" data-start-note>Pago seguro con Stripe. Después del pago subes tu material desde tu celular.</p>
+      </section>
       <p class="ed-status" data-status role="status"></p>
 
       <section class="ed-orders" data-orders hidden>
-        <h2>Tus videos</h2>
+        <h2>Tus pedidos en este dispositivo</h2>
         <ul data-order-list></ul>
       </section>
     </main>

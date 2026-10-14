@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#faf9f5" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Tu pedido | CreativeRush AI</title>
+    <link rel="icon" href="/assets/favicon.png" />
+    <link rel="stylesheet" href="/assets/edicion.css" />
+    <script defer src="/assets/meta-pixel.js"></script>
+    <script type="module" src="/assets/edicion-pedido.js"></script>
+  </head>
+  <body>
+    <header class="ed-top">
+      <a class="ed-logo" href="/edicion/" aria-label="CreativeRush">Creative<span>Rush</span></a>
+      <button type="button" class="ed-ghost" data-copy-link hidden>Copiar mi enlace</button>
+    </header>
+
+    <main class="ed ed-pedido">
+      <h1 data-title>Cargando tu pedido…</h1>
+      <p class="ed-lead" data-lead></p>
+
+      <!-- Pagado: entrega del material -->
+      <form class="ed-steps-form" data-material hidden>
+        <section class="ed-step" data-step="reference">
+          <h2><b>1</b> El video que te gusta</h2>
+          <div class="ed-done" data-done="reference" hidden><span>✓</span><small data-done-name="reference"></small><button type="button" class="ed-link" data-change="reference">Cambiar</button></div>
+          <div class="ed-step-body" data-body="reference">
+            <input type="url" inputmode="url" data-ref-link placeholder="Pega el link de TikTok, Instagram o YouTube" autocomplete="off" />
+            <label class="ed-file-link">o súbelo desde tu galería<input type="file" accept="video/*" data-file="reference" /></label>
+            <div class="ed-progress" data-progress="reference" hidden><i></i><small></small></div>
+          </div>
+        </section>
+
+        <section class="ed-step" data-step="source">
+          <h2><b>2</b> Tu video</h2>
+          <div class="ed-done" data-done="source" hidden><span>✓</span><small data-done-name="source"></small><button type="button" class="ed-link" data-change="source">Cambiar</button></div>
+          <div class="ed-step-body" data-body="source">
+            <label class="ed-pick">Elegir mi video<input type="file" accept="video/*" data-file="source" /></label>
+            <small class="ed-help">Hasta 3 minutos. Si se corta la señal, se reanuda solo.</small>
+            <div class="ed-progress" data-progress="source" hidden><i></i><small></small></div>
+          </div>
+          <p class="ed-check" data-check="source" hidden></p>
+        </section>
+
+        <section class="ed-step">
+          <h2><b>3</b> ¿Algo más? <small>(opcional)</small></h2>
+          <textarea data-instructions rows="3" maxlength="1500" placeholder="Qué cortar, qué resaltar, colores de tu marca…"></textarea>
+          <input type="text" data-names maxlength="300" placeholder="Nombres o marcas que dices en el video (para escribirlos bien)" autocomplete="off" />
+        </section>
+
+        <button type="submit" class="ed-cta" data-submit disabled>Enviar a edición</button>
+      </form>
+
+      <!-- En cola o editando -->
+      <ol class="ed-track" data-track hidden>
+        <li data-track-step="received">Recibimos tu material</li>
+        <li data-track-step="editing">Editando en el estilo de tu referencia</li>
+        <li data-track-step="ready">Listo para ver</li>
+      </ol>
+
+      <!-- Entregado -->
+      <section class="ed-result" data-result hidden>
+        <video data-player controls playsinline preload="metadata"></video>
+        <div class="ed-versions" data-versions></div>
+        <div class="ed-result-actions">
+          <a class="ed-cta" data-download href="#">Descargar</a>
+          <button type="button" class="ed-ghost ed-ghost-lg" data-share hidden>Compartir</button>
+        </div>
+
+        <form class="ed-changes" data-changes>
+          <h2>¿Quieres cambiar algo?</h2>
+          <div class="ed-quick" data-quick></div>
+          <textarea data-change-text rows="3" maxlength="1000" placeholder="Cuéntanos qué cambiar. Puedes marcar el momento del video."></textarea>
+          <div class="ed-changes-bar">
+            <button type="button" class="ed-tool" data-mark>📍 Marcar 0:00</button>
+            <button type="button" class="ed-tool" data-voice hidden>🎙️ Dictar</button>
+            <small data-rounds></small>
+            <button type="submit" class="ed-send-text" data-send-change>Enviar cambios</button>
+          </div>
+        </form>
+        <p class="ed-applying" data-applying hidden>Aplicando tus cambios… suele tardar unos 5 minutos. Te dejamos aquí la nueva versión.</p>
+      </section>
+
+      <p class="ed-status" data-status role="status"></p>
+      <p class="ed-keep" data-keep hidden>Guarda tu enlace privado para volver a tu pedido desde cualquier dispositivo. <button type="button" class="ed-link" data-copy-link>Copiar enlace</button></p>
+    </main>
+  </body>
+</html>

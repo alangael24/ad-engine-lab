@@ -3,20 +3,36 @@ import { getSupabaseAdmin, json } from '../../src/backend.js';
 import { readJson, rpc, UUID, ApiError } from '../../src/generations.js';
 import { own, signed } from '../../src/studio.js';
 import { edicionError } from '../../src/edicion.js';
+import { MATERIAL_BUCKET, partPath, resultOwner } from '../../src/edicion-guest.js';
 
 // Worker de edición: toma pedidos pagados (kind "order") o rondas de cambios (kind "revision"),
 // recibe URLs firmadas y entrega el MP4. Ambos usan lease con heartbeat.
 const KINDS = {
-  order: { table: 'edicion_orders', rpc: 'edicion_work', path: o => `${o.user_id}/edicion/${o.id}.mp4`,
-    project: o => projectPath(o.user_id, o.id, 1) },
-  revision: { table: 'edicion_revisions', rpc: 'edicion_revision_work', path: r => `${r.user_id}/edicion/${r.order_id}_v${r.version}.mp4`,
-    project: r => projectPath(r.user_id, r.order_id, r.version) },
+  order: { table: 'edicion_orders', rpc: 'edicion_work', path: o => `${resultOwner(o)}/edicion/${o.id}.mp4`,
+    project: o => projectPath(resultOwner(o), o.id, 1) },
+  revision: { table: 'edicion_revisions', rpc: 'edicion_revision_work', path: r => `${resultOwner(r)}/edicion/${r.order_id}_v${r.version}.mp4`,
+    project: r => projectPath(resultOwner(r), r.order_id, r.version) },
 };
 // Proyecto de cada versión (receta, script, imágenes) para aplicar cambios en cualquier servidor.
 const PROJECT_BUCKET = 'edicion-proyectos';
 const projectPath = (userId, orderId, version) => `${userId}/${orderId}/proyecto_v${version}.tar.gz`;
 
+// Material subido por partes desde la página privada: una URL firmada por parte, en una sola petición.
+async function uploaded(db, order, kind) {
+  const up = order[`${kind}_upload`];
+  const paths = Array.from({ length: up.parts }, (_, i) => partPath(order.id, kind, i));
+  const { data, error } = await db.storage.from(MATERIAL_BUCKET).createSignedUrls(paths, 3600);
+  if (error) throw error;
+  if (data.length !== paths.length || data.some(d => d.error || !d.signedUrl)) throw new ApiError('RESULT_NOT_READY');
+  return { name: up.name, durationSeconds: up.durationSeconds, size: up.size, parts: data.map(d => d.signedUrl) };
+}
+
 async function materials(db, order) {
+  if (order.source_upload) {
+    return { source: await uploaded(db, order, 'source'),
+      reference: order.reference_upload ? await uploaded(db, order, 'reference') : { link: order.reference_url },
+      names: order.names || '' };
+  }
   const source = await own(db, 'studio_assets', order.user_id, order.source_asset_id);
   const reference = order.reference_asset_id ? await own(db, 'studio_assets', order.user_id, order.reference_asset_id) : null;
   return {
@@ -43,8 +59,11 @@ export async function onRequestPost(context) {
         return json({ job: { id: claimed.id, leaseToken: claimed.lease_token, plan: claimed.plan, instructions: claimed.instructions,
           attempt: claimed.attempts, ...(await materials(db, claimed)) } });
       }
-      const order = await own(db, 'edicion_orders', claimed.user_id, claimed.order_id);
-      const previous = projectPath(order.user_id, order.id, claimed.previousVersion);
+      const q = await db.from('edicion_orders').select('*').eq('id', claimed.order_id).maybeSingle();
+      if (q.error) throw q.error;
+      const order = q.data;
+      if (!order) throw new ApiError('EDICION_NOT_FOUND');
+      const previous = projectPath(resultOwner(order), order.id, claimed.previousVersion);
       const info = await db.storage.from(PROJECT_BUCKET).info(previous);
       const project = !info.error && info.data ? { url: await signed(db, PROJECT_BUCKET, previous) } : null;
       return json({ job: { id: claimed.id, orderId: claimed.order_id, leaseToken: claimed.lease_token, plan: claimed.plan,

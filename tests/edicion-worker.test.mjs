@@ -4,7 +4,7 @@ import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {buildPrompt,buildRevisionPrompt,agentEnv,startProviderProxy,processOrder,processRevision,run,PLAN_LIMITS} from '../workers/edicion-worker.mjs';
+import {buildPrompt,buildRevisionPrompt,agentEnv,startProviderProxy,processOrder,processRevision,run,PLAN_LIMITS,fetchMaterial} from '../workers/edicion-worker.mjs';
 import {copyFile,mkdir} from 'node:fs/promises';
 
 const hasFfmpeg=(()=>{try{execFileSync('ffmpeg',['-version'],{stdio:'ignore'});return true;}catch{return false;}})();
@@ -169,4 +169,15 @@ test('cambios sin disco: el worker restaura el proyecto desde Storage y usa Haik
   assert.equal(r.status,'delivered');assert.deepEqual(models,['claude-haiku-5-5'],'no hizo falta Opus');assert.equal(r.costUsd,0.01);
   assert.deepEqual(puts,['video/mp4','application/gzip'],'sube el video y el proyecto de la versión 2');
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('material por partes: se descargan en orden, se unen y se respeta el límite',async()=>{
+ const dir=await mkdtemp(resolve(tmpdir(),'partes-')),file=resolve(dir,'fuente.mp4');
+ const parts={'https://x.test/000':'AAA','https://x.test/001':'BB','https://x.test/002':'C'};
+ const fetchImpl=async url=>parts[url]?new Response(parts[url]):new Response('no',{status:404});
+ await fetchMaterial({parts:Object.keys(parts)},file,fetchImpl);
+ assert.equal(await readFile(file,'utf8'),'AAABBC');
+ await assert.rejects(()=>fetchMaterial({parts:['https://x.test/000','https://x.test/404']},file,fetchImpl),/SOURCE_DOWNLOAD_FAILED/);
+ await assert.rejects(()=>fetchMaterial({parts:['http://otro.test/000']},file,fetchImpl),/HTTPS required/);
+ await rm(dir,{recursive:true,force:true});
 });

@@ -20,8 +20,13 @@ export const EDICION_PLANS = Object.freeze({
 
 export const MAX_INSTRUCTIONS = 1500;
 export const MAX_REVISION_REQUEST = 1000;
-export const MAX_VIDEO_BYTES = 52428800;
+export const MAX_VIDEO_BYTES = 52428800; // subida antigua en un solo archivo (cuentas con sesión)
 export const MAX_VIDEO_SECONDS = 180;
+// Subida por partes desde la página privada del pedido: se reanuda si se corta la señal.
+export const PART_BYTES = 8388608;
+export const MAX_UPLOAD_BYTES = 629145600; // 600 MB
+export const MAX_PARTS = Math.ceil(MAX_UPLOAD_BYTES / PART_BYTES);
+export const MAX_NAMES = 300;
 
 const REFERENCE_HOSTS = ['tiktok.com', 'instagram.com', 'youtube.com', 'youtu.be', 'facebook.com', 'fb.watch', 'x.com', 'twitter.com', 'vimeo.com'];
 
@@ -36,6 +41,7 @@ export function referenceUrl(value) {
 
 export const ORDER_STATUS = Object.freeze({
   awaiting_payment: 'Pendiente de pago',
+  awaiting_material: 'Esperando tu material',
   paid: 'En cola',
   processing: 'Editando',
   delivered: 'Entregado',

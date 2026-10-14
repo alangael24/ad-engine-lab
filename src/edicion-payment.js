@@ -14,6 +14,7 @@ export async function applyEdicionPayment(db, event, session) {
     p_order_id: orderId,
     p_amount_total: session.amount_total || 0,
     p_currency: String(session.currency || ''),
+    p_email: session.customer_details?.email || session.customer_email || null,
   });
   if (result?.duplicatePayment) console.error('edicion_duplicate_payment', orderId, session.id);
   return result;

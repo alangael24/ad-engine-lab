@@ -14,22 +14,32 @@ import { getSupabaseAdmin } from '../src/backend.js';
 
 const migration = new URL('../supabase/migrations/20261014030000_edicion_orders.sql', import.meta.url);
 const revisions = new URL('../supabase/migrations/20261014040000_edicion_revisions.sql', import.meta.url);
+const pagoPrimero = new URL('../supabase/migrations/20261014050000_edicion_pago_primero.sql', import.meta.url);
 const env = { SUPABASE_URL: 'http://supabase.test', SUPABASE_SERVICE_ROLE_KEY: 'test-server-key', EDICION_ENABLED: 'true',
   STRIPE_SECRET_KEY: 'sk_test_only', STRIPE_WEBHOOK_SECRET: 'whsec_test_only', APP_URL: 'https://app.test',
   EDICION_WORKER_TOKEN: 'local-edicion-worker-secret-not-a-real-key-123' };
 let db, stub, originalFetch, stripeCalls;
+const stripeSessions = new Map();
 
 before(async () => {
-  db = await database(); await db.exec(await readFile(migration, 'utf8')); await db.exec(await readFile(revisions, 'utf8'));
+  db = await database(); await db.exec(await readFile(migration, 'utf8')); await db.exec(await readFile(revisions, 'utf8')); await db.exec(await readFile(pagoPrimero, 'utf8'));
   stub = mockSupabase(db); originalFetch = globalThis.fetch; stripeCalls = [];
   // Stripe no se contacta en tests: se responde una sesión de Checkout falsa y se registra la petición.
   globalThis.fetch = async (input, options = {}) => {
     const request = input instanceof Request ? input : new Request(input, options);
     if (new URL(request.url).hostname === 'api.stripe.com') {
+      const headers = { 'content-type': 'application/json', 'request-id': 'req_test' };
+      if (request.method === 'GET') {
+        const found = stripeSessions.get(new URL(request.url).pathname.split('/').pop());
+        return new Response(JSON.stringify(found || { error: { message: 'No such checkout session', type: 'invalid_request_error' } }), { status: found ? 200 : 404, headers });
+      }
       const body = new URLSearchParams(await request.text());
       stripeCalls.push({ body, idempotency: request.headers.get('idempotency-key') });
       const id = `cs_test_${body.get('metadata[order_id]').slice(0, 8)}`;
-      return new Response(JSON.stringify({ id, object: 'checkout.session', url: `https://checkout.stripe.test/${id}` }), { status: 200, headers: { 'content-type': 'application/json', 'request-id': 'req_test' } });
+      const session = { id, object: 'checkout.session', url: `https://checkout.stripe.test/${id}`, payment_status: 'unpaid', currency: 'mxn',
+        amount_total: Number(body.get('line_items[0][price_data][unit_amount]')), metadata: { kind: body.get('metadata[kind]'), order_id: body.get('metadata[order_id]') } };
+      stripeSessions.set(id, { ...session, ...stripeSessions.get(id) });
+      return new Response(JSON.stringify(session), { status: 200, headers });
     }
     return stub.fetch(request);
   };
@@ -271,11 +281,103 @@ test('Worker de /edicion/: solo atiende su página, sus assets y sus APIs', asyn
   const page = await go('/edicion/?pedido=1');
   assert.equal(page.status, 200); assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await go('/assets/edicion.js')).status, 200);
-  assert.deepEqual(served, ['/edicion/', '/assets/edicion.js']);
+  assert.deepEqual(served.slice(0, 2), ['/edicion/', '/assets/edicion.js']);
   assert.equal((await go('/assets/edicion-secreto.js')).status, 404);
   assert.equal((await go('/edicionx')).status, 404);
+  assert.equal((await go('/edicion/p/?o=1')).status, 200);
+  assert.equal((await go('/edicion/p/')).headers.get('referrer-policy'), 'no-referrer');
+  assert.equal((await go('/edicion/p')).status, 308);
+  assert.equal((await go('/assets/edicion-pedido.js')).status, 200);
   assert.equal((await go('/edicion/', { method: 'POST' })).status, 405);
   assert.equal((await go('/api/edicion')).status, 401, 'la API exige sesión');
   assert.equal((await go('/api/edicion', { method: 'DELETE' })).status, 405);
   assert.equal((await go('/api/edicion-worker', { method: 'POST', body: '{}' })).status, 401, 'el worker exige su token');
+});
+
+test('sin cuenta: pagar primero, subir por partes, enviar, entregar, cambios y recuperar el enlace', async () => {
+  const { PART_BYTES } = await import('../assets/edicion-plans.js');
+  const newToken = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  const token = newToken(), orderId = crypto.randomUUID();
+  const guest = (resource, method = 'GET', body, t = token) => new Request(`https://app.test${resource}`, {
+    method, headers: { 'x-edicion-token': t, ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const post = (body, t) => edicion.onRequestPost({ env, params: {}, request: guest('/api/edicion', 'POST', { orderId, ...body }, t) });
+  const get = (q = '', t) => edicion.onRequestGet({ env, params: {}, request: guest(`/api/edicion?o=${orderId}${q}`, 'GET', undefined, t) });
+
+  // Configuración pública y arranque del pago sin sesión.
+  assert.equal((await (await edicion.onRequestGet({ env, params: {}, request: new Request('https://app.test/api/edicion?config=1') })).json()).enabled, true);
+  const started = await post({ action: 'start', plan: 'pro' });
+  assert.equal(started.status, 201);
+  assert.match((await started.json()).checkoutUrl, /^https:\/\/checkout\.stripe\.test\//);
+  const call0 = stripeCalls.at(-1);
+  assert.equal(call0.body.get('success_url'), `https://app.test/edicion/p/?o=${orderId}&s={CHECKOUT_SESSION_ID}`);
+  assert.equal(call0.body.get('customer_email'), null);
+  assert.equal(call0.body.get('line_items[0][price_data][unit_amount]'), '39900');
+  assert.equal((await post({ action: 'start', plan: 'pro' })).status, 201, 'reintento idempotente');
+  assert.equal((await post({ action: 'start', plan: 'pro' }, newToken())).status, 409, 'otra llave no toma el pedido');
+
+  assert.equal((await (await get()).json()).order.status, 'awaiting_payment');
+  assert.equal((await get('', newToken())).status, 404);
+  assert.equal((await post({ action: 'submit' })).status, 402);
+
+  // Stripe confirma el pago: el pedido espera el material (no entra a la cola todavía).
+  const sessionId = `cs_test_${orderId.slice(0, 8)}`;
+  Object.assign(stripeSessions.get(sessionId), { payment_status: 'paid', customer_details: { email: 'cliente@correo.test' } });
+  assert.equal((await (await get()).json()).order.status, 'awaiting_material');
+  assert.equal((await db.query('select email from edicion_orders where id=$1', [orderId])).rows[0].email, 'cliente@correo.test');
+  const claimMine = async () => { for (let i = 0; i < 10; i++) { const j = (await (await runWorker({ action: 'claim' })).json()).job; if (!j || j.id === orderId) return j; } };
+  assert.equal(await claimMine(), null, 'sin material no hay trabajo');
+  assert.equal((await post({ action: 'submit' })).status, 400);
+
+  // Referencia por enlace; video propio por partes (la última parte es más chica).
+  assert.equal((await post({ action: 'material', kind: 'reference', referenceUrl: 'https://evil.com/x' })).status, 400);
+  assert.equal((await post({ action: 'material', kind: 'reference', referenceUrl: 'https://www.tiktok.com/@a/video/1' })).status, 200);
+  const size = PART_BYTES + 1000;
+  assert.equal((await post({ action: 'part', kind: 'source', index: 0, size: PART_BYTES + 1 })).status, 400);
+  const p0 = await (await post({ action: 'part', kind: 'source', index: 0, size: PART_BYTES })).json();
+  await fetch(p0.url, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(PART_BYTES) });
+  const upload = { name: 'mi video.mov', size, parts: 2, durationSeconds: 42.5, width: 1080, height: 1920, hasAudio: true };
+  assert.equal((await post({ action: 'material', kind: 'source', upload })).status, 409, 'falta la segunda parte');
+  assert.deepEqual((await (await post({ action: 'parts', kind: 'source' })).json()).parts, [{ index: 0, size: PART_BYTES }], 'para reanudar');
+  const p1 = await (await post({ action: 'part', kind: 'source', index: 1, size: 1000 })).json();
+  await fetch(p1.url, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(1000) });
+  assert.equal((await post({ action: 'material', kind: 'source', upload: { ...upload, durationSeconds: 999 } })).status, 400);
+  const withSource = await (await post({ action: 'material', kind: 'source', upload })).json();
+  assert.equal(withSource.order.sourceName, 'mi video.mov');
+
+  const sent = await post({ action: 'submit', instructions: 'Más dinámico', names: 'Stock Charts Academy' });
+  assert.equal(sent.status, 202); assert.equal((await sent.json()).order.status, 'paid');
+  assert.equal((await post({ action: 'submit' })).status, 202, 'reintento: sigue en cola');
+  assert.equal((await post({ action: 'material', kind: 'reference', referenceUrl: 'https://youtu.be/x' })).status, 409, 'ya no se cambia el material');
+
+  // El worker recibe las partes firmadas, el enlace de referencia y los nombres; entrega bajo "invitados".
+  const job = await claimMine();
+  assert.equal(job.id, orderId); assert.equal(job.source.parts.length, 2); assert.match(job.source.parts[1], new RegExp(`${orderId}/source/001`));
+  assert.equal(job.reference.link, 'https://www.tiktok.com/@a/video/1'); assert.equal(job.names, 'Stock Charts Academy');
+  const up = await (await runWorker({ action: 'upload', jobId: job.id, leaseToken: job.leaseToken })).json();
+  assert.match(up.url, new RegExp(`invitados/edicion/${orderId}\\.mp4`));
+  stub.media.set(`studio-media/invitados/edicion/${orderId}.mp4`, { size: 2048, contentType: 'video/mp4' });
+  assert.equal((await (await runWorker({ action: 'finish', jobId: job.id, leaseToken: job.leaseToken, result: { status: 'delivered' } })).json()).status, 'delivered');
+
+  const delivered = await (await get()).json();
+  assert.equal(delivered.order.status, 'delivered'); assert.deepEqual(delivered.versions.map(v => v.version), [1]);
+  assert.match((await (await get('&video=1&download=1')).json()).url, new RegExp(`invitados/edicion/${orderId}\\.mp4`));
+
+  // Cambios desde el enlace: nueva versión v2 y ambas versiones disponibles.
+  const revisionId = crypto.randomUUID();
+  assert.equal((await post({ action: 'revision', revisionId, request: '[0:12] subtítulos más grandes' })).status, 202);
+  assert.equal((await post({ action: 'revision', revisionId, request: '[0:12] subtítulos más grandes' })).status, 202, 'idempotente');
+  const rj = (await (await runWorker({ action: 'claim', kind: 'revision' })).json()).job;
+  assert.equal(rj.orderId, orderId); assert.equal(rj.version, 2); assert.equal(rj.source.parts.length, 2);
+  stub.media.set(`studio-media/invitados/edicion/${orderId}_v2.mp4`, { size: 2048, contentType: 'video/mp4' });
+  await runWorker({ kind: 'revision', action: 'finish', jobId: rj.id, leaseToken: rj.leaseToken, result: { status: 'delivered' } });
+  const after = await (await get()).json();
+  assert.equal(after.order.version, 2); assert.deepEqual(after.versions.map(v => v.version), [1, 2]);
+  assert.match((await (await get('&video=1&version=1')).json()).url, new RegExp(`${orderId}\\.mp4`));
+
+  // Otro navegador: la sesión pagada de Stripe emite una llave nueva y la anterior deja de servir.
+  const other = newToken();
+  assert.equal((await post({ action: 'recover', sessionId: 'cs_test_inventada' }, other)).status, 404);
+  assert.equal((await post({ action: 'recover', sessionId }, other)).status, 200);
+  assert.equal((await get('', other)).status, 200);
+  assert.equal((await get()).status, 404);
 });
