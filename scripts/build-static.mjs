@@ -15,6 +15,7 @@ const staticEntries = [
   "videos",
   "herramienta",
   "estudio",
+  "edicion",
   "cuenta",
   "planes",
   "campus",

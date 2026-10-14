@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Uso: transcribir <audio.wav> > palabras.json — pide la transcripción al proxy del worker (sin ver llaves)."""
+import json, os, sys, urllib.request
+if len(sys.argv) != 2: sys.exit("uso: transcribir <audio.wav>")
+data = open(sys.argv[1], "rb").read()
+req = urllib.request.Request(os.environ["EDICION_PROXY_URL"] + "/transcribir", data=data, method="POST",
+                             headers={"x-proxy-secret": os.environ["EDICION_PROXY_SECRET"], "content-type": "audio/wav"})
+with urllib.request.urlopen(req, timeout=330) as r:
+    sys.stdout.write(json.dumps(json.load(r), ensure_ascii=False))

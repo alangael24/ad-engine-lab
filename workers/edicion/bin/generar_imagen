@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Uso: generar_imagen "<prompt>" <salida.png> [1024x1024|1024x1536|1536x1024] — pide la imagen al proxy del worker."""
+import json, os, sys, urllib.request, urllib.error
+if len(sys.argv) not in (3, 4): sys.exit('uso: generar_imagen "<prompt>" <salida.png> [tamaño]')
+body = json.dumps({"prompt": sys.argv[1], "size": sys.argv[3] if len(sys.argv) == 4 else "1024x1024"}).encode()
+req = urllib.request.Request(os.environ["EDICION_PROXY_URL"] + "/imagen", data=body, method="POST",
+                             headers={"x-proxy-secret": os.environ["EDICION_PROXY_SECRET"], "content-type": "application/json"})
+try:
+    with urllib.request.urlopen(req, timeout=200) as r:
+        open(sys.argv[2], "wb").write(r.read())
+    print("ok", sys.argv[2])
+except urllib.error.HTTPError as e:
+    sys.exit(f"error {e.code}: {e.read().decode()[:200]}")
