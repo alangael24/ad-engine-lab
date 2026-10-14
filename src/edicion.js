@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { json } from './backend.js';
 import { authContext, readJson, rpc, ApiError, apiError, UUID } from './generations.js';
 import { own, signed } from './studio.js';
+import { applyEdicionPayment } from './edicion-payment.js';
 import { EDICION_PLANS, MAX_INSTRUCTIONS, MAX_REVISION_REQUEST, referenceUrl } from '../assets/edicion-plans.js';
 
 const ERRORS = {
@@ -65,21 +66,45 @@ export function checkoutParams(order, plan, user, appUrl) {
   };
 }
 
+// Confirma pagos consultando la sesión en Stripe (no depende del webhook del sitio principal).
+// Es idempotente: edicion_payment solo cambia pedidos que siguen en awaiting_payment.
+export async function reconcilePayments(db, env, orders, stripe = stripeClient(env)) {
+  const pending = orders.filter(o => o.status === 'awaiting_payment' && o.checkout_session_id
+    && Date.now() - Date.parse(o.created_at) < 3 * 864e5).slice(0, 5);
+  let changed = false;
+  for (const o of pending) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(o.checkout_session_id);
+      if (session.payment_status !== 'paid' || session.metadata?.kind !== 'edicion' || session.metadata?.order_id !== o.id) continue;
+      const r = await applyEdicionPayment(db, { id: `reconcile:${session.id}` }, session);
+      changed ||= Boolean(r?.applied);
+    } catch (error) { console.error('edicion_reconcile_failed', o.id, error?.message); }
+  }
+  return changed;
+}
+
 export async function getEdicion(context) {
   try {
     const { db, user } = await authContext(context);
     const url = new URL(context.request.url);
+    const reconcile = async rows => edicionEnabled(context.env) && await reconcilePayments(db, context.env, rows);
     if (url.searchParams.has('order')) {
-      const o = await own(db, 'edicion_orders', user.id, url.searchParams.get('order'));
+      let o = await own(db, 'edicion_orders', user.id, url.searchParams.get('order'));
+      if (await reconcile([o])) o = await own(db, 'edicion_orders', user.id, o.id);
       if (url.searchParams.has('download')) {
         if (o.status !== 'delivered' || !o.result_path) throw new ApiError('EDICION_NOT_READY');
         return json({ url: await signed(db, 'studio-media', o.result_path, true) });
       }
       return json({ order: publicOrder(o) });
     }
-    const { data, error } = await db.from('edicion_orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30);
-    if (error) throw error;
-    return json({ orders: data.map(publicOrder), enabled: edicionEnabled(context.env), plans: EDICION_PLANS });
+    const list = async () => {
+      const { data, error } = await db.from('edicion_orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30);
+      if (error) throw error;
+      return data;
+    };
+    let rows = await list();
+    if (await reconcile(rows)) rows = await list();
+    return json({ orders: rows.map(publicOrder), enabled: edicionEnabled(context.env), plans: EDICION_PLANS });
   } catch (error) { return edicionError(error); }
 }
 

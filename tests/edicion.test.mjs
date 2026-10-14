@@ -8,7 +8,9 @@ import * as edicion from '../functions/api/edicion.js';
 import * as edicionWorker from '../functions/api/edicion-worker.js';
 import * as webhook from '../functions/api/stripe/webhook.js';
 import { EDICION_PLANS, referenceUrl } from '../assets/edicion-plans.js';
-import { validateOrder, checkoutParams } from '../src/edicion.js';
+import { validateOrder, checkoutParams, reconcilePayments } from '../src/edicion.js';
+import edicionWeb from '../workers/edicion-web.mjs';
+import { getSupabaseAdmin } from '../src/backend.js';
 
 const migration = new URL('../supabase/migrations/20261014030000_edicion_orders.sql', import.meta.url);
 const revisions = new URL('../supabase/migrations/20261014040000_edicion_revisions.sql', import.meta.url);
@@ -226,4 +228,54 @@ test('API de cambios: el cliente pide, el worker aplica y la descarga da la vers
   assert.equal((await (await runWorker({ kind: 'revision', action: 'finish', jobId: job.id, leaseToken: job.leaseToken, result: { status: 'delivered' } })).json()).status, 'delivered');
   const dl = await (await edicion.onRequestGet(ctx(`/api/edicion?order=${id}&download=1`, 'alice-rev'))).json();
   assert.match(dl.url, new RegExp(`${id}_v2\\.mp4`));
+});
+
+test('pago sin webhook: al consultar, se confirma con Stripe solo si la sesión está pagada y es de ese pedido', async () => {
+  const a = await user(db); stub.users.set('carol', a);
+  const mk = async () => {
+    const r = await edicion.onRequestPost(ctx('/api/edicion', 'carol', 'POST', { orderId: crypto.randomUUID(), plan: 'basico', sourceAssetId: await clip(a), referenceUrl: 'https://youtu.be/abc' }));
+    return (await r.json()).order;
+  };
+  const paid = await mk(), unpaid = await mk(), other = await mk(), cheap = await mk();
+  const rows = async () => (await db.query('select * from edicion_orders where user_id=$1 order by created_at desc', [a.id])).rows.map(r => ({ ...r, created_at: new Date(r.created_at).toISOString() }));
+  const sessions = {};
+  for (const r of await rows()) {
+    const o = { id: r.checkout_session_id, payment_status: 'paid', amount_total: 29900, currency: 'mxn', metadata: { kind: 'edicion', order_id: r.id } };
+    if (r.id === unpaid.id) o.payment_status = 'unpaid';
+    if (r.id === other.id) o.metadata.order_id = paid.id; // sesión de otro pedido: se ignora
+    if (r.id === cheap.id) o.amount_total = 100; // monto alterado: la base lo rechaza
+    sessions[r.checkout_session_id] = o;
+  }
+  const retrieved = [];
+  const stripe = { checkout: { sessions: { retrieve: async id => { retrieved.push(id); return sessions[id]; } } } };
+  const admin = getSupabaseAdmin(env);
+  assert.equal(await reconcilePayments(admin, env, await rows(), stripe), true);
+  const status = Object.fromEntries((await rows()).map(r => [r.id, r.status]));
+  assert.equal(status[paid.id], 'paid');
+  assert.equal(status[unpaid.id], 'awaiting_payment');
+  assert.equal(status[other.id], 'awaiting_payment');
+  assert.equal(status[cheap.id], 'awaiting_payment');
+  // Repetir no cambia nada ni vuelve a consultar el pedido ya pagado.
+  const paidSession = (await rows()).find(r => r.id === paid.id).checkout_session_id;
+  retrieved.length = 0;
+  assert.equal(await reconcilePayments(admin, env, await rows(), stripe), false);
+  assert.equal(retrieved.length, 3); assert.ok(!retrieved.includes(paidSession));
+  assert.equal((await rows()).filter(r => r.status === 'paid').length, 1);
+});
+
+test('Worker de /edicion/: solo atiende su página, sus assets y sus APIs', async () => {
+  const served = [];
+  const workerEnv = { ...env, ASSETS: { fetch: async req => { served.push(new URL(req.url).pathname); return new Response('ok', { headers: { 'content-type': 'text/html' } }); } } };
+  const go = (path, init) => edicionWeb.fetch(new Request('https://creativerushai.com' + path, init), workerEnv, { waitUntil() {} });
+  assert.equal((await go('/edicion')).status, 308);
+  const page = await go('/edicion/?pedido=1');
+  assert.equal(page.status, 200); assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal((await go('/assets/edicion.js')).status, 200);
+  assert.deepEqual(served, ['/edicion/', '/assets/edicion.js']);
+  assert.equal((await go('/assets/edicion-secreto.js')).status, 404);
+  assert.equal((await go('/edicionx')).status, 404);
+  assert.equal((await go('/edicion/', { method: 'POST' })).status, 405);
+  assert.equal((await go('/api/edicion')).status, 401, 'la API exige sesión');
+  assert.equal((await go('/api/edicion', { method: 'DELETE' })).status, 405);
+  assert.equal((await go('/api/edicion-worker', { method: 'POST', body: '{}' })).status, 401, 'el worker exige su token');
 });

@@ -1,0 +1,19 @@
+// Worker de /edicion/: se despliega aparte de Pages, como los Workers de regalos.
+//   node scripts/build-edicion-web.mjs && npx wrangler deploy -c wrangler.edicion.jsonc
+// Secretos: STRIPE_SECRET_KEY (llave restringida, solo Checkout Sessions), SUPABASE_SERVICE_ROLE_KEY, EDICION_WORKER_TOKEN.
+{
+ "name":"creativerush-edicion",
+ "main":"workers/edicion-web.mjs",
+ "account_id":"862ee97d4f753b862e4c4aed8dbf7286",
+ "compatibility_date":"2026-10-05",
+ "compatibility_flags":["nodejs_compat"],
+ "workers_dev":false,
+ "observability":{"enabled":true,"head_sampling_rate":0.1},
+ "routes":[
+  {"pattern":"creativerushai.com/edicion*","zone_name":"creativerushai.com"},
+  {"pattern":"creativerushai.com/api/edicion*","zone_name":"creativerushai.com"},
+  {"pattern":"creativerushai.com/assets/edicion*","zone_name":"creativerushai.com"}
+ ],
+ "assets":{"directory":"dist-edicion","binding":"ASSETS","run_worker_first":true},
+ "vars":{"APP_URL":"https://creativerushai.com","SUPABASE_URL":"https://ozkewphfxaohtihxmgoo.supabase.co","EDICION_ENABLED":"false"}
+}
